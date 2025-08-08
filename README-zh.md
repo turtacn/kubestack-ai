@@ -164,6 +164,164 @@ make test
 * 所有中间件项目维护者构建的出色工具
 * 让这个项目成为可能的所有贡献者
 
+
+## 代码架构设计
+
+
+```
+kubestack-ai/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   ├── release.yml
+│   │   └── security.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   └── plugin_request.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── CODEOWNERS
+├── cmd/
+│   └── ksai/
+│       └── main.go
+├── pkg/
+│   ├── cli/
+│   │   ├── root.go
+│   │   ├── diagnose.go
+│   │   ├── analyze.go
+│   │   ├── repair.go
+│   │   ├── config.go
+│   │   └── version.go
+│   ├── orchestrator/
+│   │   ├── orchestrator.go
+│   │   ├── workflow.go
+│   │   └── context.go
+│   ├── plugin/
+│   │   ├── interface.go
+│   │   ├── loader.go
+│   │   ├── registry.go
+│   │   └── manager.go
+│   ├── plugins/
+│   │   ├── redis/
+│   │   │   ├── redis.go
+│   │   │   ├── diagnostics.go
+│   │   │   └── config.go
+│   │   ├── kafka/
+│   │   │   ├── kafka.go
+│   │   │   ├── diagnostics.go
+│   │   │   └── config.go
+│   │   ├── postgres/
+│   │   │   ├── postgres.go
+│   │   │   ├── diagnostics.go
+│   │   │   └── config.go
+│   │   └── minio/
+│   │       ├── minio.go
+│   │       ├── diagnostics.go
+│   │       └── config.go
+│   ├── collector/
+│   │   ├── kubernetes.go
+│   │   ├── metrics.go
+│   │   └── logs.go
+│   ├── llm/
+│   │   ├── client.go
+│   │   ├── openai.go
+│   │   ├── claude.go
+│   │   └── prompts.go
+│   ├── config/
+│   │   ├── config.go
+│   │   ├── loader.go
+│   │   └── validation.go
+│   └── utils/
+│       ├── k8s.go
+│       ├── logger.go
+│       └── formatter.go
+├── internal/
+│   ├── server/
+│   │   ├── server.go
+│   │   ├── handlers.go
+│   │   └── middleware.go
+│   └── auth/
+│       ├── auth.go
+│       └── tokens.go
+├── configs/
+│   ├── config.yaml
+│   ├── plugins.yaml
+│   └── example/
+│       ├── basic-config.yaml
+│       └── advanced-config.yaml
+├── scripts/
+│   ├── build.sh
+│   ├── test.sh
+│   ├── install.sh
+│   └── release.sh
+├── docs/
+│   ├── architecture.md
+│   ├── plugins/
+│   │   ├── developing-plugins.md
+│   │   ├── redis-plugin.md
+│   │   ├── kafka-plugin.md
+│   │   ├── postgres-plugin.md
+│   │   └── minio-plugin.md
+│   ├── user-guide/
+│   │   ├── installation.md
+│   │   ├── getting-started.md
+│   │   ├── configuration.md
+│   │   └── troubleshooting.md
+│   ├── api/
+│   │   └── plugin-api.md
+│   └── examples/
+│       ├── basic-usage.md
+│       ├── advanced-scenarios.md
+│       └── integration-examples.md
+├── examples/
+│   ├── basic/
+│   │   ├── diagnose-redis.sh
+│   │   ├── analyze-kafka.sh
+│   │   └── repair-postgres.sh
+│   └── advanced/
+│       ├── multi-service-diagnosis.sh
+│       └── automated-health-check.sh
+├── test/
+│   ├── unit/
+│   │   ├── orchestrator_test.go
+│   │   ├── plugin_test.go
+│   │   └── collector_test.go
+│   ├── integration/
+│   │   ├── redis_integration_test.go
+│   │   ├── kafka_integration_test.go
+│   │   └── e2e_test.go
+│   └── fixtures/
+│       ├── mock-k8s-resources.yaml
+│       └── test-configs.yaml
+├── deployments/
+│   ├── kubernetes/
+│   │   ├── namespace.yaml
+│   │   ├── rbac.yaml
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── docker/
+│   │   ├── Dockerfile
+│   │   └── docker-compose.yaml
+│   └── helm/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── service.yaml
+│           └── configmap.yaml
+├── .gitignore
+├── .golangci.yml
+├── go.mod
+├── go.sum
+├── Makefile
+├── LICENSE
+├── README.md
+├── README-zh.md
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+└── SECURITY.md
+```
+
 ---
 
 <div align="center">
