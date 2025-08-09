@@ -210,7 +210,7 @@ KubeStack-AI实际运行效果：
 
 ![KubeStack-AI 演示](demo.gif)
 
-*要自己生成此演示，请运行：`./scripts/ksa-demo.sh`*
+*要自己生成此演示，请运行：[./scripts/ksa-demo.sh](./scripts/ksa-demo.sh)*
 
 ## 🤝 贡献
 

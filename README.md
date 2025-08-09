@@ -210,7 +210,7 @@ Here's KubeStack-AI in action:
 
 ![KubeStack-AI Demo](demo.gif)
 
-*To generate this demo yourself, run: `./scripts/ksa-demo.sh`*
+*To generate this demo yourself, run: [./scripts/ksa-demo.sh](./scripts/ksa-demo.sh)*
 
 ## 🤝 Contributing
 
