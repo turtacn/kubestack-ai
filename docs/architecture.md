@@ -1,215 +1,211 @@
-# KubeStack-AI 架构设计
+# KubeStack-AI 架构设计文档
 
-## 概览
+## 概述
 
-KubeStack-AI 是一个基于人工智能的统一中间件管理平台，旨在解决云原生环境中中间件运维的复杂性和碎片化问题。本文档详细阐述了项目的技术架构、设计决策和实现策略。
+KubeStack-AI是一个革命性的AI驱动中间件运维平台，专为解决现代云原生基础设施中复杂的中间件管理挑战而设计。本文档详细阐述了项目的技术架构、设计决策和实现蓝图。
 
-### 架构愿景
+## 领域问题全景
 
-传统的中间件运维面临着工具分散、专业知识要求高、故障排查复杂等挑战。KubeStack-AI 通过统一的智能接口，整合了多种中间件的运维能力，提供从诊断分析到自动修复的完整解决方案。
+### DFX问题挑战
 
-### 核心设计原则
+现代企业基础设施面临的核心挑战包括：
 
-- **统一性**：单一 CLI 工具管理所有中间件
-- **智能化**：AI 驱动的诊断和决策能力
-- **可扩展性**：插件化架构支持新中间件接入
-- **可靠性**：企业级稳定性和错误处理
-- **可观测性**：全面的监控和追踪能力
+**复杂性爆炸（Complexity Explosion）**：
 
-## 系统架构概览
+* 单一应用栈可能涉及15-20种不同中间件
+* 每种中间件有独特的监控、诊断和运维工具
+* 跨组件问题排查需要专家级知识
 
-### 整体架构图
+**运维效率瓶颈（Operational Bottlenecks）**：
+
+* 故障定位平均耗时2-4小时
+* 重复性运维任务占用60%+工程师时间
+* 知识孤岛导致依赖关键人员
+
+**可靠性风险（Reliability Risks）**：
+
+* 人工操作错误率高
+* 缺乏统一的健康评估标准
+* 预防性维护能力不足
+
+### 解决方案全景
+
+KubeStack-AI通过以下创新架构解决上述挑战：
 
 ```mermaid
 graph TB
-    %% 用户交互层
-    subgraph UI[用户交互层（User Interface Layer）]
-        CLI[命令行接口（CLI Interface）]
-        API[REST API 接口（REST API）]
-        WEB[Web 控制台（Web Console）]
+    %% 问题域映射
+    subgraph PD[问题域（Problem Domain）]
+        P1[复杂性管理（Complexity Management）]
+        P2[效率提升（Efficiency Enhancement）]
+        P3[可靠性保障（Reliability Assurance）]
     end
 
-    %% 应用层
-    subgraph APP[应用层（Application Layer）]
-        CMD[命令处理器（Command Handler）]
-        ORCH[编排引擎（Orchestrator）]
-        AUTH[认证授权（Authentication）]
+    %% 解决方案架构
+    subgraph SA[解决方案架构（Solution Architecture）]
+        direction TB
+        
+        subgraph UI[用户接入层（User Interface Layer）]
+            CLI[命令行界面<br/>（CLI Interface）]
+            NLP[自然语言处理<br/>（Natural Language Processing）]
+            API[REST API接口<br/>（REST API）]
+        end
+
+        subgraph CORE[核心引擎层（Core Engine Layer）]
+            ORCH[智能编排器<br/>（Intelligent Orchestrator）]
+            CTX[上下文收集器<br/>（Context Collector）]
+            AI[AI推理引擎<br/>（AI Inference Engine）]
+        end
+
+        subgraph PLUGIN[插件生态层（Plugin Ecosystem Layer）]
+            REDIS[Redis插件<br/>（Redis Plugin）]
+            MYSQL[MySQL插件<br/>（MySQL Plugin）]
+            KAFKA[Kafka插件<br/>（Kafka Plugin）]
+            CUSTOM[可扩展插件<br/>（Extensible Plugins）]
+        end
+
+        subgraph INFRA[基础设施层（Infrastructure Layer）]
+            K8S[Kubernetes集成<br/>（Kubernetes Integration）]
+            MONITOR[监控数据源<br/>（Monitoring Sources）]
+            STORAGE[持久化存储<br/>（Persistent Storage）]
+        end
     end
 
-    %% 核心服务层
-    subgraph CORE[核心服务层（Core Services Layer）]
-        DIAG[诊断引擎（Diagnostic Engine）]
-        AI[AI 服务（AI Service）]
-        PLUGIN[插件管理器（Plugin Manager）]
-        CONFIG[配置管理（Config Manager）]
-    end
-
-    %% 插件层
-    subgraph PLUGINS[插件层（Plugin Layer）]
-        REDIS[Redis 插件（Redis Plugin）]
-        MYSQL[MySQL 插件（MySQL Plugin）]
-        KAFKA[Kafka 插件（Kafka Plugin）]
-        ELASTIC[ES 插件（ElasticSearch Plugin）]
-        OTHER[其他插件（Other Plugins）]
-    end
-
-    %% 基础设施层
-    subgraph INFRA[基础设施层（Infrastructure Layer）]
-        K8S[Kubernetes API]
-        METRICS[指标收集（Metrics Collection）]
-        LOGS[日志聚合（Log Aggregation）]
-        STORAGE[存储服务（Storage Service）]
-    end
-
-    %% 外部系统
-    subgraph EXT[外部系统（External Systems）]
-        LLM[大语言模型（LLM Providers）]
-        MIDDLEWARE[中间件实例（Middleware Instances）]
-        MONITOR[监控系统（Monitoring Systems）]
+    %% 预期效果
+    subgraph EF[预期效果（Expected Effects）]
+        E1[诊断效率提升80%<br/>（80% Faster Diagnosis）]
+        E2[运维自动化率90%<br/>（90% Automation Rate）]
+        E3[故障预防能力增强<br/>（Enhanced Prevention）]
     end
 
     %% 连接关系
-    CLI --> CMD
-    API --> CMD
-    WEB --> API
+    P1 --> UI
+    P2 --> CORE
+    P3 --> PLUGIN
     
-    CMD --> ORCH
-    ORCH --> AUTH
-    ORCH --> DIAG
-    ORCH --> AI
-    ORCH --> PLUGIN
-    ORCH --> CONFIG
+    UI --> CORE
+    CORE --> PLUGIN
+    PLUGIN --> INFRA
     
-    DIAG --> PLUGINS
-    AI --> LLM
-    PLUGIN --> PLUGINS
-    
-    PLUGINS --> INFRA
-    INFRA --> MIDDLEWARE
-    INFRA --> K8S
-    INFRA --> MONITOR
-    
-    METRICS --> INFRA
-    LOGS --> INFRA
-````
+    INFRA --> E1
+    PLUGIN --> E2
+    CORE --> E3
+```
 
-### 数据流架构图
+## 系统架构
+
+### 总体架构
+
+KubeStack-AI采用分层式微服务架构，确保高可扩展性和可维护性：
+
+```mermaid
+graph TB
+    %% 架构分层
+    subgraph L1[表示层（Presentation Layer）]
+        direction LR
+        CLI1[CLI命令行<br/>（Command Line）]
+        WEB[Web控制台<br/>（Web Console）]
+        API1[RESTful API<br/>（REST API）]
+    end
+
+    subgraph L2[应用层（Application Layer）]
+        direction LR
+        APP[应用服务<br/>（Application Services）]
+        WORK[工作流引擎<br/>（Workflow Engine）]
+        AUTH[认证授权<br/>（Authentication）]
+    end
+
+    subgraph L3[领域层（Domain Layer）]
+        direction LR
+        DIAG[诊断服务<br/>（Diagnostic Services）]
+        OPTIM[优化服务<br/>（Optimization Services）]
+        REPAIR[修复服务<br/>（Repair Services）]
+    end
+
+    subgraph L4[基础设施层（Infrastructure Layer）]
+        direction LR
+        PLUGIN1[插件管理器<br/>（Plugin Manager）]
+        DATA[数据访问层<br/>（Data Access Layer）]
+        EXT[外部集成<br/>（External Integrations）]
+    end
+
+    %% 跨层组件
+    subgraph CC[横切关注点（Cross-Cutting Concerns）]
+        direction LR
+        LOG[日志系统<br/>（Logging）]
+        MON[监控指标<br/>（Monitoring）]
+        SEC[安全策略<br/>（Security）]
+    end
+
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    
+    CC -.-> L1
+    CC -.-> L2
+    CC -.-> L3
+    CC -.-> L4
+```
+
+### 核心组件详解
+
+#### 智能编排器（Intelligent Orchestrator）
+
+智能编排器是系统的控制中心，负责协调所有组件的工作：
+
+* **请求路由**：将用户请求路由到合适的插件和服务
+* **工作流管理**：编排复杂的多步骤诊断和修复流程
+* **资源调度**：管理插件的加载、卸载和资源分配
+* **错误恢复**：处理异常情况和故障恢复
+
+#### 上下文收集器（Context Collector）
+
+负责从各种数据源收集运行时上下文信息：
+
+* **多源数据采集**：
+
+  * Kubernetes API Server
+  * 中间件特定API
+  * 监控系统（Prometheus、Grafana）
+  * 日志聚合系统
+  * 配置管理工具
+
+* **数据标准化**：将不同格式的数据转换为统一的内部格式
+
+* **缓存机制**：优化数据访问性能，避免重复请求
+
+* **实时更新**：支持数据的实时更新和变更通知
+
+#### AI推理引擎（AI Inference Engine）
+
+集成多种AI模型，提供智能分析能力：
 
 ```mermaid
 sequenceDiagram
-    participant U as 用户（User）
-    participant CLI as CLI 接口
-    participant O as 编排引擎（Orchestrator）
-    participant PM as 插件管理器（Plugin Manager）
-    participant P as 中间件插件（Plugin）
-    participant CC as 上下文收集器（Context Collector）
-    participant AI as AI 服务（AI Service）
-    participant LLM as 大语言模型（LLM）
-    participant E as 执行引擎（Execution Engine）
+    participant User as 用户<br/>（User）
+    participant CLI as CLI接口<br/>（CLI）
+    participant ORCH as 编排器<br/>（Orchestrator）
+    participant AI as AI引擎<br/>（AI Engine）
+    participant RAG as 知识库<br/>（Knowledge Base）
+    participant PLUGIN as 插件<br/>（Plugin）
 
-    U->>CLI: 1. 输入自然语言指令<br/>"检查 Redis 性能问题"
-    CLI->>O: 2. 解析命令与参数
-    O->>PM: 3. 加载 Redis 插件
-    PM-->>O: 4. 返回插件实例
-    
-    O->>P: 5. 调用插件诊断方法
-    P->>CC: 6. 收集系统上下文
-    CC-->>P: 7. 返回指标、日志、配置
-    P-->>O: 8. 返回结构化诊断数据
-    
-    O->>AI: 9. 请求 AI 分析
-    AI->>LLM: 10. 构造提示并发送
-    LLM-->>AI: 11. 返回分析结果
-    AI-->>O: 12. 结构化分析报告
-    
-    O->>U: 13. 展示诊断结果
-    
-    alt 用户确认修复
-        U->>CLI: 14. 确认执行修复
-        CLI->>O: 15. 触发修复流程
-        O->>E: 16. 执行修复命令
-        E-->>O: 17. 返回执行结果
-        O->>U: 18. 展示修复结果
-    end
+    User->>CLI: 自然语言查询<br/>（Natural Language Query）
+    CLI->>ORCH: 解析请求<br/>（Parse Request）
+    ORCH->>PLUGIN: 收集上下文<br/>（Collect Context）
+    PLUGIN-->>ORCH: 返回数据<br/>（Return Data）
+    ORCH->>RAG: 检索相关知识<br/>（Retrieve Knowledge）
+    RAG-->>ORCH: 返回参考文档<br/>（Return References）
+    ORCH->>AI: 构造提示<br/>（Construct Prompt）
+    AI-->>ORCH: AI分析结果<br/>（AI Analysis）
+    ORCH->>CLI: 格式化输出<br/>（Format Output）
+    CLI-->>User: 显示结果<br/>（Display Results）
 ```
 
-## 核心组件详解
+### 插件架构设计
 
-### CLI 引擎（CLI Engine）
+#### 插件接口标准
 
-CLI 引擎基于 Cobra 框架构建，提供灵活的命令行接口和参数处理能力。
-
-**核心职责：**
-
-* 命令解析与验证
-* 用户交互管理
-* 输出格式化与美化
-* 错误信息展示
-
-**主要命令结构：**
-
-```
-kubestack-ai
-├── init          # 初始化配置
-├── config        # 配置管理
-├── plugin        # 插件管理
-├── analyze       # 自然语言分析
-├── diagnose      # 结构化诊断
-├── health        # 健康检查
-├── optimize      # 优化建议
-├── security      # 安全审计
-├── fix           # 自动修复
-└── interactive   # 交互模式
-```
-
-### 编排引擎（Orchestrator）
-
-编排引擎是系统的核心协调器，负责整个诊断和修复流程的管理。
-
-**核心职责：**
-
-* 请求路由与分发
-* 插件生命周期管理
-* 工作流程编排
-* 结果聚合与处理
-* 错误处理与重试
-
-**工作流程：**
-
-```mermaid
-flowchart TD
-    START([开始]) --> PARSE[解析用户输入]
-    PARSE --> VALIDATE[验证参数]
-    VALIDATE --> SELECT[选择对应插件]
-    
-    SELECT --> LOAD{插件已加载？}
-    LOAD -->|否| INSTALL[安装并加载插件]
-    LOAD -->|是| EXECUTE[执行插件方法]
-    INSTALL --> EXECUTE
-    
-    EXECUTE --> COLLECT[收集上下文数据]
-    COLLECT --> ANALYZE[AI 分析处理]
-    ANALYZE --> FORMAT[格式化结果]
-    
-    FORMAT --> ACTION{需要执行操作？}
-    ACTION -->|是| CONFIRM[用户确认]
-    ACTION -->|否| DISPLAY[显示结果]
-    
-    CONFIRM --> APPROVED{用户批准？}
-    APPROVED -->|是| EXEC[执行修复操作]
-    APPROVED -->|否| DISPLAY
-    
-    EXEC --> VERIFY[验证执行结果]
-    VERIFY --> DISPLAY
-    DISPLAY --> END([结束])
-```
-继续完善 docs/architecture.md 文档：
-
-### 插件接口（Plugin Interface）
-
-插件系统是 KubeStack-AI 可扩展性的核心，每个中间件插件必须实现统一的接口规范。
-
-**核心接口定义：**
+所有插件必须实现标准接口，确保系统的一致性和可扩展性：
 
 ```go
 type MiddlewarePlugin interface {
@@ -219,475 +215,527 @@ type MiddlewarePlugin interface {
     SupportedVersions() []string
     
     // 生命周期管理
-    Initialize(ctx context.Context, config *PluginConfig) error
+    Initialize(config PluginConfig) error
+    Validate() error
     Cleanup() error
     
     // 核心功能
-    Diagnose(ctx context.Context, req *DiagnoseRequest) (*DiagnoseResult, error)
-    Analyze(ctx context.Context, data *ContextData) (*AnalysisResult, error)
-    Repair(ctx context.Context, action *RepairAction) (*RepairResult, error)
+    Diagnose(ctx context.Context, target DiagnosticTarget) (*DiagnosisResult, error)
+    Analyze(ctx context.Context, metrics MetricsData) (*AnalysisResult, error)
+    Repair(ctx context.Context, issue Issue) (*RepairResult, error)
     
-    // 健康检查
-    HealthCheck(ctx context.Context) (*HealthStatus, error)
-    
-    // 配置验证
-    ValidateConfig(config map[string]interface{}) error
+    // 数据收集
+    CollectMetrics(ctx context.Context) (*MetricsData, error)
+    CollectLogs(ctx context.Context) ([]LogEntry, error)
+    CollectConfig(ctx context.Context) (*ConfigData, error)
 }
 ```
 
-**插件生命周期管理：**
+#### 插件生命周期管理
 
 ```mermaid
 stateDiagram-v2
-    [*] --> 未安装: 插件不存在
-    未安装 --> 已安装: install 命令
-    已安装 --> 已加载: load 操作
-    已加载 --> 运行中: initialize 成功
-    运行中 --> 已加载: cleanup 调用
-    已加载 --> 已安装: unload 操作
-    已安装 --> 未安装: uninstall 命令
+    [*] --> Uninstalled: 初始状态<br/>（Initial State）
     
-    运行中 --> 诊断中: diagnose 调用
-    诊断中 --> 运行中: 诊断完成
+    Uninstalled --> Installing: 开始安装<br/>（Start Installation）
+    Installing --> Installed: 安装完成<br/>（Installation Complete）
+    Installing --> Failed: 安装失败<br/>（Installation Failed）
     
-    运行中 --> 修复中: repair 调用
-    修复中 --> 运行中: 修复完成
-    修复中 --> 错误状态: 修复失败
-    错误状态 --> 运行中: 错误恢复
+    Installed --> Loading: 开始加载<br/>（Start Loading）
+    Loading --> Active: 加载成功<br/>（Loading Success）
+    Loading --> Error: 加载失败<br/>（Loading Failed）
+    Active --> Executing: 执行任务<br/>（Execute Task）
+    Executing --> Active: 任务完成<br/>（Task Complete）
+    Executing --> Error: 执行错误<br/>（Execution Error）
+    
+    Active --> Unloading: 开始卸载<br/>（Start Unloading）
+    Error --> Unloading: 错误恢复<br/>（Error Recovery）
+    
+    Unloading --> Installed: 卸载完成<br/>（Unloading Complete）
+    
+    Installed --> Uninstalling: 开始卸载<br/>（Start Uninstallation）
+    Uninstalling --> Uninstalled: 卸载完成<br/>（Uninstallation Complete）
+    
+    Failed --> Uninstalling: 清理失败安装<br/>（Clean Failed Installation）
 ```
 
-### 上下文收集器（Context Collector）
 
-上下文收集器负责从多个数据源收集中间件运行时信息。
+## 知识库与RAG系统详细设计
 
-**数据收集源：**
+### 知识库架构
 
-* Kubernetes API（Pod 状态、资源使用）
-* 中间件原生 API（特定指标、配置）
-* 系统级监控（CPU、内存、磁盘、网络）
-* 日志聚合系统（错误日志、性能日志）
-* 配置文件（运行参数、安全设置）
-
-**收集策略：**
+KubeStack-AI的知识库系统采用多层次、多模态的设计，为AI推理提供丰富的上下文信息：
 
 ```mermaid
-graph LR
-    CC[上下文收集器] --> K8S[Kubernetes<br/>数据收集]
-    CC --> MW[中间件<br/>数据收集]
-    CC --> SYS[系统级<br/>数据收集]
-    CC --> LOG[日志<br/>数据收集]
+graph TB
+    %% 数据源层
+    subgraph DS[数据源层（Data Sources Layer）]
+        direction TB
+        OFF[官方文档<br/>（Official Documentation）]
+        COMM[社区知识<br/>（Community Knowledge）]
+        BEST[最佳实践<br/>（Best Practices）]
+        CASE[案例库<br/>（Case Studies）]
+    end
+
+    %% 预处理层
+    subgraph PP[预处理层（Preprocessing Layer）]
+        direction TB
+        CRAWL[爬虫系统<br/>（Web Crawler）]
+        PARSE[解析器<br/>（Parser）]
+        CLEAN[数据清洗<br/>（Data Cleaning）]
+        VALID[质量验证<br/>（Quality Validation）]
+    end
+
+    %% 向量化层
+    subgraph VL[向量化层（Vectorization Layer）]
+        direction TB
+        CHUNK[文档分块<br/>（Document Chunking）]
+        EMBED[嵌入生成<br/>（Embedding Generation）]
+        INDEX[索引构建<br/>（Index Building）]
+        STORE[向量存储<br/>（Vector Storage）]
+    end
+
+    %% 检索层
+    subgraph RL[检索层（Retrieval Layer）]
+        direction TB
+        QUERY[查询理解<br/>（Query Understanding）]
+        MATCH[语义匹配<br/>（Semantic Matching）]
+        RANK[相关性排序<br/>（Relevance Ranking）]
+        FILTER[结果过滤<br/>（Result Filtering）]
+    end
+
+    %% 数据流
+    DS --> PP
+    PP --> VL
+    VL --> RL
     
-    K8S --> K8S_POD[Pod 状态]
-    K8S --> K8S_RES[资源使用]
-    K8S --> K8S_NET[网络策略]
-    
-    MW --> MW_METRIC[业务指标]
-    MW --> MW_CONFIG[配置参数]
-    MW --> MW_HEALTH[健康状态]
-    
-    SYS --> SYS_CPU[CPU 使用率]
-    SYS --> SYS_MEM[内存使用]
-    SYS --> SYS_DISK[磁盘 I/O]
-    
-    LOG --> LOG_ERROR[错误日志]
-    LOG --> LOG_PERF[性能日志]
-    LOG --> LOG_AUDIT[审计日志]
+    %% 外部集成
+    EXT1[GitHub API] --> CRAWL
+    EXT2[文档站点<br/>（Doc Sites）] --> CRAWL
+    EXT3[Stack Overflow] --> CRAWL
+    EXT4[Reddit社区<br/>（Reddit Community）] --> CRAWL
+````
+
+### 多源数据采集策略
+
+#### 官方文档采集
+
+**Redis文档采集**：
+
+* 来源：redis.io官方文档、GitHub Wiki
+* 采集频率：每周更新
+* 内容类型：配置参数、命令参考、故障排除指南
+* 质量评分：基于官方权威性，评分9-10分
+
+**MySQL文档采集**：
+
+* 来源：dev.mysql.com、官方手册
+* 采集频率：版本发布时更新
+* 内容类型：性能调优、复制配置、故障诊断
+* 质量评分：官方文档评分9-10分
+
+**Kafka文档采集**：
+
+* 来源：kafka.apache.org、Confluent文档
+* 采集频率：每月更新
+* 内容类型：集群管理、性能优化、监控指标
+* 质量评分：Apache官方9-10分，Confluent 8-9分
+
+#### 社区知识挖掘
+
+**技术博客爬取**：
+
+```python
+# 示例爬虫配置
+crawler_config = {
+    "sources": [
+        {
+            "name": "高质量技术博客",
+            "domains": ["medium.com", "dev.to", "hashnode.com"],
+            "keywords": ["redis optimization", "mysql performance", "kafka troubleshooting"],
+            "quality_threshold": 7.0,
+            "update_frequency": "weekly"
+        }
+    ],
+    "content_filters": {
+        "min_length": 1000,
+        "has_code_examples": True,
+        "author_reputation": "verified"
+    }
+}
 ```
 
-### AI 服务（AI Service）
+**Stack Overflow问答挖掘**：
 
-AI 服务负责与大语言模型的交互，提供智能分析和决策能力。
+* 高票答案（100+赞）优先收录
+* 按中间件分类标签筛选
+* 提取问题-解决方案对
+* 质量评分基于投票数和采纳率
 
-**核心功能：**
+#### 案例库构建
 
-* 提示工程（Prompt Engineering）
-* 上下文理解与推理
-* 结果结构化处理
-* 多轮对话支持
-
-**LLM 交互模型：**
-
-```mermaid
-sequenceDiagram
-    participant AI as AI 服务
-    participant PE as 提示工程器（Prompt Engineer）
-    participant LLM as 大语言模型
-    participant SP as 结构化处理器（Structure Parser）
-    
-    AI->>PE: 1. 传入诊断数据
-    PE->>PE: 2. 构造专业提示
-    PE->>LLM: 3. 发送分析请求
-    LLM-->>PE: 4. 返回分析结果
-    PE->>SP: 5. 解析响应内容
-    SP->>SP: 6. 结构化数据提取
-    SP-->>AI: 7. 返回结构化结果
-    AI-->>AI: 8. 验证结果完整性
-```
-
-## 插件架构深度解析
-
-### 插件发现与注册机制
-
-```mermaid
-flowchart TD
-    START[启动插件管理器] --> SCAN[扫描插件目录]
-    SCAN --> VALIDATE[验证插件文件]
-    VALIDATE --> LOAD[加载插件元数据]
-    LOAD --> REGISTER[注册到插件注册表]
-    REGISTER --> READY[插件就绪]
-    
-    READY --> MONITOR[监控插件状态]
-    MONITOR --> HEALTH[定期健康检查]
-    HEALTH --> HEALTHY{插件健康？}
-    HEALTHY -->|是| MONITOR
-    HEALTHY -->|否| RECOVER[尝试恢复]
-    RECOVER --> FAILED{恢复成功？}
-    FAILED -->|是| MONITOR  
-    FAILED -->|否| DISABLE[禁用插件]
-```
-
-### 数据收集接口标准
-
-每个插件必须实现标准的数据收集接口：
+**故障案例结构化存储**：
 
 ```json
 {
-  "collectMetrics": {
-    "description": "收集中间件性能指标",
-    "returns": {
-      "cpu_usage_percent": "number",
-      "memory_usage_bytes": "number",
-      "disk_io_read_bps": "number",
-      "disk_io_write_bps": "number",
-      "network_rx_bps": "number",
-      "network_tx_bps": "number",
-      "custom_metrics": "object"
-    }
-  },
-  "collectLogs": {
-    "description": "收集最新日志条目",
-    "parameters": {
-      "lines": "number",
-      "level": "string",
-      "since": "timestamp"
+  "case_id": "redis_memory_leak_001",
+  "middleware": "redis",
+  "category": "memory_management",
+  "symptoms": [
+    "内存使用持续增长",
+    "响应时间变慢",
+    "连接数异常"
+  ],
+  "root_cause": "大key导致的内存碎片",
+  "solution_steps": [
+    {
+      "step": 1,
+      "action": "识别大key",
+      "command": "redis-cli --bigkeys"
     },
-    "returns": {
-      "logs": "array",
-      "total_count": "number"
+    {
+      "step": 2,
+      "action": "分析key结构",
+      "command": "memory usage keyname"
     }
-  },
-  "collectConfig": {
-    "description": "收集运行时配置",
-    "returns": {
-      "runtime_config": "object",
-      "static_config": "object",
-      "environment_vars": "object"
-    }
-  }
+  ],
+  "prevention": "定期监控key大小分布",
+  "source_quality": 9.2,
+  "verification_count": 15
 }
 ```
 
-## 配置管理架构
+### RAG检索优化
 
-### 配置层次结构
-
-```mermaid
-graph TD
-    GLOBAL[全局配置<br/>Global Config] --> USER[用户配置<br/>User Config]
-    USER --> ENV[环境配置<br/>Environment Config]
-    ENV --> PLUGIN[插件配置<br/>Plugin Config]
-    
-    GLOBAL --> G1[系统级设置]
-    GLOBAL --> G2[默认参数]
-    GLOBAL --> G3[安全策略]
-    
-    USER --> U1[个人偏好]
-    USER --> U2[认证信息]
-    USER --> U3[输出格式]
-    
-    ENV --> E1[集群配置]
-    ENV --> E2[网络设置]
-    ENV --> E3[访问权限]
-    
-    PLUGIN --> P1[中间件特定参数]
-    PLUGIN --> P2[插件行为配置]
-    PLUGIN --> P3[自定义规则]
-```
-
-### 配置优先级与合并策略
-
-配置项按以下优先级顺序应用：
-
-1. 命令行参数（最高优先级）
-2. 环境变量
-3. 用户配置文件
-4. 系统默认配置（最低优先级）
-
-## 错误处理与可靠性设计
-
-### 错误分类与处理策略
-
-| 错误类型     | 处理策略          | 用户体验     |
-| -------- | ------------- | -------- |
-| 网络连接错误   | 自动重试 3 次，指数退避 | 显示重试进度   |
-| 认证失败     | 立即终止，提示重新认证   | 清晰的错误说明  |
-| 插件加载失败   | 跳过该插件，记录警告    | 显示可用替代方案 |
-| AI 服务不可用 | 降级到规则引擎       | 提示功能受限   |
-| 数据格式错误   | 数据清理和标准化      | 显示数据质量警告 |
-
-### 错误恢复机制
-
-```mermaid
-stateDiagram-v2
-    [*] --> 正常运行: 系统启动
-    正常运行 --> 检测错误: 异常发生
-    检测错误 --> 错误分类: 分析错误类型
-    
-    错误分类 --> 可恢复: 暂时性错误
-    错误分类 --> 不可恢复: 永久性错误
-    
-    可恢复 --> 自动重试: 重试策略
-    自动重试 --> 正常运行: 重试成功
-    自动重试 --> 降级服务: 重试失败
-    
-    降级服务 --> 正常运行: 服务恢复
-    不可恢复 --> 错误报告: 生成错误报告
-    错误报告 --> [*]: 终止服务
-```
-
-## 性能优化策略
-
-### 缓存架构设计
-
-```mermaid
-graph TB
-    REQ[用户请求] --> L1[L1 内存缓存<br/>Memory Cache]
-    L1 --> HIT1{缓存命中？}
-    HIT1 -->|是| RET1[返回结果]
-    HIT1 -->|否| L2[L2 Redis 缓存<br/>Redis Cache]
-    
-    L2 --> HIT2{缓存命中？}
-    HIT2 -->|是| UPDATE1[更新 L1 缓存]
-    UPDATE1 --> RET2[返回结果]
-    
-    HIT2 -->|否| DB[数据源查询<br/>Data Source]
-    DB --> UPDATE2[更新 L2 缓存]
-    UPDATE2 --> UPDATE3[更新 L1 缓存]
-    UPDATE3 --> RET3[返回结果]
-    
-    L1 --> TTL1[TTL: 5分钟]
-    L2 --> TTL2[TTL: 30分钟]
-```
-
-### 并发处理优化
-
-* **连接池管理**：复用 Kubernetes API 连接
-* **批量操作**：聚合多个资源查询
-* **异步处理**：后台任务队列
-* **流式处理**：大数据集分块传输
-
-## 安全架构设计
-
-### 认证与授权流程
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant CLI as CLI 客户端
-    participant AUTH as 认证服务
-    participant RBAC as 权限控制
-    participant K8S as Kubernetes API
-    
-    U->>CLI: 1. 执行命令
-    CLI->>AUTH: 2. 验证用户身份
-    AUTH-->>CLI: 3. 返回认证令牌
-    CLI->>RBAC: 4. 检查操作权限
-    RBAC-->>CLI: 5. 权限验证结果
-    CLI->>K8S: 6. 调用 API（附带令牌）
-    K8S-->>CLI: 7. 返回操作结果
-    CLI->>U: 8. 展示结果
-```
-
-### 数据安全保护
-
-* **敏感数据加密**：API 密钥、数据库密码等
-* **传输安全**：TLS 加密所有网络通信
-* **审计日志**：记录所有操作和访问
-* **权限最小化**：最小必要权限原则
-
-## 监控与可观测性
-
-### 系统监控指标
-
-| 指标类别 | 具体指标         | 采集频率 | 存储期限 |
-| ---- | ------------ | ---- | ---- |
-| 性能指标 | 响应时间、吞吐量、错误率 | 30 秒 | 90 天 |
-| 资源使用 | CPU、内存、磁盘、网络 | 1 分钟 | 30 天 |
-| 业务指标 | 诊断次数、修复成功率   | 5 分钟 | 1 年  |
-| 用户行为 | 命令使用频率、功能覆盖率 | 实时   | 6 个月 |
-
-### 分布式追踪
+#### 混合检索策略
 
 ```mermaid
 graph LR
-    REQ[用户请求] --> SPAN1[CLI Span]
-    SPAN1 --> SPAN2[Orchestrator Span]
-    SPAN2 --> SPAN3[Plugin Span]
-    SPAN2 --> SPAN4[AI Service Span]
-    SPAN3 --> SPAN5[K8s API Span]
-    SPAN4 --> SPAN6[LLM API Span]
+    %% 查询输入
+    QI[用户查询<br/>（User Query）]
     
-    SPAN1 --> TRACE[完整链路追踪]
-    SPAN2 --> TRACE
-    SPAN3 --> TRACE
-    SPAN4 --> TRACE
-    SPAN5 --> TRACE
-    SPAN6 --> TRACE
+    %% 检索分支
+    subgraph RS[检索策略（Retrieval Strategies）]
+        direction TB
+        SEM[语义检索<br/>（Semantic Search）]
+        KW[关键词检索<br/>（Keyword Search）]
+        STRUCT[结构化检索<br/>（Structured Search）]
+    end
+    
+    %% 结果融合
+    subgraph RF[结果融合（Result Fusion）]
+        direction TB
+        MERGE[结果合并<br/>（Result Merging）]
+        RERANK[重新排序<br/>（Re-ranking）]
+        FILTER[质量过滤<br/>（Quality Filtering）]
+    end
+    
+    %% 上下文增强
+    CE[上下文增强<br/>（Context Enhancement）]
+    
+    QI --> RS
+    RS --> RF
+    RF --> CE
+    
+    %% 详细流程
+    SEM --> |余弦相似度| MERGE
+    KW --> |BM25评分| MERGE
+    STRUCT --> |精确匹配| MERGE
 ```
 
-## 项目目录结构
+#### 上下文感知检索
 
-```
-kubestack-ai/
-├── cmd/                          # 应用程序入口
-│   └── kubestack-ai/            # 主程序
-├── internal/                     # 内部包（不对外暴露）
-│   ├── common/                   # 公共组件
-│   │   ├── types/               # 公共类型定义
-│   │   ├── errors/              # 错误定义
-│   │   ├── constants/           # 常量定义
-│   │   ├── logger/              # 日志组件
-│   │   └── utils/               # 工具函数
-│   ├── config/                   # 配置管理
-│   ├── core/                     # 核心业务逻辑
-│   │   ├── orchestrator/        # 编排引擎
-│   │   ├── plugin/              # 插件管理
-│   │   ├── ai/                  # AI 服务
-│   │   ├── context/             # 上下文收集
-│   │   └── executor/            # 执行引擎
-│   ├── cli/                      # CLI 实现
-│   ├── api/                      # API 服务器（可选）
-│   └── plugins/                  # 内置插件
-│       ├── redis/
-│       ├── mysql/
-│       ├── kafka/
-│       └── elasticsearch/
-├── pkg/                          # 可被外部引用的包
-│   ├── client/                   # 客户端库
-│   ├── plugin/                   # 插件开发 SDK
-│   └── types/                    # 公共类型
-├── docs/                         # 文档
-│   ├── architecture.md
-│   ├── plugins.md
-│   └── api.md
-├── deployments/                  # 部署配置
-│   ├── kubernetes/
-│   └── docker/
-├── scripts/                      # 构建和部署脚本
-├── tests/                        # 测试文件
-│   ├── integration/
-│   └── e2e/
-├── examples/                     # 示例配置
-├── assets/                       # 静态资源
-├── go.mod                        # Go 模块定义
-├── go.sum                        # 依赖锁定
-├── Makefile                      # 构建脚本
-├── Dockerfile                    # 容器构建
-├── README.md                     # 项目说明
-├── README-zh.md                  # 中文说明
-├── LICENSE                       # 开源协议
-└── CONTRIBUTING.md               # 贡献指南
+**查询理解增强**：
+
+* 识别中间件类型和版本
+* 提取关键技术术语
+* 理解问题严重程度
+* 推断用户技术水平
+
+**检索结果个性化**：
+
+* 基于历史查询优化排序
+* 考虑用户环境特征
+* 动态调整内容深度
+* 优先推荐验证过的解决方案
+
+#### 知识库更新机制
+
+**增量更新流水线**：
+
+```mermaid
+sequenceDiagram
+    participant SCHED as 调度器<br/>（Scheduler）
+    participant CRAWL as 爬虫<br/>（Crawler）
+    participant PROC as 处理器<br/>（Processor）
+    participant VALID as 验证器<br/>（Validator）
+    participant INDEX as 索引器<br/>（Indexer）
+    participant STORE as 存储<br/>（Storage）
+
+    SCHED->>CRAWL: 触发定时采集<br/>（Trigger Collection）
+    CRAWL->>PROC: 原始数据<br/>（Raw Data）
+    PROC->>VALID: 处理后数据<br/>（Processed Data）
+    VALID->>INDEX: 验证通过<br/>（Validation Pass）
+    INDEX->>STORE: 更新向量索引<br/>（Update Vector Index）
+    STORE-->>SCHED: 更新完成通知<br/>（Update Complete）
 ```
 
-## 开发工作流程
+**质量保障机制**：
 
-### 代码开发流程
+* 多源交叉验证
+* 专家审核流程
+* 用户反馈集成
+* 自动化测试验证
+
+### RAG效果提升技术
+
+#### 检索质量优化
+
+**查询扩展技术**：
+
+* 同义词扩展：redis -> cache, in-memory database
+* 技术术语映射：lag -> replication delay
+* 上下文推理：MySQL慢查询 -> performance optimization
+
+**文档分块优化**：
+
+* 智能分块：保持语义完整性
+* 重叠窗口：避免关键信息分割
+* 层次结构：维护文档层级关系
+
+#### 生成质量提升
+
+**提示工程优化**：
+
+```text
+你是一个专业的{middleware}运维专家，具有10年以上的生产环境经验。
+
+当前情况：
+- 中间件类型：{middleware_type}
+- 版本信息：{version_info}
+- 环境信息：{environment_context}
+- 用户查询：{user_query}
+
+相关知识：
+{retrieved_knowledge}
+
+请基于上述信息，提供专业的分析和建议：
+1. 问题诊断：准确识别问题根源
+2. 解决方案：提供可执行的具体步骤
+3. 预防措施：给出避免类似问题的建议
+4. 风险评估：说明操作可能的风险和注意事项
+
+回答应该：
+- 技术准确，基于最佳实践
+- 步骤清晰，便于执行
+- 包含必要的命令和配置示例
+- 考虑生产环境的安全性
+```
+
+## 数据流架构
+
+### 请求处理流程
 
 ```mermaid
 flowchart TD
-    START[开始开发] --> DESIGN[功能设计]
-    DESIGN --> INTERFACE[定义接口]
-    INTERFACE --> IMPL[实现功能]
-    IMPL --> UNITTEST[单元测试]
-    UNITTEST --> INTEGRATION[集成测试]
-    INTEGRATION --> REVIEW[代码审查]
-    REVIEW --> MERGE[合并代码]
-    MERGE --> DEPLOY[部署测试]
-    DEPLOY --> END[完成]
+    %% 用户输入
+    START([用户输入<br/>User Input]) --> PARSE{解析请求类型<br/>Parse Request Type}
     
-    REVIEW -->|需要修改| IMPL
-    INTEGRATION -->|测试失败| IMPL
+    %% 请求类型分支
+    PARSE -->|自然语言<br/>Natural Language| NLP[NLP处理<br/>NLP Processing]
+    PARSE -->|结构化命令<br/>Structured Command| DIRECT[直接解析<br/>Direct Parsing]
+    
+    %% NLP处理分支
+    NLP --> INTENT[意图识别<br/>Intent Recognition]
+    INTENT --> ENTITY[实体提取<br/>Entity Extraction]
+    ENTITY --> NORMALIZE[标准化<br/>Normalization]
+    
+    %% 汇聚到编排器
+    DIRECT --> ORCHESTRATOR[智能编排器<br/>Orchestrator]
+    NORMALIZE --> ORCHESTRATOR
+    
+    %% 编排器处理
+    ORCHESTRATOR --> ROUTE[路由决策<br/>Routing Decision]
+    ROUTE --> LOAD[加载插件<br/>Load Plugins]
+    LOAD --> COLLECT[数据收集<br/>Data Collection]
+    
+    %% 数据收集分支
+    COLLECT --> K8S_DATA[K8s数据<br/>K8s Data]
+    COLLECT --> MW_DATA[中间件数据<br/>Middleware Data]
+    COLLECT --> LOG_DATA[日志数据<br/>Log Data]
+    COLLECT --> METRIC_DATA[指标数据<br/>Metrics Data]
+    
+    %% 数据汇聚和分析
+    K8S_DATA --> AGGREGATE[数据汇聚<br/>Data Aggregation]
+    MW_DATA --> AGGREGATE
+    LOG_DATA --> AGGREGATE
+    METRIC_DATA --> AGGREGATE
+    
+    AGGREGATE --> AI_ANALYSIS[AI分析<br/>AI Analysis]
+    AI_ANALYSIS --> RAG_QUERY[RAG查询<br/>RAG Query]
+    RAG_QUERY --> GENERATE[结果生成<br/>Result Generation]
+    
+    %% 输出格式化
+    GENERATE --> FORMAT[格式化输出<br/>Format Output]
+    FORMAT --> RESPONSE[返回结果<br/>Return Result]
+    RESPONSE --> END([处理完成<br/>Process Complete])
 ```
-
-### 质量保证措施
-
-* **代码规范**：使用 golangci-lint 进行代码检查
-* **测试覆盖率**：要求 >80% 的测试覆盖率
-* **性能测试**：关键路径性能基准测试
-* **安全扫描**：使用 gosec 进行安全漏洞扫描
 
 ## 部署架构
 
-### 容器化部署
+### 标准部署模型
 
 ```mermaid
 graph TB
-    subgraph K8S[Kubernetes 集群]
-        subgraph NS[kubestack-ai 命名空间]
-            API[API 服务<br/>Deployment]
-            WEB[Web 控制台<br/>Deployment]
-            REDIS[Redis 缓存<br/>StatefulSet]
-        end
-        
-        subgraph MON[监控命名空间]
-            PROM[Prometheus]
-            GRAF[Grafana]
-            JAEGER[Jaeger]
-        end
+    %% 用户层
+    subgraph UL[用户层（User Layer）]
+        DEV[开发人员<br/>（Developers）]
+        OPS[运维人员<br/>（Operations）]
+        SRE[SRE工程师<br/>（SRE Engineers）]
     end
     
-    subgraph EXT[外部依赖]
-        LLM[LLM API]
-        DB[数据库]
+    %% 访问层
+    subgraph AL[访问层（Access Layer）]
+        LB[负载均衡器<br/>（Load Balancer）]
+        GW[API网关<br/>（API Gateway）]
+        AUTH[认证服务<br/>（Auth Service）]
     end
     
-    API --> REDIS
-    API --> LLM
-    WEB --> API
-    PROM --> API
-    GRAF --> PROM
-    JAEGER --> API
+    %% 应用层
+    subgraph APP[应用层（Application Layer）]
+        direction LR
+        CLI_SVC[CLI服务<br/>（CLI Service）]
+        WEB_SVC[Web服务<br/>（Web Service）]
+        API_SVC[API服务<br/>（API Service）]
+    end
+    
+    %% 核心服务层
+    subgraph CORE[核心服务层（Core Services Layer）]
+        direction TB
+        ORCH_SVC[编排服务<br/>（Orchestrator Service）]
+        AI_SVC[AI服务<br/>（AI Service）]
+        PLUGIN_MGR[插件管理器<br/>（Plugin Manager）]
+        CTX_COL[上下文收集器<br/>（Context Collector）]
+    end
+    
+    %% 数据层
+    subgraph DL[数据层（Data Layer）]
+        direction LR
+        VECTOR_DB[(向量数据库<br/>Vector Database)]
+        META_DB[(元数据库<br/>Metadata DB)]
+        CACHE[(缓存<br/>Cache)]
+        FS[(文件存储<br/>File Storage)]
+    end
+    
+    %% 外部集成
+    subgraph EI[外部集成（External Integrations）]
+        K8S_API[Kubernetes API]
+        MW_API[中间件API<br/>（Middleware APIs）]
+        LLM_API[大语言模型API<br/>（LLM APIs）]
+        MON_API[监控API<br/>（Monitoring APIs）]
+    end
+    
+    %% 连接关系
+    UL --> AL
+    AL --> APP
+    APP --> CORE
+    CORE --> DL
+    CORE --> EI
 ```
 
-### 高可用性设计
+### 云原生部署
 
-* **多副本部署**：核心服务至少 3 个副本
-* **负载均衡**：使用 Kubernetes Service 和 Ingress
-* **健康检查**：完善的存活性和就绪性探针
-* **优雅关闭**：处理 SIGTERM 信号，完成正在进行的任务
-* **数据持久化**：重要数据使用持久卷存储
+KubeStack-AI支持完全云原生部署，利用Kubernetes的各种特性：
 
-## 扩展性考虑
+**Helm Chart部署配置**：
 
-### 水平扩展策略
+```yaml
+# values.yaml示例
+deployment:
+  replicas: 3
+  strategy: RollingUpdate
+  
+resources:
+  orchestrator:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+storage:
+  vectorDB:
+    size: 100Gi
+    storageClass: fast-ssd
+  
+ai:
+  provider: openai  # or azure, anthropic, local
+  model: gpt-4
+  maxTokens: 4000
+  
+plugins:
+  autoInstall:
+    - redis
+    - mysql
+    - kafka
+    - postgres
+  
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+  jaeger:
+    enabled: true
+```
 
-* **无状态设计**：核心服务保持无状态
-* **缓存外置**：使用 Redis 作为共享缓存
-* **数据库分片**：大数据量时支持分库分表
-* **CDN 加速**：静态资源使用 CDN 分发
+## 代码结构参考设计
 
-### 插件生态发展
 
-* **插件市场**：提供插件发现和分发平台
-* **开发者工具**：完善的插件开发 SDK
-* **社区贡献**：鼓励开源社区贡献插件
-* **质量认证**：插件质量评级和认证机制
-
-## 参考资料
-
-* \[1] k8sgpt-ai 项目 - [https://github.com/k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt)
-* \[2] kubectl-ai 项目 - [https://github.com/GoogleCloudPlatform/kubectl-ai](https://github.com/GoogleCloudPlatform/kubectl-ai)
-* \[3] Kubernetes API 参考 - [https://kubernetes.io/docs/reference/](https://kubernetes.io/docs/reference/)
-* \[4] OpenAI API 文档 - [https://platform.openai.com/docs/](https://platform.openai.com/docs/)
-* \[5] Cobra CLI 框架 - [https://github.com/spf13/cobra](https://github.com/spf13/cobra)
-* \[6] Go 语言最佳实践 - [https://golang.org/doc/effective\_go](https://golang.org/doc/effective_go)
+```
+kubestack-ai/
+├── cmd/                           # 应用程序入口点
+│   └── ksa/                      # CLI应用
+├── internal/                     # 私有应用和库代码
+│   ├── common/                   # 通用组件
+│   │   ├── config/              # 配置管理
+│   │   ├── logger/              # 日志系统
+│   │   ├── errors/              # 错误定义
+│   │   └── types/               # 通用类型定义
+│   ├── core/                    # 核心业务逻辑
+│   │   ├── orchestrator/        # 编排器
+│   │   ├── collector/           # 上下文收集
+│   │   ├── ai/                  # AI推理引擎
+│   │   └── rag/                 # RAG系统
+│   ├── plugins/                 # 插件系统
+│   │   ├── interface/           # 插件接口定义
+│   │   ├── manager/             # 插件管理器
+│   │   ├── registry/            # 插件注册表
+│   │   └── implementations/     # 具体插件实现
+│   ├── cli/                     # CLI接口层
+│   │   ├── commands/            # 命令定义
+│   │   ├── handlers/            # 命令处理器
+│   │   └── ui/                  # 用户界面
+│   ├── api/                     # API接口层
+│   │   ├── rest/                # REST API
+│   │   └── grpc/                # gRPC API
+│   └── infrastructure/          # 基础设施层
+│       ├── database/            # 数据库访问
+│       ├── cache/               # 缓存
+│       ├── storage/             # 存储
+│       └── external/            # 外部服务集成
+├── pkg/                         # 公共库代码
+│   ├── client/                  # 客户端库
+│   └── utils/                   # 工具库
+├── api/                         # API定义文件
+│   ├── proto/                   # Protocol Buffer定义
+│   └── openapi/                 # OpenAPI规范
+├── configs/                     # 配置文件
+├── docs/                        # 文档
+├── scripts/                     # 脚本
+├── test/                        # 测试文件
+├── deployments/                 # 部署配置
+├── build/                       # 构建配置
+└── examples/                    # 示例
+```
