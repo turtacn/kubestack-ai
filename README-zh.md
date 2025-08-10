@@ -8,7 +8,7 @@
 
 统一的、AI驱动的命令行助手，用于诊断、管理和优化运行在Kubernetes和裸机环境中的整个中间件堆栈。
 
-English | [简体中文](README-zh.md)
+[English](README.md) | 简体中文
 
 ## 🎯 项目使命
 
