@@ -13,7 +13,6 @@ const (
 	MiddlewareEtcd          = "etcd"
 	MiddlewarePrometheus    = "prometheus"
 	MiddlewareMinIO         = "minio"
-	// 更多。More.
 )
 
 // StatusLevel 状态级别。StatusLevel for diagnosis status.
@@ -28,6 +27,19 @@ const (
 	SeverityLow    = "low"
 	SeverityMedium = "medium"
 	SeverityHigh   = "high"
+)
+
+// EnvironmentType 环境类型。EnvironmentType for deployment environments.
+const (
+	EnvironmentKubernetes = "kubernetes"
+	EnvironmentBareMetal  = "baremetal"
+)
+
+// KnowledgeSource 知识来源类型。KnowledgeSource for RAG content sources.
+const (
+	KnowledgeSourceOfficial  = "official"
+	KnowledgeSourceCommunity = "community"
+	KnowledgeSourceCaseStudy = "case_study"
 )
 
 //Personal.AI order the ending

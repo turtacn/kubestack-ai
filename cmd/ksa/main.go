@@ -4,7 +4,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/turtacn/kubestack-ai/internal/ai"
 	"github.com/turtacn/kubestack-ai/internal/cmd"
+	//"github.com/turtacn/kubestack-ai/internal/collectors"
 	"github.com/turtacn/kubestack-ai/internal/logging"
 	"github.com/turtacn/kubestack-ai/internal/plugins"
 )
@@ -13,9 +15,15 @@ import (
 func main() {
 	// 初始化日志记录器。Initialize logger.
 	logging.InitLogger()
+	logging.Logger.Info("Starting KubeStack-AI CLI")
 
 	// 初始化插件管理器。Initialize plugin manager.
 	plugins.InitManager()
+
+	// 初始化RAG系统。Initialize RAG system.
+	rag := ai.NewRAG()
+	// 预加载知识库。Preload knowledge base.
+	loadKnowledgeBase(rag)
 
 	// 创建根命令。Create root command.
 	rootCmd := &cobra.Command{
@@ -28,13 +36,31 @@ func main() {
 	rootCmd.AddCommand(cmd.NewDiagnoseCmd())
 	rootCmd.AddCommand(cmd.NewInstallPluginCmd())
 	rootCmd.AddCommand(cmd.NewUninstallPluginCmd())
+	rootCmd.AddCommand(cmd.NewQueryCmd(rag))
 
 	// 执行根命令。Execute root command.
 	if err := rootCmd.Execute(); err != nil {
-		logging.Logger.Error(err)
+		logging.Logger.Error("Command execution failed", err)
 		os.Exit(1)
 	}
+}
 
+// 加载知识库数据。Load knowledge base data.
+func loadKnowledgeBase(rag ai.RAG) {
+	// 示例：加载MySQL和Redis的文档。Example: load MySQL and Redis documents.
+	docs := map[string][]string{
+		"mysql": {
+			"MySQL slow query log can be enabled with slow_query_log = 1",
+			"High connections may indicate connection pool issues",
+		},
+		"redis": {
+			"Redis memory usage can be checked with INFO memory",
+			"RDB persistence is configured via save directives",
+		},
+	}
+	if err := rag.EmbedAndStore(docs); err != nil {
+		logging.Logger.Warn("Failed to load knowledge base", err)
+	}
 }
 
 //Personal.AI order the ending
