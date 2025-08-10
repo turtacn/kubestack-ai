@@ -122,6 +122,36 @@ ksa interactive
 > Generate a performance tuning plan
 ```
 
+5. **Install Plugins**:
+
+```bash
+# List available plugins
+ksa list-plugins
+
+# Install MySQL plugin
+ksa install-plugin mysql
+
+# Install Redis plugin
+ksa install-plugin redis
+```
+
+6. **Run Diagnosis**:
+
+```bash
+# Diagnose MySQL instance
+ksa diagnose --middleware mysql --namespace default --name mysql-0
+
+# Diagnose Redis cluster
+ksa diagnose --middleware redis --namespace redis-system --name redis-cluster
+
+# Enable auto-fix
+ksa diagnose --middleware mysql --namespace default --name mysql-0 --auto-fix
+
+# JSON output
+ksa diagnose --middleware redis --namespace default --name redis-0 --output json
+```
+
+
 ## 📖 Usage Examples
 
 ### Redis Diagnostics
@@ -136,6 +166,68 @@ ksa analyze redis --memory --recommendations
 # Natural language troubleshooting
 ksa "My Redis is running out of memory, what should I do?"
 ```
+
+### MySQL Diagnosis Example
+
+```bash
+$ ksa diagnose --middleware mysql --namespace default --name mysql-primary
+
+=== Diagnosis Report ===
+Middleware: mysql
+Environment: kubernetes
+Overall Health: warning
+Duration: 2340ms
+
+Summary:
+MySQL instance shows performance degradation with high connection usage (85%) and 
+slow query accumulation. Buffer pool hit ratio is below optimal threshold.
+
+Findings (3):
+1. High Connection Usage [high]
+   Detail: Connection usage is 170/200 (85.0%)
+   Recommendations:
+   1) Increase max_connections parameter [AUTO-FIXABLE]
+   2) Optimize connection pooling in applications
+
+2. High Slow Query Count [medium]  
+   Detail: Found 342 slow queries
+   Recommendations:
+   1) Analyze slow query log and optimize queries
+   2) Add appropriate indexes for slow queries
+
+3. Low InnoDB Buffer Pool Hit Ratio [medium]
+   Detail: Buffer pool hit ratio: 92.3% (recommended > 95%)
+   Recommendations:
+   1) Increase innodb_buffer_pool_size
+
+=== End Report ===
+```
+
+### Redis Diagnosis Example 2
+
+```bash
+$ ksa diagnose --middleware redis --namespace redis-system --name redis-cluster-0
+
+=== Diagnosis Report ===
+Middleware: redis
+Environment: kubernetes
+Overall Health: healthy
+Duration: 1850ms
+
+Summary:
+Redis instance is operating within normal parameters with good memory utilization
+and connection management. Minor optimization opportunities identified.
+
+Findings (1):
+1. High Slow Operation Count [low]
+   Detail: Found 23 slow operations in recent history
+   Recommendations:
+   1) Analyze slow operations and optimize commands
+   2) Consider using pipelining for batch operations
+
+=== End Report ===
+```
+
 
 ### Multi-Component Analysis
 
@@ -202,6 +294,58 @@ graph TB
     REDIS --> K8S
     MYSQL --> MW
     LLM --> DOCS
+```
+
+## Plugin Development
+
+### Creating Custom Plugin
+
+```go
+package myplugin
+
+import (
+    "context"
+    "github.com/turtacn/kubestack-ai/internal/models"
+    "github.com/turtacn/kubestack-ai/internal/plugins"
+)
+
+type MyPlugin struct {
+    config plugins.PluginConfig
+}
+
+func (p *MyPlugin) Name() string {
+    return "myplugin"
+}
+
+func (p *MyPlugin) Version() string {
+    return "1.0.0"
+}
+
+func (p *MyPlugin) Initialize(config plugins.PluginConfig) error {
+    p.config = config
+    return nil
+}
+
+func (p *MyPlugin) Diagnose(ctx context.Context, target models.DiagnosticTarget) (*models.DiagnosisResult, error) {
+    // 实现诊断逻辑 Implement diagnosis logic
+    result := &models.DiagnosisResult{
+        Middleware: "myplugin",
+        // ... 其他字段 other fields
+    }
+    return result, nil
+}
+
+// 实现其他必需方法 Implement other required methods
+```
+
+### Plugin Registration
+
+```go
+func init() {
+    plugins.Register("myplugin", func() plugins.Plugin {
+        return &MyPlugin{}
+    })
+}
 ```
 
 ## 📸 Demo
