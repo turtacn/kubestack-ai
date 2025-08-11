@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/turtacn/kubestack-ai/internal/constants"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,7 +71,7 @@ func NewDiagnosisResult(middleware string, environment string) *DiagnosisResult 
 		Middleware:  middleware,
 		Environment: environment,
 		Timestamp:   time.Now(),
-		Status:      StatusHealthy,
+		Status:      constants.StatusHealthy,
 		Findings:    []Finding{},
 	}
 }

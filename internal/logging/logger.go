@@ -34,7 +34,7 @@ func InitLogger() {
 		Logger.SetOutput(os.Stdout)
 	} else {
 		logFile := filepath.Join(logDir, time.Now().Format("2006-01-02")+".log")
-		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		_, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			Logger.Warn("Failed to open log file", err)
 			Logger.SetOutput(os.Stdout)

@@ -3,6 +3,8 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -500,5 +502,13 @@ func determineMySQLStatus(findings []models.Finding) string {
 }
 
 var _ plugins.Plugin = (*MySQLPlugin)(nil)
+
+// 新增：通过 init 函数注册插件
+func init() {
+	// 注册插件名称和构造函数
+	plugins.RegisterPlugin("mysql", func() plugins.Plugin {
+		return &MySQLPlugin{}
+	})
+}
 
 //Personal.AI order the ending

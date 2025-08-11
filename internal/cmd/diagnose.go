@@ -12,7 +12,11 @@ import (
 	"github.com/turtacn/kubestack-ai/internal/collectors"
 	"github.com/turtacn/kubestack-ai/internal/diagnosis"
 	"github.com/turtacn/kubestack-ai/internal/logging"
+	"github.com/turtacn/kubestack-ai/internal/models"
 	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // NewDiagnoseCmd 创建诊断命令。NewDiagnoseCmd creates diagnose command.

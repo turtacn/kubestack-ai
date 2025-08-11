@@ -2,6 +2,7 @@ package diagnosis
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/turtacn/kubestack-ai/internal/ai"

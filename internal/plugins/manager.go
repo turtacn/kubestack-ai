@@ -6,9 +6,19 @@ import (
 
 	"github.com/turtacn/kubestack-ai/internal/errors"
 	"github.com/turtacn/kubestack-ai/internal/logging"
-	"github.com/turtacn/kubestack-ai/plugins/mysql"
-	"github.com/turtacn/kubestack-ai/plugins/redis"
 )
+
+// 定义插件构造函数类型：由具体插件实现
+type PluginConstructor func() Plugin
+
+// 全局注册表：存储插件名称到构造函数的映射
+var pluginRegistry = make(map[string]PluginConstructor)
+
+// RegisterPlugin 供具体插件调用，注册自身的构造函数
+func RegisterPlugin(name string, constructor PluginConstructor) {
+	pluginRegistry[name] = constructor
+	logging.Logger.Infof("Plugin %s registered", name)
+}
 
 // PluginManager 接口定义插件管理。PluginManager interface for managing plugins.
 type PluginManager interface {
@@ -50,31 +60,29 @@ func InitManager() {
 }
 
 // Install 安装插件。Install installs a plugin.
+// Install 方法中，通过注册表创建插件实例，替代硬编码
 func (m *manager) Install(ctx context.Context, name string, source string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	logging.Logger.Infof("Installing plugin: %s from source: %s", name, source)
 
-	// 检查插件是否已安装。Check if plugin is already installed.
 	if _, exists := m.plugins[name]; exists {
 		logging.Logger.Warnf("Plugin %s is already installed", name)
 		return nil
 	}
 
-	// 根据名称创建插件实例。Create plugin instance based on name.
-	var plugin Plugin
-	switch name {
-	case "mysql":
-		plugin = &mysql.MySQLPlugin{}
-	case "redis":
-		plugin = &redis.RedisPlugin{}
-	default:
+	// 从注册表获取构造函数，替代硬编码的 switch-case
+	constructor, exists := pluginRegistry[name]
+	if !exists {
 		logging.Logger.Errorf("Unsupported plugin: %s", name)
 		return errors.ErrPluginInstallationFailed
 	}
 
-	// 初始化插件。Initialize plugin.
+	// 调用构造函数创建插件实例
+	plugin := constructor()
+
+	// 后续初始化逻辑不变
 	config := PluginConfig{"source": source}
 	if err := plugin.Initialize(config); err != nil {
 		logging.Logger.Errorf("Failed to initialize plugin %s: %v", name, err)
@@ -82,14 +90,12 @@ func (m *manager) Install(ctx context.Context, name string, source string) error
 		return errors.ErrPluginInstallationFailed
 	}
 
-	// 验证插件。Validate plugin.
 	if err := plugin.Validate(); err != nil {
 		logging.Logger.Errorf("Plugin %s validation failed: %v", name, err)
 		m.status[name] = PluginStatusError
 		return errors.ErrPluginInstallationFailed
 	}
 
-	// 存储插件实例。Store plugin instance.
 	m.plugins[name] = plugin
 	m.status[name] = PluginStatusInstalled
 	logging.Logger.Infof("Plugin %s installed successfully", name)

@@ -382,4 +382,11 @@ func (p *RedisPlugin) parsePersistence(info string, metrics models.Metrics) {
 // 确保RedisPlugin实现了Plugin接口。Ensure RedisPlugin implements Plugin interface.
 var _ plugins.Plugin = (*RedisPlugin)(nil)
 
+// 新增：通过 init 函数注册插件
+func init() {
+	plugins.RegisterPlugin("redis", func() plugins.Plugin {
+		return &RedisPlugin{}
+	})
+}
+
 //Personal.AI order the ending
