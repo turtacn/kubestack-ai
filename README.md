@@ -18,6 +18,8 @@ KubeStack-AI Vision：
 
 ![KubeStack-AI Vision](demo2.gif)
 
+<img src="demo2.gif" alt="KubeStack-AI Vision" width="100%">
+
 ## 🚀 Why KubeStack-AI?
 
 **Modern infrastructure complexity demands intelligent tooling.** Traditional middleware management involves:
