@@ -27,7 +27,7 @@ type RAG interface {
 }
 
 type rag struct {
-	embedder    embedder.Embedder
+	embedder    embedder.Embedding
 	index       index.Index
 	splitter    textsplitter.TextSplitter
 	documentMap map[string][]models.KnowledgeDocument
