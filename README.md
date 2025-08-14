@@ -16,8 +16,6 @@ KubeStack-AI transforms complex middleware operations into natural language inte
 
 KubeStack-AI Vision：
 
-![KubeStack-AI Vision](demo2.gif)
-
 <img src="demo2.gif" alt="KubeStack-AI Vision" width="100%">
 
 ## 🚀 Why KubeStack-AI?
