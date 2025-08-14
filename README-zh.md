@@ -14,6 +14,11 @@
 
 KubeStack-AI将复杂的中间件操作转化为自然语言交互，为云原生基础设施提供智能诊断、性能分析和自动化优化。它超越了单一工具助手，为管理Redis、Kafka、PostgreSQL、MinIO、MySQL、MongoDB、ClickHouse、Elasticsearch等提供了全面、可扩展和智能的界面。
 
+KubeStack-AI效果：
+
+![KubeStack-AI 效果](demo2.gif)
+
+
 ## 🚀 为什么选择KubeStack-AI？
 
 **现代基础设施的复杂性需要智能工具。** 传统中间件管理涉及：
@@ -350,7 +355,7 @@ func init() {
 
 ## 📸 演示
 
-KubeStack-AI实际运行效果：
+KubeStack-AI实际运行效果(CLI后端)：
 
 ![KubeStack-AI 演示](demo.gif)
 

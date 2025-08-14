@@ -14,6 +14,10 @@ A unified, AI-powered command-line assistant for diagnosing, managing, and optim
 
 KubeStack-AI transforms complex middleware operations into natural language interactions, providing intelligent diagnostics, performance analysis, and automated optimization for cloud-native infrastructure. It moves beyond single-tool assistants to provide a holistic, extensible, and intelligent interface for managing Redis, Kafka, PostgreSQL, MinIO, MySQL, MongoDB, ClickHouse, Elasticsearch, and more.
 
+KubeStack-AI Vision：
+
+![KubeStack-AI Vision](demo2.gif)
+
 ## 🚀 Why KubeStack-AI?
 
 **Modern infrastructure complexity demands intelligent tooling.** Traditional middleware management involves:
@@ -350,7 +354,7 @@ func init() {
 
 ## 📸 Demo
 
-Here's KubeStack-AI in action:
+Here's KubeStack-AI CLI Backend in action:
 
 ![KubeStack-AI Demo](demo.gif)
 
