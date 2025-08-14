@@ -14,7 +14,7 @@ type RAG interface {
 
 // rag RAG实现。rag implements RAG.
 type rag struct {
-	embedder embedder.Embedder
+	embedder embedder.Embedding
 	// vectorStore map[string][]float32 // 示例向量存储。Example vector store.
 }
 

@@ -1,26 +1,28 @@
-package plugins
+package pluginmgr
 
 import (
 	"github.com/turtacn/kubestack-ai/internal/errors"
 	"github.com/turtacn/kubestack-ai/internal/logging"
+	"github.com/turtacn/kubestack-ai/pkg/plugins"
+	"github.com/turtacn/kubestack-ai/pkg/plugins/mysql"
 )
 
 // PluginManager 接口定义插件管理。PluginManager interface for managing plugins.
 type PluginManager interface {
 	Install(name string, source string) error
-	Load(name string) (Plugin, error)
+	Load(name string) (plugins.Plugin, error)
 	Uninstall(name string) error
 }
 
 // manager 插件管理实现。manager implementation for plugins.
 type manager struct {
-	plugins map[string]Plugin
+	plugins map[string]plugins.Plugin
 }
 
 // NewManager 创建插件管理器。NewManager creates a new plugin manager.
 func NewManager() PluginManager {
 	return &manager{
-		plugins: make(map[string]Plugin),
+		plugins: make(map[string]plugins.Plugin),
 	}
 }
 
@@ -37,13 +39,13 @@ func (m *manager) Install(name string, source string) error {
 	logging.Logger.Info("Installing plugin", name)
 	// 示例注册。Example registration.
 	if name == "mysql" {
-		m.plugins[name] = &MySQLPlugin{} // 假设实现。
+		m.plugins[name] = &mysql.MySQLPlugin{} // 假设实现。
 	}
 	return nil
 }
 
 // Load 加载插件。Load loads a plugin.
-func (m *manager) Load(name string) (Plugin, error) {
+func (m *manager) Load(name string) (plugins.Plugin, error) {
 	p, ok := m.plugins[name]
 	if !ok {
 		return nil, errors.ErrPluginNotFound

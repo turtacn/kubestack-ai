@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/turtacn/kubestack-ai/internal/cmd"
 	"github.com/turtacn/kubestack-ai/internal/logging"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/internal/pluginmgr"
 )
 
 // 主函数：CLI入口，初始化系统组件并执行命令。Main function: CLI entry point, initializes system components and executes commands.
@@ -15,7 +15,7 @@ func main() {
 	logging.InitLogger()
 
 	// 初始化插件管理器。Initialize plugin manager.
-	plugins.InitManager()
+	pluginmgr.InitManager()
 
 	// 创建根命令。Create root command.
 	rootCmd := &cobra.Command{

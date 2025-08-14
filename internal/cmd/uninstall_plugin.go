@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/internal/pluginmgr"
 )
 
 // NewUninstallPluginCmd 创建卸载插件命令。NewUninstallPluginCmd creates uninstall plugin command.
@@ -17,7 +17,7 @@ func NewUninstallPluginCmd() *cobra.Command {
 				fmt.Println("Name required")
 				return
 			}
-			err := plugins.Manager.Uninstall(args[0])
+			err := pluginmgr.Manager.Uninstall(args[0])
 			if err != nil {
 				fmt.Println(err)
 				return
