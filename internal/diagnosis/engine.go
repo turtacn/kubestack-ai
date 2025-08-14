@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/turtacn/kubestack-ai/internal/ai"
+	"github.com/turtacn/kubestack-ai/internal/ai/llm"
 	"github.com/turtacn/kubestack-ai/internal/collectors"
 	"github.com/turtacn/kubestack-ai/internal/logging"
 	"github.com/turtacn/kubestack-ai/internal/models"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/internal/pluginmgr"
 )
 
 // DiagnosisEngine 接口定义诊断引擎。DiagnosisEngine interface for diagnosis.
@@ -19,12 +19,12 @@ type DiagnosisEngine interface {
 // engine 诊断引擎实现。engine implements DiagnosisEngine.
 type engine struct {
 	collector collectors.Collector
-	pluginMgr plugins.PluginManager
-	llm       ai.LLM
+	pluginMgr pluginmgr.PluginManager
+	llm       llm.LLM
 }
 
 // NewEngine 创建诊断引擎。NewEngine creates diagnosis engine.
-func NewEngine(c collectors.Collector, pm plugins.PluginManager, l ai.LLM) DiagnosisEngine {
+func NewEngine(c collectors.Collector, pm pluginmgr.PluginManager, l llm.LLM) DiagnosisEngine {
 	return &engine{collector: c, pluginMgr: pm, llm: l}
 }
 

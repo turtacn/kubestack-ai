@@ -5,7 +5,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/turtacn/kubestack-ai/internal/models"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/pkg/plugins"
 )
 
 // MySQLPlugin MySQL插件实现。MySQLPlugin implements Plugin for MySQL.

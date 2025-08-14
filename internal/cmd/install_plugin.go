@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/internal/pluginmgr"
 )
 
 // NewInstallPluginCmd 创建安装插件命令。NewInstallPluginCmd creates install plugin command.
@@ -17,7 +17,7 @@ func NewInstallPluginCmd() *cobra.Command {
 				fmt.Println("Name and source required")
 				return
 			}
-			err := plugins.Manager.Install(args[0], args[1])
+			err := pluginmgr.Manager.Install(args[0], args[1])
 			if err != nil {
 				fmt.Println(err)
 				return

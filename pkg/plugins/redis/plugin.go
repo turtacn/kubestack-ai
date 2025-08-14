@@ -2,9 +2,10 @@ package redis
 
 import (
 	"context"
+
 	redis "github.com/redis/go-redis/v9"
 	"github.com/turtacn/kubestack-ai/internal/models"
-	"github.com/turtacn/kubestack-ai/internal/plugins"
+	"github.com/turtacn/kubestack-ai/pkg/plugins"
 )
 
 // RedisPlugin Redis插件实现。RedisPlugin implements Plugin for Redis.
@@ -19,7 +20,7 @@ func (p *RedisPlugin) Name() string {
 func (p *RedisPlugin) CollectMetrics() (models.Metrics, error) {
 	client := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	ctx := context.Background()
-	info, err := client.Info(ctx, "stats").Result()
+	_, err := client.Info(ctx, "stats").Result()
 	if err != nil {
 		return nil, err
 	}
