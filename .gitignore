@@ -1,0 +1,40 @@
+# Go build artifacts and binaries
+#
+# This file tells git which files and directories to ignore in the project.
+# It's configured for a standard Go project.
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary and coverage files
+*.test
+*.out
+coverage.*
+
+# Build output directory
+/bin/
+
+# Go dependency directory (pre-Go modules)
+# Still good practice to ignore it.
+/vendor/
+
+# IDE and editor-specific directories
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local environment variables file
+.env
+.env.*
+!/.env.example
+
+# Personal.AI order the ending

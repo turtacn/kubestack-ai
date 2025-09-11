@@ -1,0 +1,51 @@
+# Default configuration for KubeStack-AI (ksa)
+# This file defines the default settings for the application.
+# Settings can be overridden by environment variables (e.g., KSA_LOGGER_LEVEL=debug)
+# or command-line flags (e.g., --log-level=debug).
+
+# Logger configuration for controlling log output.
+logger:
+  # Log level: "debug", "info", "warn", "error", "fatal".
+  level: "info"
+  # Log format: "text" (for human-readable console output) or "json" (for machine parsing).
+  format: "text"
+  # Output target: "console", "file", or "both".
+  output: "console"
+  # --- File Output Settings (used if output is "file" or "both") ---
+  # Path to the log file.
+  file: "/var/log/kubestack-ai/ksa.log"
+  # Log rotation settings.
+  maxSize: 100    # Maximum size in megabytes of a log file before it gets rotated.
+  maxBackups: 3   # Maximum number of old log files to retain.
+  maxAge: 7       # Maximum number of days to retain old log files.
+  compress: true  # Compress rotated log files using gzip.
+
+# API Server configuration (if running in server mode).
+server:
+  port: 8080
+  timeout: 30 # Request timeout in seconds.
+
+# LLM (Large Language Model) provider configuration.
+llm:
+  # The default provider to use: "openai" or "gemini".
+  provider: "openai"
+  openai:
+    # API key for OpenAI.
+    # SECURITY WARNING: It is strongly recommended to set this via the
+    # KSA_LLM_OPENAI_APIKEY environment variable instead of hardcoding it in this file.
+    apiKey: ""
+    # The default chat model to use.
+    model: "gpt-4"
+  gemini:
+    # API key for Google Gemini.
+    # SECURITY WARNING: Set this via the KSA_LLM_GEMINI_APIKEY environment variable.
+    apiKey: ""
+    # The default chat model to use.
+    model: "gemini-pro"
+
+# Plugin system configuration.
+plugins:
+  # Directory where KubeStack-AI looks for plugins.
+  directory: "/var/lib/kubestack-ai/plugins"
+
+# Personal.AI order the ending

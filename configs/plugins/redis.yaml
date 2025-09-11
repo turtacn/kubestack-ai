@@ -1,0 +1,48 @@
+# Configuration for the KubeStack-AI Redis Plugin.
+# This file allows you to fine-tune the diagnosis and analysis for Redis instances
+# by setting custom thresholds and enabling/disabling specific checks.
+
+# Connection settings for the target Redis instance.
+# These can be overridden by instance-specific configurations passed via the CLI.
+connection:
+  host: "127.0.0.1"
+  port: 6379
+  # It is strongly recommended to use environment variables for passwords instead of this file.
+  password: ""
+  db: 0
+  tls:
+    enabled: false
+    # ca_cert: "/path/to/ca.pem"
+    # client_cert: "/path/to/client.pem"
+    # client_key: "/path/to/client.key"
+
+# Diagnosis rules and thresholds.
+diagnosis:
+  rules:
+    memory:
+      # Trigger a 'Warning' if the memory fragmentation ratio exceeds this value.
+      # A healthy value is typically between 1.0 and 1.5.
+      fragmentation_ratio_threshold: 1.5
+      # Trigger a 'Warning' if the maxmemory_policy is set to 'noeviction', as it can
+      # cause write errors when the memory limit is reached.
+      noeviction_policy_warning: true
+
+    persistence:
+      # Trigger a 'High' severity issue if both RDB and AOF are disabled.
+      require_persistence: true
+
+    security:
+      # Trigger a 'Critical' issue if 'requirepass' is not set.
+      require_password: true
+      # Trigger a 'High' severity issue if Redis is bound to a public interface (0.0.0.0 or *).
+      disallow_public_bind: true
+
+# Analysis algorithm configurations.
+analysis:
+  # Settings for slow query analysis.
+  slowlog:
+    # Consider any query taking longer than this value (in microseconds) to be slow.
+    # 10000 microseconds = 10 milliseconds.
+    threshold_us: 10000
+
+# Personal.AI order the ending
