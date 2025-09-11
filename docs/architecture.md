@@ -610,11 +610,18 @@ stateDiagram-v2
 ## 参考资料
 
 \[1] k8sgpt-ai项目 - [https://github.com/k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt)
+
 \[2] kubectl-ai项目 - [https://github.com/GoogleCloudPlatform/kubectl-ai](https://github.com/GoogleCloudPlatform/kubectl-ai)
+
 \[3] Kubernetes官方文档 - [https://kubernetes.io/docs/](https://kubernetes.io/docs/)
+
 \[4] Go语言规范 - [https://golang.org/ref/spec](https://golang.org/ref/spec)
+
 \[5] OpenAI API文档 - [https://platform.openai.com/docs](https://platform.openai.com/docs)
+
 \[6] Cobra CLI框架 - [https://github.com/spf13/cobra](https://github.com/spf13/cobra)
+
 \[7] 向量数据库技术 - [https://github.com/milvus-io/milvus](https://github.com/milvus-io/milvus)
+
 \[8] 云原生安全最佳实践 - [https://kubernetes.io/docs/concepts/security/](https://kubernetes.io/docs/concepts/security/)
 
