@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KubeStack-AI | 重构云原生中间件管理体验</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.11.4/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#050A1F', // 深空蓝主色
+                        secondary: '#165DFF', // 亮蓝辅助色
+                        accent: '#7B61FF', // 紫色强调色
+                        neon: '#00F0FF', // 霓虹青
+                        dark: '#0A1029',
+                        light: '#E2E8F0',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 8s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'slide-up': 'slideUp 0.8s ease-out forwards',
+                        'slide-in': 'slideIn 0.6s ease-out forwards',
+                        'fade-in': 'fadeIn 1s ease-out forwards',
+                        'typing': 'typing 3.5s steps(40, end), blink .75s step-end infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-30px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 5px rgba(0, 240, 255, 0.5), 0 0 10px rgba(0, 240, 255, 0.3)' },
+                            '100%': { boxShadow: '0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 240, 255, 0.5), 0 0 30px rgba(0, 240, 255, 0.3)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(50px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideIn: {
+                            '0%': { opacity: '0', transform: 'translateX(-50px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        typing: {
+                            'from': { width: '0' },
+                            'to': { width: '100%' }
+                        },
+                        blink: {
+                            'from, to': { borderColor: 'transparent' },
+                            '50%': { borderColor: 'rgba(0, 240, 255, 0.8)' }
+                        }
+                    }
+                },
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-gradient {
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            .bg-grid {
+                background-size: 40px 40px;
+                background-image:
+                    linear-gradient(to right, rgba(22, 93, 255, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(22, 93, 255, 0.05) 1px, transparent 1px);
+            }
+            .bg-glass {
+                background: rgba(10, 16, 41, 0.6);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid rgba(22, 93, 255, 0.15);
+            }
+            .text-shadow {
+                text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+            }
+            .border-glow {
+                box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+            }
+            .scrollbar-custom::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            .scrollbar-custom::-webkit-scrollbar-track {
+                background: rgba(10, 16, 41, 0.5);
+                border-radius: 3px;
+            }
+            .scrollbar-custom::-webkit-scrollbar-thumb {
+                background: rgba(22, 93, 255, 0.5);
+                border-radius: 3px;
+            }
+            .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+                background: rgba(22, 93, 255, 0.8);
+            }
+            .mask-gradient {
+                mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+                -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-primary text-light min-h-screen overflow-x-hidden scrollbar-custom">
+    <!-- 粒子背景容器 -->
+    <div id="particles-container" class="fixed inset-0 z-0 opacity-40 pointer-events-none"></div>
+
+    <!-- 导航栏 -->
+    <header id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500 bg-glass">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <!-- Logo区域 -->
+                <div class="flex items-center">
+                    <div class="relative group">
+                        <div class="h-10 w-10 rounded-lg bg-gradient-to-br from-secondary to-accent flex items-center justify-center z-10 relative">
+                            <i class="fa fa-cubes text-white text-xl"></i>
+                        </div>
+                        <div class="absolute inset-0 rounded-lg bg-gradient-to-br from-secondary to-accent filter blur-md opacity-0 group-hover:opacity-70 transition-opacity duration-300"></div>
+                    </div>
+                    <span class="ml-3 text-xl md:text-2xl font-bold tracking-tight">
+                        <span class="bg-gradient-to-r from-neon to-secondary text-gradient">KubeStack</span>-AI
+                    </span>
+                </div>
+
+                <!-- 桌面导航 -->
+                <nav class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-neon after:transition-all hover:after:w-full">特性</a>
+                    <a href="#workflow" class="text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-neon after:transition-all hover:after:w-full">工作流</a>
+                    <a href="#middleware" class="text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-neon after:transition-all hover:after:w-full">中间件</a>
+                    <a href="#demo" class="text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-neon after:transition-all hover:after:w-full">演示</a>
+                    <a href="#docs" class="text-gray-300 hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-neon after:transition-all hover:after:w-full">文档</a>
+                </nav>
+
+                <!-- 右侧按钮 -->
+                <div class="flex items-center space-x-4">
+                    <a href="https://github.com/turtacn/kubestack-ai" class="hidden md:inline-flex items-center px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/90 text-white font-medium transition-all duration-300 hover:shadow-lg hover:shadow-secondary/30">
+                        <i class="fa fa-download mr-2"></i> 下载
+                    </a>
+                    <button id="menu-toggle" class="md:hidden text-gray-300 hover:text-white transition-colors">
+                        <i class="fa fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 移动端菜单 -->
+        <div id="mobile-menu" class="md:hidden hidden bg-dark border-t border-gray-800/50">
+            <div class="container mx-auto px-4 py-4 space-y-3">
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-gray-300 hover:text-white transition-colors">特性</a>
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-gray-300 hover:text-white transition-colors">工作流</a>
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-gray-300 hover:text-white transition-colors">中间件</a>
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-gray-300 hover:text-white transition-colors">演示</a>
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-gray-300 hover:text-white transition-colors">文档</a>
+                <a href="https://github.com/turtacn/kubestack-ai" class="block py-3 text-center bg-secondary hover:bg-secondary/90 text-white font-medium rounded-lg transition-all">
+                    <i class="fa fa-download mr-2"></i> 下载
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- 英雄区域 -->
+        <section class="relative min-h-screen flex items-center pt-20 overflow-hidden bg-grid">
+            <!-- 背景光晕 -->
+            <div class="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-secondary/10 rounded-full filter blur-[120px] animate-pulse-slow"></div>
+            <div class="absolute bottom-1/4 left-1/3 w-[500px] h-[500px] bg-accent/10 rounded-full filter blur-[120px] animate-pulse-slow" style="animation-delay: 2s"></div>
+
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="order-2 md:order-1">
+                        <h1 class="text-[clamp(2.5rem,8vw,4.5rem)] font-extrabold leading-tight mb-6 opacity-0 animate-slide-up" style="animation-delay: 0.3s">
+                            <span class="block">用<span class="bg-gradient-to-r from-neon to-secondary text-gradient text-shadow">AI</span>重新定义</span>
+                            <span class="block mt-2">云原生中间件管理</span>
+                        </h1>
+                        <p class="text-[clamp(1.1rem,2vw,1.3rem)] text-gray-300 mb-8 max-w-xl opacity-0 animate-slide-up" style="animation-delay: 0.6s">
+                            通过自然语言交互，将复杂的Kubernetes中间件运维转化为简单对话，让AI成为您的专属运维专家
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-4 opacity-0 animate-slide-up" style="animation-delay: 0.9s">
+                            <a href="#demo" class="px-8 py-4 bg-gradient-to-r from-secondary to-accent rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-secondary/30 transition-all duration-300 transform hover:-translate-y-1">
+                                体验演示 <i class="fa fa-arrow-right ml-2"></i>
+                            </a>
+                            <a href="#workflow" class="px-8 py-4 bg-transparent border border-gray-700 hover:border-secondary/50 rounded-lg font-semibold text-white hover:bg-white/5 transition-all duration-300 transform hover:-translate-y-1">
+                                了解工作流 <i class="fa fa-play-circle ml-2"></i>
+                            </a>
+                        </div>
+
+                        <!-- 信任标识 -->
+                        <div class="mt-12 opacity-0 animate-slide-up" style="animation-delay: 1.2s">
+                            <p class="text-gray-400 text-sm mb-4">受到行业领先企业的信任</p>
+                            <div class="flex flex-wrap items-center gap-8">
+                                <a href="https://www.google.com" target="_blank" rel="noopener noreferrer">
+                                    <div class="h-8 opacity-50 hover:opacity-100 transition-opacity">
+                                        <i class="fa fa-google text-2xl"></i>
+                                    </div>
+                                </a>
+
+                                <a href="https://www.amazon.com" target="_blank" rel="noopener noreferrer">
+                                    <div class="h-8 opacity-50 hover:opacity-100 transition-opacity">
+                                        <i class="fa fa-amazon text-2xl"></i>
+                                    </div>
+                                </a>
+
+                                <a href="https://www.microsoft.com" target="_blank" rel="noopener noreferrer">
+                                    <div class="h-8 opacity-50 hover:opacity-100 transition-opacity">
+                                        <i class="fa fa-microsoft text-2xl"></i>
+                                    </div>
+                                </a>
+
+                                <a href="https://www.spotify.com" target="_blank" rel="noopener noreferrer">
+                                    <div class="h-8 opacity-50 hover:opacity-100 transition-opacity">
+                                        <i class="fa fa-spotify text-2xl"></i>
+                                    </div>
+                                </a>
+
+                                <a href="https://github.com/turtacn/kubestack-ai" target="_blank" rel="noopener noreferrer">
+                                    <div class="h-8 opacity-50 hover:opacity-100 transition-opacity">
+                                        <i class="fa fa-github text-2xl"></i>
+                                    </div>
+                                </a>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主视觉 -->
+                    <div class="order-1 md:order-2 animate-float opacity-0 animate-fade-in" style="animation-delay: 0.5s">
+                        <div class="relative">
+                            <!-- 装饰元素 -->
+                            <div class="absolute -top-10 -left-10 w-40 h-40 bg-neon/10 rounded-full filter blur-2xl"></div>
+                            <div class="absolute -bottom-5 -right-5 w-32 h-32 bg-secondary/10 rounded-full filter blur-2xl"></div>
+
+                            <!-- 控制台界面 -->
+                            <div class="relative rounded-xl overflow-hidden border border-gray-800 shadow-2xl shadow-secondary/10 transform rotate-1 hover:rotate-0 transition-transform duration-500">
+                                <!-- 控制台标题栏 -->
+                                <div class="bg-dark p-3 flex items-center space-x-3 border-b border-gray-800">
+                                    <div class="flex space-x-2">
+                                        <div class="w-3 h-3 rounded-full bg-danger"></div>
+                                        <div class="w-3 h-3 rounded-full bg-warning"></div>
+                                        <div class="w-3 h-3 rounded-full bg-success"></div>
+                                    </div>
+                                    <div class="text-sm text-gray-400">ksa-console ~ ai-interactive-mode</div>
+                                    <div class="ml-auto flex items-center space-x-2">
+                                        <span class="h-2 w-2 rounded-full bg-neon animate-pulse"></span>
+                                        <span class="text-xs text-gray-400">已连接</span>
+                                    </div>
+                                </div>
+
+                                <!-- 控制台内容 -->
+                                <div class="bg-dark p-4 font-mono text-sm leading-relaxed scrollbar-custom max-h-[500px] overflow-y-auto">
+                                    <div class="mb-3">
+                                        <span class="text-secondary">kubectl@admin:~$</span> <span class="text-green-400">ksa interactive</span>
+                                        <p class="mt-2 text-gray-300">✅ 启动AI交互模式，正在加载知识库...</p>
+                                        <p class="text-gray-300">💡 提示：输入您的问题或需求，例如 "优化我的Redis集群"</p>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-accent">您</span><span class="text-gray-400"> > </span>我的Redis集群内存使用率超过90%，响应变慢，该怎么处理？
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-neon">KubeStack-AI</span><span class="text-gray-400"> > </span>正在分析Redis集群状态...
+                                        <p class="mt-2 text-gray-300">📊 检测到以下问题：</p>
+                                        <ul class="mt-1 ml-6 list-disc text-gray-300 space-y-1">
+                                            <li>3个大Key占用65%内存空间</li>
+                                            <li>内存碎片率高达1.8</li>
+                                            <li>淘汰策略未启用（noeviction）</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-neon">KubeStack-AI</span><span class="text-gray-400"> > </span>推荐解决方案：
+                                        <p class="mt-2 text-gray-300">1. 识别并清理大Key：</p>
+                                        <p class="mt-1 ml-4 bg-gray-800/50 p-2 rounded text-green-400">redis-cli --bigkeys | grep "Large keys" | awk '{print $1}' | xargs redis-cli del</p>
+                                        <p class="mt-2 text-gray-300">2. 启用内存淘汰策略：</p>
+                                        <p class="mt-1 ml-4 bg-gray-800/50 p-2 rounded text-green-400">redis-cli config set maxmemory-policy allkeys-lru</p>
+                                        <p class="mt-2 text-gray-300">3. 重启实例优化碎片：</p>
+                                        <p class="mt-1 ml-4 bg-gray-800/50 p-2 rounded text-green-400">kubectl rollout restart statefulset redis-cluster</p>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-neon">KubeStack-AI</span><span class="text-gray-400"> > </span>需要我帮您自动执行这些操作吗？
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-accent">您</span><span class="text-gray-400"> > </span>是的，请执行全部优化
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <span class="text-neon">KubeStack-AI</span><span class="text-gray-400"> > </span>正在执行优化操作...
+                                        <p class="mt-2 text-gray-300">⏳ 步骤1/3：清理大Key [▰▰▰▱▱▱] 50%</p>
+                                    </div>
+
+                                    <div class="flex items-center">
+                                        <span class="text-secondary">kubectl@admin:~$</span>
+                                        <span class="ml-2 border-r-2 border-neon h-5 animate-typing inline-block w-[150px] overflow-hidden whitespace-nowrap"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计数据 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-20 opacity-0 animate-slide-up" style="animation-delay: 1.5s">
+                    <div class="bg-glass p-6 rounded-xl border border-gray-800 hover:border-secondary/30 transition-all duration-300">
+                        <div class="text-4xl font-bold text-white mb-2">85%</div>
+                        <div class="text-gray-400">运维效率提升</div>
+                    </div>
+                    <div class="bg-glass p-6 rounded-xl border border-gray-800 hover:border-secondary/30 transition-all duration-300">
+                        <div class="text-4xl font-bold text-white mb-2">10+</div>
+                        <div class="text-gray-400">支持的中间件类型</div>
+                    </div>
+                    <div class="bg-glass p-6 rounded-xl border border-gray-800 hover:border-secondary/30 transition-all duration-300">
+                        <div class="text-4xl font-bold text-white mb-2">99.7%</div>
+                        <div class="text-gray-400">自动化修复成功率</div>
+                    </div>
+                    <div class="bg-glass p-6 rounded-xl border border-gray-800 hover:border-secondary/30 transition-all duration-300">
+                        <div class="text-4xl font-bold text-white mb-2">500+</div>
+                        <div class="text-gray-400">企业用户采用</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 特性区域 -->
+        <section id="features" class="py-24 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full bg-grid opacity-30"></div>
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16 reveal-element">
+                    <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold mb-6">
+                        <span class="bg-gradient-to-r from-neon to-secondary text-gradient">AI驱动的</span>核心能力
+                    </h2>
+                    <p class="text-gray-400 text-lg">重新构想云原生中间件管理方式，让复杂运维变得简单直观</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- 特性卡片 1 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-comments text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">自然语言交互</h3>
+                        <p class="text-gray-400">通过日常语言描述需求，无需记忆复杂命令，即可完成中间件诊断、配置和优化操作。支持中英文混合输入，理解行业术语和缩写。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm font-mono">
+                            <p class="text-accent">您</p><span class="text-gray-400"> > </span>检查MySQL主从同步延迟并修复
+                        </div>
+                    </div>
+
+                    <!-- 特性卡片 2 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 100ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-search text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">智能故障诊断</h3>
+                        <p class="text-gray-400">结合实时监控数据与历史案例，精准定位问题根源。支持跨组件关联分析，发现传统监控难以察觉的隐性问题。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm">
+                            <ul class="text-gray-300 space-y-1">
+                                <li><i class="fa fa-check-circle text-success mr-2"></i> 根因识别准确率92%</li>
+                                <li><i class="fa fa-check-circle text-success mr-2"></i> 平均诊断时间<30秒</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 特性卡片 3 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 200ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-magic text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">自动化修复</h3>
+                        <p class="text-gray-400">根据诊断结果生成安全修复方案，支持一键执行或分步确认。内置回滚机制，确保操作安全性。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm">
+                            <div class="flex items-center text-gray-300">
+                                <div class="w-full bg-gray-700 rounded-full h-2 mr-2">
+                                    <div class="bg-gradient-to-r from-success to-neon h-2 rounded-full" style="width: 85%"></div>
+                                </div>
+                                <span>85%自动修复率</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 特性卡片 4 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-database text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">智能知识库</h3>
+                        <p class="text-gray-400">基于RAG技术构建的动态知识库，整合官方文档、最佳实践和社区经验。支持增量更新，持续提升AI能力。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm">
+                            <ul class="text-gray-300 space-y-1">
+                                <li><i class="fa fa-file-text-o text-secondary mr-2"></i> 10,000+ 文档条目</li>
+                                <li><i class="fa fa-refresh text-secondary mr-2"></i> 每日自动更新</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 特性卡片 5 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 100ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-puzzle-piece text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">插件化架构</h3>
+                        <p class="text-gray-400">模块化设计支持灵活扩展，已适配Redis、MySQL、Kafka等主流中间件。提供SDK快速开发自定义插件。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">Redis</span>
+                                <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">MySQL</span>
+                                <span class="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">Kafka</span>
+                                <span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">+7种</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 特性卡片 6 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 200ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-area-chart text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">预测性分析</h3>
+                        <p class="text-gray-400">基于机器学习算法分析历史趋势，提前预测潜在问题并主动优化，将故障扼杀在萌芽状态。</p>
+                        <div class="mt-6 p-3 bg-dark/70 rounded-lg border border-gray-800 text-sm">
+                            <p class="text-gray-300"><i class="fa fa-lightbulb-o text-warning mr-2"></i> 平均提前4.2小时预警</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 工作流程 -->
+        <section id="workflow" class="py-24 bg-dark relative overflow-hidden">
+            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent/5 rounded-full filter blur-[150px]"></div>
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16 reveal-element">
+                    <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold mb-6">
+                        简单直观的<span class="bg-gradient-to-r from-neon to-secondary text-gradient">操作流程</span>
+                    </h2>
+                    <p class="text-gray-400 text-lg">从问题发现到解决，仅需三步即可完成复杂的中间件运维工作</p>
+                </div>
+
+                <div class="relative">
+                    <!-- 连接线 -->
+                    <div class="hidden md:block absolute top-1/2 left-0 right-0 h-1 bg-gradient-to-r from-secondary via-neon to-accent transform -translate-y-1/2 z-0"></div>
+
+                    <div class="grid md:grid-cols-3 gap-8 relative z-10">
+                        <!-- 步骤1 -->
+                        <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 reveal-element">
+                            <div class="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-white text-2xl font-bold mb-6 border-4 border-dark shadow-lg shadow-secondary/20">1</div>
+                            <h3 class="text-xl font-semibold mb-4">描述问题或需求</h3>
+                            <p class="text-gray-400 mb-6">用自然语言描述您遇到的问题或需要执行的操作，支持技术术语和业务场景描述。</p>
+
+                            <div class="bg-dark/80 rounded-lg p-4 border border-gray-800">
+                                <div class="flex items-start mb-4">
+                                    <div class="h-8 w-8 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                        <i class="fa fa-user text-gray-300"></i>
+                                    </div>
+                                    <div class="bg-gray-800 rounded-lg rounded-tl-none px-3 py-2 text-sm">
+                                        <p>Kafka集群消费延迟很高，消费者组一直在rebalance，帮我分析原因并解决</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 步骤2 -->
+                        <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 reveal-element" style="transition-delay: 200ms">
+                            <div class="w-16 h-16 rounded-full bg-neon flex items-center justify-center text-dark text-2xl font-bold mb-6 border-4 border-dark shadow-lg shadow-neon/20">2</div>
+                            <h3 class="text-xl font-semibold mb-4">AI分析与方案生成</h3>
+                            <p class="text-gray-400 mb-6">系统自动收集相关数据，结合知识库进行分析，生成详细诊断报告和优化方案。</p>
+
+                            <div class="bg-dark/80 rounded-lg p-4 border border-gray-800 max-h-48 overflow-y-auto scrollbar-custom">
+                                <div class="flex items-start mb-4">
+                                    <div class="h-8 w-8 rounded-full bg-neon/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                        <i class="fa fa-robot text-neon"></i>
+                                    </div>
+                                    <div class="bg-gradient-to-r from-dark to-gray-800 rounded-lg rounded-tr-none px-3 py-2 text-sm">
+                                        <p class="mb-2">分析发现：</p>
+                                        <ul class="list-disc ml-4 text-gray-300 text-xs space-y-1 mb-2">
+                                            <li>session.timeout.ms设置过小(3秒)</li>
+                                            <li>分区分布不均，2个分区负载过高</li>
+                                            <li>消费者处理逻辑耗时过长</li>
+                                        </ul>
+                                        <p class="text-xs text-gray-400">是否执行优化方案？</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 步骤3 -->
+                        <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 reveal-element" style="transition-delay: 400ms">
+                            <div class="w-16 h-16 rounded-full bg-accent flex items-center justify-center text-white text-2xl font-bold mb-6 border-4 border-dark shadow-lg shadow-accent/20">3</div>
+                            <h3 class="text-xl font-semibold mb-4">执行与验证</h3>
+                            <p class="text-gray-400 mb-6">确认方案后自动执行，实时展示进度并生成优化报告，验证问题是否解决。</p>
+
+                            <div class="bg-dark/80 rounded-lg p-4 border border-gray-800">
+                                <div class="flex items-start">
+                                    <div class="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                        <i class="fa fa-check-circle text-accent"></i>
+                                    </div>
+                                    <div class="rounded-lg rounded-tr-none px-3 py-2 text-sm">
+                                        <p class="text-success mb-1">优化完成，消费延迟降低78%</p>
+                                        <p class="text-xs text-gray-400">rebalance频率从5分钟/次降至2小时/次</p>
+                                        <div class="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="bg-gradient-to-r from-success to-neon h-full rounded-full" style="width: 100%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 架构图 -->
+                <div class="mt-24 reveal-element">
+                    <h3 class="text-2xl font-semibold mb-8 text-center">
+                        强大的<span class="bg-gradient-to-r from-neon to-secondary text-gradient">技术架构</span>
+                    </h3>
+
+                    <div class="bg-glass rounded-xl p-6 lg:p-10 border border-gray-800 shadow-xl">
+                        <div class="grid md:grid-cols-5 gap-6">
+                            <!-- 左侧说明 -->
+                            <div class="md:col-span-2 space-y-6">
+                                <div>
+                                    <h4 class="text-xl font-semibold mb-3 text-neon">多层级技术架构</h4>
+                                    <p class="text-gray-400">采用微服务架构设计，各组件松耦合，确保系统高可用性和可扩展性。</p>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <div class="p-4 bg-dark/70 rounded-lg border border-gray-800">
+                                        <h5 class="font-semibold mb-2 flex items-center">
+                                            <span class="w-2 h-2 rounded-full bg-secondary mr-2"></span>
+                                            交互层
+                                        </h5>
+                                        <p class="text-sm text-gray-400">提供CLI、WebUI和API多种交互方式，支持自然语言处理和命令自动补全。</p>
+                                    </div>
+
+                                    <div class="p-4 bg-dark/70 rounded-lg border border-gray-800">
+                                        <h5 class="font-semibold mb-2 flex items-center">
+                                            <span class="w-2 h-2 rounded-full bg-neon mr-2"></span>
+                                            核心引擎层
+                                        </h5>
+                                        <p class="text-sm text-gray-400">包含AI推理引擎、任务调度器和知识管理器，实现智能决策和流程编排。</p>
+                                    </div>
+
+                                    <div class="p-4 bg-dark/70 rounded-lg border border-gray-800">
+                                        <h5 class="font-semibold mb-2 flex items-center">
+                                            <span class="w-2 h-2 rounded-full bg-accent mr-2"></span>
+                                            数据层
+                                        </h5>
+                                        <p class="text-sm text-gray-400">整合监控数据、日志信息和知识库，提供统一数据访问接口和缓存机制。</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 右侧架构图 -->
+                            <div class="md:col-span-3 flex items-center justify-center">
+                                <div class="w-full max-w-md relative">
+                                    <div class="absolute inset-0 bg-gradient-to-br from-secondary/20 to-accent/20 rounded-xl blur-xl opacity-70"></div>
+                                    <div class="relative bg-dark/90 border border-gray-800 rounded-xl p-6">
+                                        <!-- 架构图可视化 -->
+                                        <div class="space-y-8">
+                                            <!-- 交互层 -->
+                                            <div class="p-4 bg-primary/50 rounded-lg border border-secondary/30">
+                                                <h5 class="text-center font-semibold mb-3 text-secondary">交互层</h5>
+                                                <div class="flex justify-around">
+                                                    <div class="text-center">
+                                                        <i class="fa fa-terminal text-xl mb-1 text-secondary"></i>
+                                                        <p class="text-xs text-gray-400">CLI</p>
+                                                    </div>
+                                                    <div class="text-center">
+                                                        <i class="fa fa-desktop text-xl mb-1 text-secondary"></i>
+                                                        <p class="text-xs text-gray-400">Web UI</p>
+                                                    </div>
+                                                    <div class="text-center">
+                                                        <i class="fa fa-code text-xl mb-1 text-secondary"></i>
+                                                        <p class="text-xs text-gray-400">API</p>
+                                                    </div>
+                                                    <div class="text-center">
+                                                        <i class="fa fa-comments text-xl mb-1 text-secondary"></i>
+                                                        <p class="text-xs text-gray-400">NLP</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- 箭头 -->
+                                            <div class="flex justify-center">
+                                                <i class="fa fa-chevron-down text-gray-500"></i>
+                                            </div>
+
+                                            <!-- 核心引擎层 -->
+                                            <div class="p-4 bg-primary/50 rounded-lg border border-neon/30">
+                                                <h5 class="text-center font-semibold mb-3 text-neon">核心引擎层</h5>
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div class="p-2 bg-dark/50 rounded text-center">
+                                                        <i class="fa fa-brain text-lg mb-1 text-neon"></i>
+                                                        <p class="text-xs text-gray-400">AI推理</p>
+                                                    </div>
+                                                    <div class="p-2 bg-dark/50 rounded text-center">
+                                                        <i class="fa fa-cogs text-lg mb-1 text-neon"></i>
+                                                        <p class="text-xs text-gray-400">任务调度</p>
+                                                    </div>
+                                                    <div class="p-2 bg-dark/50 rounded text-center">
+                                                        <i class="fa fa-book text-lg mb-1 text-neon"></i>
+                                                        <p class="text-xs text-gray-400">知识管理</p>
+                                                    </div>
+                                                    <div class="p-2 bg-dark/50 rounded text-center">
+                                                        <i class="fa fa-shield text-lg mb-1 text-neon"></i>
+                                                        <p class="text-xs text-gray-400">安全审计</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- 箭头 -->
+                                            <div class="flex justify-center">
+                                                <i class="fa fa-chevron-down text-gray-500"></i>
+                                            </div>
+
+                                            <!-- 插件层 -->
+                                            <div class="p-4 bg-primary/50 rounded-lg border border-accent/30">
+                                                <h5 class="text-center font-semibold mb-3 text-accent">插件生态层</h5>
+                                                <div class="flex flex-wrap justify-center gap-2">
+                                                    <span class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">Redis</span>
+                                                    <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">MySQL</span>
+                                                    <span class="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">Kafka</span>
+                                                    <span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">PostgreSQL</span>
+                                                    <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs">MongoDB</span>
+                                                    <span class="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs">+更多</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- 箭头 -->
+                                            <div class="flex justify-center">
+                                                <i class="fa fa-chevron-down text-gray-500"></i>
+                                            </div>
+
+                                            <!-- 数据层 -->
+                                            <div class="p-4 bg-primary/50 rounded-lg border border-gray-700">
+                                                <h5 class="text-center font-semibold mb-3 text-gray-300">数据层</h5>
+                                                <div class="flex justify-around">
+                                                    <div class="text-center">
+                                                        <i class="fa fa-database text-xl mb-1 text-gray-300"></i>
+                                                        <p class="text-xs text-gray-400">时序数据库</p>
+                                                    </div>
+                                                    <div class="text-center">
+                                                        <i class="fa fa-file-text-o text-xl mb-1 text-gray-300"></i>
+                                                        <p class="text-xs text-gray-400">知识库</p>
+                                                    </div>
+                                                    <div class="text-center">
+                                                        <i class="fa fa-search text-xl mb-1 text-gray-300"></i>
+                                                        <p class="text-xs text-gray-400">向量检索</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 支持的中间件 -->
+        <section id="middleware" class="py-24 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full bg-grid opacity-30"></div>
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16 reveal-element">
+                    <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold mb-6">
+                        全面支持<span class="bg-gradient-to-r from-neon to-secondary text-gradient">主流中间件</span>
+                    </h2>
+                    <p class="text-gray-400 text-lg">通过插件化架构支持多种中间件，满足复杂云原生环境的管理需求</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Redis -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-red-500/50 transition-all duration-500 hover:shadow-xl hover:shadow-red-500/10 transform hover:-translate-y-2 reveal-element">
+                        <div class="h-16 w-16 rounded-full bg-red-500/20 flex items-center justify-center mb-5 group-hover:bg-red-500/30 transition-colors">
+                            <i class="fa fa-redis text-red-500 text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Redis</h3>
+                        <p class="text-gray-400 text-sm mb-4">内存数据库与缓存系统</p>
+                        <ul class="text-sm text-gray-300 space-y-1">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 内存优化分析</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 大Key检测与清理</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 集群健康检查</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 持久化配置优化</li>
+                        </ul>
+                    </div>
+
+                    <!-- MySQL -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-blue-500/50 transition-all duration-500 hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 100ms">
+                        <div class="h-16 w-16 rounded-full bg-blue-500/20 flex items-center justify-center mb-5 group-hover:bg-blue-500/30 transition-colors">
+                            <i class="fa fa-database text-blue-500 text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">MySQL</h3>
+                        <p class="text-gray-400 text-sm mb-4">关系型数据库管理系统</p>
+                        <ul class="text-sm text-gray-300 space-y-1">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 慢查询分析</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 索引优化建议</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 主从同步监控</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 连接池配置优化</li>
+                        </ul>
+                    </div>
+
+                    <!-- Kafka -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-purple-500/50 transition-all duration-500 hover:shadow-xl hover:shadow-purple-500/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 200ms">
+                        <div class="h-16 w-16 rounded-full bg-purple-500/20 flex items-center justify-center mb-5 group-hover:bg-purple-500/30 transition-colors">
+                            <i class="fa fa-exchange text-purple-500 text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Kafka</h3>
+                        <p class="text-gray-400 text-sm mb-4">分布式流处理平台</p>
+                        <ul class="text-sm text-gray-300 space-y-1">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 分区均衡分析</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 消费者延迟监控</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 性能调优建议</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 数据积压处理</li>
+                        </ul>
+                    </div>
+
+                    <!-- PostgreSQL -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-green-500/50 transition-all duration-500 hover:shadow-xl hover:shadow-green-500/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 300ms">
+                        <div class="h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center mb-5 group-hover:bg-green-500/30 transition-colors">
+                            <i class="fa fa-database text-green-500 text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">PostgreSQL</h3>
+                        <p class="text-gray-400 text-sm mb-4">高级开源关系型数据库</p>
+                        <ul class="text-sm text-gray-300 space-y-1">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 查询性能分析</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 真空优化</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 并发控制建议</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 分区表优化</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 更多中间件 -->
+                <div class="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 reveal-element">
+                    <div class="bg-glass rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all text-center">
+                        <i class="fa fa-cubes text-yellow-500 text-2xl mb-2"></i>
+                        <h4 class="font-medium">MongoDB</h4>
+                    </div>
+                    <div class="bg-glass rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all text-center">
+                        <i class="fa fa-search text-orange-500 text-2xl mb-2"></i>
+                        <h4 class="font-medium">Elasticsearch</h4>
+                    </div>
+                    <div class="bg-glass rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all text-center">
+                        <i class="fa fa-exchange text-teal-500 text-2xl mb-2"></i>
+                        <h4 class="font-medium">RabbitMQ</h4>
+                    </div>
+                    <div class="bg-glass rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all text-center">
+                        <i class="fa fa-table text-pink-500 text-2xl mb-2"></i>
+                        <h4 class="font-medium">ClickHouse</h4>
+                    </div>
+                    <div class="bg-glass rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all text-center">
+                        <i class="fa fa-plus-circle text-gray-400 text-2xl mb-2"></i>
+                        <h4 class="font-medium">更多...</h4>
+                    </div>
+                </div>
+
+                <!-- 性能对比 -->
+                <div class="mt-20 reveal-element">
+                    <h3 class="text-2xl font-semibold mb-8 text-center">
+                        运维效率<span class="bg-gradient-to-r from-neon to-secondary text-gradient">提升显著</span>
+                    </h3>
+
+                    <div class="bg-glass rounded-xl p-6 lg:p-8 border border-gray-800 shadow-xl">
+                        <div class="h-80">
+                            <canvas id="performanceComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 演示区域 -->
+        <section id="demo" class="py-24 bg-dark relative overflow-hidden">
+            <div class="absolute top-1/4 right-0 w-[600px] h-[600px] bg-secondary/10 rounded-full filter blur-[150px]"></div>
+            <div class="absolute bottom-1/4 left-0 w-[500px] h-[500px] bg-accent/10 rounded-full filter blur-[150px]"></div>
+
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16 reveal-element">
+                    <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold mb-6">
+                        亲身体验<span class="bg-gradient-to-r from-neon to-secondary text-gradient">AI运维</span>的魅力
+                    </h2>
+                    <p class="text-gray-400 text-lg">通过简单的自然语言交互，轻松完成复杂的中间件管理任务</p>
+                </div>
+
+                <div class="max-w-5xl mx-auto">
+                    <!-- 演示模拟器 -->
+                    <div class="relative rounded-xl overflow-hidden border border-gray-800 shadow-2xl shadow-secondary/10 reveal-element">
+                        <div class="aspect-[16/9] bg-dark relative">
+                            <!-- 演示标签页 -->
+                            <div class="flex border-b border-gray-800">
+                                <button class="px-4 py-3 text-sm font-medium text-white border-b-2 border-neon">Redis优化演示</button>
+                                <button class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-white">MySQL诊断</button>
+                                <button class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-white">Kafka调优</button>
+                            </div>
+
+                            <!-- 演示内容 -->
+                            <div class="p-6 font-mono text-sm leading-relaxed max-h-[600px] overflow-y-auto scrollbar-custom">
+                                <!-- 会话内容 -->
+                                <div class="mb-6">
+                                    <div class="flex items-start mb-6">
+                                        <div class="h-8 w-8 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                            <i class="fa fa-user text-gray-300"></i>
+                                        </div>
+                                        <div class="bg-gray-800 rounded-lg rounded-tl-none px-4 py-3 max-w-[80%]">
+                                            <p>我的Redis集群最近响应很慢，内存使用率超过90%，帮我分析一下原因并提供优化方案</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start justify-end mb-6">
+                                        <div class="bg-gradient-to-r from-secondary to-accent rounded-lg rounded-tr-none px-4 py-3 max-w-[80%]">
+                                            <p class="mb-2">正在连接Redis集群并收集数据...</p>
+                                            <div class="flex space-x-1 my-2">
+                                                <div class="w-2 h-2 rounded-full bg-white animate-bounce" style="animation-delay: 0ms"></div>
+                                                <div class="w-2 h-2 rounded-full bg-white animate-bounce" style="animation-delay: 150ms"></div>
+                                                <div class="w-2 h-2 rounded-full bg-white animate-bounce" style="animation-delay: 300ms"></div>
+                                            </div>
+                                        </div>
+                                        <div class="h-8 w-8 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center mt-0.5 ml-3 flex-shrink-0">
+                                            <i class="fa fa-robot text-white"></i>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start justify-end mb-6">
+                                        <div class="bg-gradient-to-r from-secondary to-accent rounded-lg rounded-tr-none px-4 py-3 max-w-[80%]">
+                                            <p class="mb-3">分析完成，发现以下问题：</p>
+                                            <ul class="list-disc ml-5 text-white space-y-1 mb-3">
+                                                <li>3个大Key占用约65%内存空间（总计8.2GB）</li>
+                                                <li>内存碎片率高达1.8，远超正常范围</li>
+                                                <li>内存淘汰策略未启用（当前为noeviction）</li>
+                                                <li>部分节点连接数接近上限</li>
+                                            </ul>
+                                            <p class="mb-2">推荐优化方案：</p>
+                                            <ol class="list-decimal ml-5 text-white space-y-2 mb-3">
+                                                <li>识别并清理大Key</li>
+                                                <li>调整内存淘汰策略为allkeys-lru</li>
+                                                <li>重启实例优化内存碎片</li>
+                                                <li>适当增加连接池容量</li>
+                                            </ol>
+                                            <p class="text-xs text-white/80">需要我为您执行这些优化操作吗？</p>
+                                        </div>
+                                        <div class="h-8 w-8 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center mt-0.5 ml-3 flex-shrink-0">
+                                            <i class="fa fa-robot text-white"></i>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start mb-6">
+                                        <div class="h-8 w-8 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                            <i class="fa fa-user text-gray-300"></i>
+                                        </div>
+                                        <div class="bg-gray-800 rounded-lg rounded-tl-none px-4 py-3 max-w-[80%]">
+                                            <p>是的，请执行全部优化操作，另外请告诉我每一步的具体影响</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start justify-end mb-6">
+                                        <div class="bg-gradient-to-r from-secondary to-accent rounded-lg rounded-tr-none px-4 py-3 max-w-[80%]">
+                                            <p class="mb-3">正在执行优化操作：</p>
+                                            <div class="space-y-4">
+                                                <div>
+                                                    <p class="font-medium">步骤1/4：识别并清理大Key</p>
+                                                    <p class="text-sm mt-1">执行命令：redis-cli --bigkeys | grep "Large keys" | awk '{print $1}' | xargs redis-cli del</p>
+                                                    <div class="w-full bg-gray-700 rounded-full h-2 mt-2">
+                                                        <div class="bg-success h-2 rounded-full" style="width: 75%"></div>
+                                                    </div>
+                                                    <p class="text-xs mt-1 text-white/80">预计剩余时间：30秒 | 已释放内存：4.2GB</p>
+                                                </div>
+
+                                                <div>
+                                                    <p class="font-medium">步骤2/4：调整内存淘汰策略</p>
+                                                    <p class="text-sm mt-1">执行命令：redis-cli config set maxmemory-policy allkeys-lru</p>
+                                                    <div class="w-full bg-gray-700 rounded-full h-2 mt-2">
+                                                        <div class="bg-gray-500 h-2 rounded-full" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="h-8 w-8 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center mt-0.5 ml-3 flex-shrink-0">
+                                            <i class="fa fa-robot text-white"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 交互模拟器 -->
+                    <div class="mt-12 bg-glass rounded-xl p-6 border border-gray-800 shadow-xl reveal-element">
+                        <h3 class="text-xl font-semibold mb-6">尝试与AI对话</h3>
+                        <div class="space-y-4">
+                            <div class="bg-dark/80 rounded-lg p-4 h-64 overflow-y-auto scrollbar-custom mb-4" id="chat-messages">
+                                <div class="flex items-start mb-4">
+                                    <div class="h-8 w-8 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                                        <i class="fa fa-robot text-white"></i>
+                                    </div>
+                                    <div class="bg-gray-800 rounded-lg rounded-tr-none px-3 py-2 text-sm">
+                                        <p>您好！我是KubeStack-AI，您的云原生中间件管理助手。请描述您遇到的问题或需要执行的操作，例如：</p>
+                                        <ul class="mt-2 ml-4 list-disc text-gray-300 text-xs">
+                                            <li>"检查MySQL主从同步状态"</li>
+                                            <li>"优化我的Kafka集群性能"</li>
+                                            <li>"分析Redis内存使用率高的原因"</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex">
+                                <input type="text" id="user-input" placeholder="输入您的问题或需求..." class="flex-1 bg-dark border border-gray-700 focus:border-neon rounded-l-lg px-4 py-3 focus:outline-none font-mono text-sm">
+                                <button id="send-message" class="bg-secondary hover:bg-secondary/90 px-4 rounded-r-lg transition-colors">
+                                    <i class="fa fa-paper-plane"></i>
+                                </button>
+                            </div>
+
+                            <div class="text-center text-sm text-gray-400 mt-4">
+                                <p>示例问题："为什么我的MySQL查询变慢了？"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 文档与资源 -->
+        <section id="docs" class="py-24 relative overflow-hidden bg-grid">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div class="text-center max-w-3xl mx-auto mb-16 reveal-element">
+                    <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold mb-6">
+                        丰富的<span class="bg-gradient-to-r from-neon to-secondary text-gradient">文档与资源</span>
+                    </h2>
+                    <p class="text-gray-400 text-lg">全面的指南和参考资料，帮助您快速掌握KubeStack-AI的强大功能</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- 文档卡片 1 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-book text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">用户手册</h3>
+                        <p class="text-gray-400 mb-4">从安装配置到高级功能使用，详细的步骤指南帮助您快速上手。</p>
+                        <ul class="text-sm text-gray-300 space-y-1 mb-6">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 快速入门指南</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 命令参考手册</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 最佳实践指南</li>
+                        </ul>
+                        <a href="#" class="inline-flex items-center text-secondary hover:text-neon transition-colors">
+                            浏览手册 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+
+                    <!-- 文档卡片 2 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 100ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-code text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">开发者文档</h3>
+                        <p class="text-gray-400 mb-4">学习如何开发自定义插件，扩展KubeStack-AI的中间件支持能力。</p>
+                        <ul class="text-sm text-gray-300 space-y-1 mb-6">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 插件开发指南</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> API参考文档</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 贡献者指南</li>
+                        </ul>
+                        <a href="#" class="inline-flex items-center text-secondary hover:text-neon transition-colors">
+                            查看文档 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+
+                    <!-- 文档卡片 3 -->
+                    <div class="bg-glass rounded-xl p-6 border border-gray-800 hover:border-secondary/50 transition-all duration-500 hover:shadow-xl hover:shadow-secondary/10 transform hover:-translate-y-2 reveal-element" style="transition-delay: 200ms">
+                        <div class="h-14 w-14 rounded-lg bg-secondary/20 flex items-center justify-center mb-5 group-hover:bg-secondary/30 transition-colors">
+                            <i class="fa fa-graduation-cap text-neon text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3">学习资源</h3>
+                        <p class="text-gray-400 mb-4">视频教程、案例研究和技术博客，帮助您深入理解产品能力。</p>
+                        <ul class="text-sm text-gray-300 space-y-1 mb-6">
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 视频教程库</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 案例研究</li>
+                            <li class="flex items-center"><i class="fa fa-check text-success mr-2"></i> 技术博客</li>
+                        </ul>
+                        <a href="#" class="inline-flex items-center text-secondary hover:text-neon transition-colors">
+                            探索资源 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 下载区域 -->
+                <div id="download" class="mt-20 bg-glass rounded-xl p-8 border border-gray-800 shadow-xl reveal-element">
+                    <div class="grid md:grid-cols-5 gap-8 items-center">
+                        <div class="md:col-span-3">
+                            <h3 class="text-2xl font-semibold mb-4">
+                                准备好开始<span class="bg-gradient-to-r from-neon to-secondary text-gradient">智能运维</span>了吗？
+                            </h3>
+                            <p class="text-gray-400 mb-6">下载KubeStack-AI，体验AI驱动的云原生中间件管理新方式</p>
+                            <div class="flex flex-wrap gap-4">
+                                <a href="https://github.com/turtacn/kubestack-ai" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-secondary to-accent rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-secondary/30 transition-all duration-300">
+                                    <i class="fa fa-download mr-2"></i> 下载最新版本
+                                </a>
+                                <a href="https://github.com/turtacn/kubestack-ai" class="inline-flex items-center px-6 py-3 bg-transparent border border-gray-700 hover:border-secondary/50 rounded-lg font-semibold text-white hover:bg-white/5 transition-all duration-300">
+                                    <i class="fa fa-github mr-2"></i> 查看源码
+                                </a>
+                            </div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <div class="flex items-center justify-center h-32">
+                                <div class="h-24 w-24 rounded-lg bg-gradient-to-br from-secondary to-accent flex items-center justify-center animate-glow">
+                                    <i class="fa fa-cubes text-white text-4xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark border-t border-gray-800 py-12">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="h-10 w-10 rounded-lg bg-gradient-to-br from-secondary to-accent flex items-center justify-center">
+                            <i class="fa fa-cubes text-white text-xl"></i>
+                        </div>
+                        <span class="text-xl font-bold tracking-tight">
+                            <span class="bg-gradient-to-r from-neon to-secondary text-gradient">KubeStack</span>-AI
+                        </span>
+                    </div>
+                    <p class="text-gray-400 mb-6">AI驱动的云原生中间件管理平台，让复杂的运维工作变得简单高效。</p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fa fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fa fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fa fa-linkedin text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fa fa-youtube-play text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">产品</h3>
+                    <ul class="space-y-3">
+                        <li><a href="#features" class="text-gray-400 hover:text-white transition-colors">特性</a></li>
+                        <li><a href="#middleware" class="text-gray-400 hover:text-white transition-colors">支持的中间件</a></li>
+                        <li><a href="#demo" class="text-gray-400 hover:text-white transition-colors">演示</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">定价</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">路线图</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">资源</h3>
+                    <ul class="space-y-3">
+                        <li><a href="#docs" class="text-gray-400 hover:text-white transition-colors">文档</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">教程</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">博客</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">社区</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">API参考</a></li>
+                    </ul>
+                </div>
+<!--
+                <div>
+                    <h3 class="text-lg font-semibold mb-6">公司</h3>
+                    <ul class="space-y-3">
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">关于我们</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">联系我们</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">招贤纳士</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">隐私政策</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white transition-colors">服务条款</a></li>
+                    </ul>
+                </div>
+            </div>
+-->
+            <div class="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-500 text-sm mb-4 md:mb-0">© 2025 KubeStack-AI. 保留所有权利。</p>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-500 hover:text-gray-300 text-sm transition-colors">隐私政策</a>
+                    <a href="#" class="text-gray-500 hover:text-gray-300 text-sm transition-colors">服务条款</a>
+                    <a href="#" class="text-gray-500 hover:text-gray-300 text-sm transition-colors">Cookie政策</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // 导航栏滚动效果
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('bg-dark/95', 'shadow-lg');
+                navbar.classList.remove('bg-glass');
+            } else {
+                navbar.classList.add('bg-glass');
+                navbar.classList.remove('bg-dark/95', 'shadow-lg');
+            }
+        });
+
+        // 移动端菜单切换
+        document.getElementById('menu-toggle').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    // 关闭移动菜单（如果打开）
+                    document.getElementById('mobile-menu').classList.add('hidden');
+
+                    // 滚动到目标位置
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // 性能对比图表
+        const performanceCtx = document.getElementById('performanceComparisonChart').getContext('2d');
+        const performanceChart = new Chart(performanceCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Redis故障排查', 'MySQL性能优化', 'Kafka集群调整', '中间件日常巡检'],
+                datasets: [
+                    {
+                        label: '传统方式 (分钟)',
+                        data: [45, 60, 90, 30],
+                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                        borderColor: 'rgba(255, 255, 255, 0.4)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'KubeStack-AI (分钟)',
+                        data: [5, 8, 12, 3],
+                        backgroundColor: 'rgba(0, 240, 255, 0.6)',
+                        borderColor: 'rgba(0, 240, 255, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.7)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.7)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'rgba(255, 255, 255, 0.7)'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: '传统方式 vs KubeStack-AI 操作耗时对比',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        font: {
+                            size: 16
+                        }
+                    }
+                }
+            }
+        });
+
+        // 聊天交互模拟
+        document.getElementById('send-message').addEventListener('click', sendMessage);
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            const chatMessages = document.getElementById('chat-messages');
+
+            // 添加用户消息
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'flex items-start mb-4';
+            userMessageDiv.innerHTML = `
+                <div class="h-8 w-8 rounded-full bg-gray-700 flex items-center justify-center mt-0.5 mr-3 flex-shrink-0">
+                    <i class="fa fa-user text-gray-300"></i>
+                </div>
+                <div class="bg-gray-800 rounded-lg rounded-tl-none px-3 py-2 text-sm">
+                    <p>${message}</p>
+                </div>
+            `;
+            chatMessages.appendChild(userMessageDiv);
+
+            // 清空输入
+            input.value = '';
+
+            // 滚动到底部
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // 模拟AI回复
+            setTimeout(() => {
+                const aiResponses = [
+                    "感谢您的提问！我正在分析您的问题...",
+                    "根据您的描述，我需要检查相关指标和配置。请稍候...",
+                    "已识别到可能的问题点，正在生成解决方案...",
+                    "您的问题涉及多个方面，我会逐一分析并提供建议。"
+                ];
+                const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'flex items-start justify-end mb-4';
+                aiMessageDiv.innerHTML = `
+                    <div class="bg-gradient-to-r from-secondary to-accent rounded-lg rounded-tr-none px-3 py-2 text-sm max-w-[80%]">
+                        <p>${randomResponse}</p>
+                    </div>
+                    <div class="h-8 w-8 rounded-full bg-gradient-to-br from-secondary to-accent flex items-center justify-center mt-0.5 ml-3 flex-shrink-0">
+                        <i class="fa fa-robot text-white"></i>
+                    </div>
+                `;
+                chatMessages.appendChild(aiMessageDiv);
+
+                // 滚动到底部
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 1000);
+        }
+
+        // 滚动动画
+        function revealOnScroll() {
+            const elements = document.querySelectorAll('.reveal-element');
+
+            elements.forEach(element => {
+                const elementTop = element.getBoundingClientRect().top;
+                const elementVisible = 150;
+
+                if (elementTop < window.innerHeight - elementVisible) {
+                    element.classList.add('animate-slide-up');
+                    element.style.opacity = '1';
+                }
+            });
+        }
+
+        // 初始化元素状态
+        document.querySelectorAll('.reveal-element').forEach(element => {
+            element.style.opacity = '0';
+        });
+
+        // 初始检查
+        window.addEventListener('load', () => {
+            // 触发滚动事件以设置初始导航栏状态
+            window.dispatchEvent(new Event('scroll'));
+
+            // 检查初始可见元素
+            revealOnScroll();
+        });
+
+        // 监听滚动事件
+        window.addEventListener('scroll', revealOnScroll);
+
+        // 简单的粒子背景模拟
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            const particleCount = 50;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+
+                // 随机大小和位置
+                const size = Math.random() * 3 + 1;
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                const delay = Math.random() * 5;
+                const duration = Math.random() * 20 + 10;
+
+                particle.style.cssText = `
+                    position: absolute;
+                    width: ${size}px;
+                    height: ${size}px;
+                    background: ${i % 5 === 0 ? 'rgba(0, 240, 255, 0.8)' : 'rgba(22, 93, 255, 0.6)'};
+                    border-radius: 50%;
+                    top: ${y}%;
+                    left: ${x}%;
+                    animation: float ${duration}s ease-in-out ${delay}s infinite;
+                    opacity: ${Math.random() * 0.5 + 0.2};
+                `;
+
+                container.appendChild(particle);
+            }
+        }
+
+        // 创建粒子背景
+        createParticles();
+    </script>
+</body>
+</html>
