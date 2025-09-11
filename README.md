@@ -1,64 +1,230 @@
 # KubeStack-AI
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubestack-ai/kubestack-ai)](https://goreportcard.com/report/github.com/kubestack-ai/kubestack-ai)
+<p align="center">
+  <img src="logo.png" alt="KubeStack-AI Logo" width="200" height="200">
+</p>
 
-**KubeStack-AI is an intelligent SRE assistant designed to help you diagnose, analyze, and fix issues with your middleware infrastructure using the power of Large Language Models.**
+<p align="center">
+  <strong>AI-Powered Unified Middleware Management for Kubernetes & Beyond</strong>
+</p>
 
-Whether your Redis is slow, your Kafka cluster is unbalanced, or your MySQL database is throwing errors, the `ksa` command-line tool provides a unified, AI-powered interface to quickly get to the root of the problem and find a solution.
+<p align="center">
+  <a href="https://github.com/turtacn/kubestack-ai/actions"><img src="https://img.shields.io/github/actions/workflow/status/turtacn/kubestack-ai/ci.yml?branch=main" alt="Build Status"></a>
+  <a href="https://github.com/turtacn/kubestack-ai/blob/main/LICENSE"><img src="https://img.shields.io/github/license/turtacn/kubestack-ai" alt="License"></a>
+  <a href="https://github.com/turtacn/kubestack-ai/releases"><img src="https://img.shields.io/github/v/release/turtacn/kubestack-ai" alt="Release"></a>
+  <a href="https://goreportcard.com/report/github.com/turtacn/kubestack-ai"><img src="https://goreportcard.com/badge/github.com/turtacn/kubestack-ai" alt="Go Report Card"></a>
+  <a href="https://codecov.io/gh/turtacn/kubestack-ai"><img src="https://codecov.io/gh/turtacn/kubestack-ai/branch/main/graph/badge.svg" alt="Coverage"></a>
+</p>
 
-## ✨ Features
+<p align="center">
+  <a href="README-zh.md">中文文档</a> •
+  <a href="docs/architecture.md">Architecture</a> •
+  <a href="docs/contributing.md">Contributing</a> •
+  <a href="docs/plugins.md">Plugin Development</a>
+</p>
 
-*   **AI-Driven Diagnosis**: Use natural language to ask "why is my database slow?" and get an analysis backed by real-time data and a comprehensive knowledge base.
-*   **Unified CLI**: A single, consistent command-line tool (`ksa`) to manage and diagnose all your supported middleware (Redis, MySQL, Kafka, Elasticsearch, and more).
-*   **Pluggable Architecture**: Easily extend KubeStack-AI by creating your own plugins for internal tools or currently unsupported middleware.
-*   **Automated Fixes**: Generate execution plans for automated fixes and review them before applying them safely and interactively from your terminal.
-*   **Multi-Environment**: Works seamlessly across Kubernetes, Docker, and bare-metal environments.
+---
 
-## 🚀 Quick Start
+## 🚀 Mission Statement
 
-1.  **Install:**
-    ```bash
-    # Clone the repository and build the binary
-    git clone https://github.com/kubestack-ai/kubestack-ai.git
-    cd kubestack-ai
-    ./scripts/build.sh
-    ```
-    This will create the `ksa` binary in the `./bin` directory for your platform.
+KubeStack-AI is a revolutionary, AI-powered command-line assistant that transforms how you diagnose, manage, and optimize your entire middleware stack running on Kubernetes and bare-metal environments. By combining the power of Large Language Models with deep middleware expertise, KubeStack-AI provides intelligent, natural language-driven operations for complex cloud-native infrastructures.
 
-2.  **Configure:**
-    Set your LLM provider's API key. This is required for the `ask` command and AI-enhanced diagnostics.
-    ```bash
-    # For OpenAI
-    export KSA_LLM_OPENAI_APIKEY="sk-..."
-    ```
+## 🎯 Why KubeStack-AI?
 
-3.  **Run a Diagnosis:**
-    ```bash
-    # Run a diagnosis on a Redis instance
-    # Note: This example assumes a locally running Redis server.
-    ./bin/ksa-linux-amd64 diagnose redis localhost
-    ```
+### The Challenge
+Modern cloud-native environments involve dozens of middleware components (Redis, Kafka, PostgreSQL, MinIO, ElasticSearch, etc.), each with unique operational complexities. Traditional approaches require:
 
-4.  **Ask a Question:**
-    ```bash
-    # Ask the AI assistant for help
-    ./bin/ksa-linux-amd64 ask "what causes high memory fragmentation in redis?"
-    ```
+- **Fragmented Tools**: Different CLI tools for each middleware
+- **Deep Expertise**: Extensive knowledge of each system's internals  
+- **Manual Correlation**: Connecting symptoms across multiple systems
+- **Time-Consuming Diagnosis**: Hours spent troubleshooting complex issues
 
-For more detailed examples and use cases, see the [**Basic Usage Guide**](./examples/basic-usage.md).
+### Our Solution
+KubeStack-AI provides a **unified, AI-driven interface** that:
 
-## 🏛️ Architecture
+✅ **Speaks Your Language**: Natural language queries instead of complex commands  
+✅ **Thinks Holistically**: Cross-middleware correlation and root cause analysis  
+✅ **Acts Intelligently**: AI-powered diagnosis with actionable recommendations  
+✅ **Extends Seamlessly**: Plugin architecture for any middleware  
+✅ **Operates Safely**: Interactive confirmation for critical operations  
 
-KubeStack-AI is built with a modular, layered architecture designed for extensibility and maintainability. For a detailed overview of the components and data flow, please see the [**Architecture Document**](./docs/architecture.md).
+## ⭐ Key Features
+
+### 🔍 **Intelligent Diagnosis**
+- **Multi-Layer Analysis**: System, Kubernetes, and middleware-specific checks
+- **AI-Powered RCA**: Root cause analysis across complex distributed systems
+- **Natural Language Queries**: Ask questions in plain English
+
+### 🛠️ **Universal Middleware Support**
+- **Database Systems**: MySQL, PostgreSQL, MongoDB, Redis, ClickHouse
+- **Message Queues**: Kafka, RabbitMQ, Pulsar
+- **Search & Analytics**: ElasticSearch, OpenSearch
+- **Storage**: MinIO, Ceph
+- **Monitoring**: Prometheus, Grafana
+- **Service Discovery**: etcd, Consul
+
+### 🧩 **Plugin Architecture**
+- **Extensible Design**: Add support for any middleware through plugins
+- **Community Driven**: Open plugin ecosystem
+- **Hot-swappable**: Install, update, and remove plugins without downtime
+
+### 🤖 **AI-Enhanced Operations**
+- **Smart Recommendations**: Context-aware optimization suggestions  
+- **Automated Fixes**: One-click resolution for common issues
+- **Knowledge Integration**: Built-in best practices and troubleshooting guides
+
+## 🚀 Getting Started
+
+### Installation
+
+#### Option 1: Go Install
+```bash
+go install github.com/turtacn/kubestack-ai/cmd/ksa@latest
+````
+
+#### Option 2: Homebrew (macOS/Linux)
+
+```bash
+brew tap turtacn/kubestack-ai
+brew install kubestack-ai
+```
+
+#### Option 3: Download Binary
+
+Visit our [releases page](https://github.com/turtacn/kubestack-ai/releases) to download pre-built binaries.
+
+### Quick Start
+
+```bash
+# Initialize KubeStack-AI
+ksa init
+
+# Diagnose all middleware in current namespace
+ksa diagnose --all
+
+# Ask natural language questions
+ksa ask "Why is my Redis cluster slow?"
+
+# Get specific middleware status
+ksa status redis --namespace production
+
+# List available plugins
+ksa plugin list
+
+# Install a new plugin
+ksa plugin install mongodb
+```
+
+### Basic Usage Examples
+
+#### Example 1: Comprehensive System Health Check
+
+```bash
+$ ksa diagnose --middleware redis,mysql,kafka
+🔍 Analyzing Redis cluster...
+✅ Redis: Healthy (3/3 nodes up, memory usage: 45%)
+
+🔍 Analyzing MySQL primary-replica...
+⚠️  MySQL: Warning detected
+   • Replica lag: 2.3s (threshold: 1s)
+   • Slow queries: 23 in last hour
+
+🔍 Analyzing Kafka cluster...
+❌ Kafka: Critical issues found
+   • Topic 'orders': 50K messages backed up
+   • Consumer group 'payment-service': 5min lag
+
+💡 AI Recommendations:
+   1. MySQL: Consider tuning innodb_buffer_pool_size
+   2. Kafka: Scale consumer group or check processing logic
+```
+
+#### Example 2: Natural Language Troubleshooting
+
+```bash
+$ ksa ask "My application can't connect to the database"
+🤔 Analyzing connection issues...
+
+🔍 Discovered Issues:
+   • PostgreSQL max_connections (100) reached
+   • Connection pool exhaustion in app pods
+   • Network policy blocking traffic on port 5432
+
+🛠️  Suggested Actions:
+   1. Increase max_connections: `ksa exec postgres --set max_connections=200`
+   2. Scale app replicas: `ksa scale app --replicas 5`
+   3. Review network policies: `ksa network analyze postgres`
+
+Execute fixes? [y/N]: 
+```
+
+#### Example 3: Plugin Management
+
+```bash
+$ ksa plugin install clickhouse
+📦 Installing ClickHouse plugin v1.2.0...
+✅ Plugin installed successfully
+
+$ ksa diagnose clickhouse --cluster analytics
+🔍 ClickHouse Cluster Analysis:
+   • Merge queue: 145 items (high)
+   • Query latency P95: 2.3s
+   • Disk usage: 78% on shard-2
+
+💡 Recommendations:
+   • Consider adding more background merge threads
+   • Archive old partitions in 'events' table
+```
+
+## 📖 Documentation
+
+* [**Architecture Overview**](docs/architecture.md) - Technical deep-dive into system design
+* [**Plugin Development Guide**](docs/plugins.md) - Build your own middleware plugins
+* [**Configuration Reference**](docs/configuration.md) - Complete config options
+* [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
+* [**API Reference**](docs/api.md) - REST API and SDK documentation
 
 ## 🤝 Contributing
 
-We welcome contributions of all kinds! Please see our [**Contributing Guide**](./CONTRIBUTING.md) for more details on how to get started with setting up your development environment, our coding standards, and the pull request process.
+We welcome contributions from the community! KubeStack-AI is built by middleware experts for middleware experts.
 
-## 📄 License
+### How to Contribute
 
-This project is licensed under the Apache 2.0 License. See the [LICENSE](./LICENSE) file for details.
+1. **🐛 Report Issues**: Found a bug? [Open an issue](https://github.com/turtacn/kubestack-ai/issues)
+2. **💡 Feature Requests**: Have ideas? [Start a discussion](https://github.com/turtacn/kubestack-ai/discussions)
+3. **🔧 Code Contributions**: [Fork, develop, and submit PRs](docs/contributing.md)
+4. **📝 Documentation**: Help improve our docs
+5. **🧩 Plugin Development**: Build plugins for new middleware
 
-<!-- Personal.AI order the ending -->
+### Development Setup
+
+```bash
+git clone https://github.com/turtacn/kubestack-ai.git
+cd kubestack-ai
+make dev-setup
+make test
+make build
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+## 🏆 Community & Support
+
+* **💬 Discussions**: [GitHub Discussions](https://github.com/turtacn/kubestack-ai/discussions)
+* **🐛 Issues**: [GitHub Issues](https://github.com/turtacn/kubestack-ai/issues)
+* **📧 Email**: [kubestack-ai@turtacn.com](mailto:kubestack-ai@turtacn.com)
+* **🐦 Twitter**: [@KubeStackAI](https://twitter.com/KubeStackAI)
+
+## 📜 License
+
+KubeStack-AI is licensed under the [Apache License 2.0](LICENSE). See [LICENSE](LICENSE) file for details.
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=turtacn/kubestack-ai\&type=Date)](https://star-history.com/#turtacn/kubestack-ai&Date)
+
+---
+
+<p align="center">
+  Built with ❤️ by the KubeStack-AI community
+</p>
