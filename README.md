@@ -29,6 +29,8 @@
 
 KubeStack-AI is a revolutionary, AI-powered command-line assistant that transforms how you diagnose, manage, and optimize your entire middleware stack running on Kubernetes and bare-metal environments. By combining the power of Large Language Models with deep middleware expertise, KubeStack-AI provides intelligent, natural language-driven operations for complex cloud-native infrastructures.
 
+<img src="demo2.gif" width="100%"/>
+
 ## 🎯 Why KubeStack-AI?
 
 ### The Challenge
