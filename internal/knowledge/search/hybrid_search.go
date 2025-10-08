@@ -32,7 +32,17 @@ type hybridSearcher struct {
 	semanticRetriever rag.Retriever
 }
 
-// NewHybridSearcher creates a new hybrid search component.
+// NewHybridSearcher creates a new hybrid searcher that combines lexical search
+// (from a document store) and semantic search (from a retriever). This approach
+// leverages the strengths of both methods to provide more relevant results.
+//
+// Parameters:
+//   keywordStore (store.DocumentStore): The document store to use for keyword-based search.
+//   semanticRetriever (rag.Retriever): The retriever to use for vector-based semantic search.
+//
+// Returns:
+//   Searcher: A new instance of a hybrid searcher.
+//   error: An error if initialization fails (nil in this implementation).
 func NewHybridSearcher(keywordStore store.DocumentStore, semanticRetriever rag.Retriever) (Searcher, error) {
 	return &hybridSearcher{
 		log:               logger.NewLogger("hybrid-searcher"),
@@ -41,7 +51,18 @@ func NewHybridSearcher(keywordStore store.DocumentStore, semanticRetriever rag.R
 	}, nil
 }
 
-// Search executes a keyword and a semantic search in parallel and fuses the results.
+// Search implements the Searcher interface. It executes a keyword search and a
+// semantic search in parallel for a given query. It then fuses the results from
+// both searches using the Reciprocal Rank Fusion (RRF) algorithm to produce a
+// single, re-ranked list of relevant documents.
+//
+// Parameters:
+//   ctx (context.Context): The context for the search operations.
+//   query (string): The user's search query.
+//
+// Returns:
+//   []rag.Document: A slice of documents, sorted by their fused relevance score.
+//   error: An error if both the keyword and semantic searches fail.
 func (s *hybridSearcher) Search(ctx context.Context, query string) ([]rag.Document, error) {
 	s.log.Infof("Performing hybrid search for query: %.50s...", query)
 

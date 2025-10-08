@@ -23,10 +23,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Collector is the interface for gathering contextual information from a Kubernetes cluster.
+// Collector defines the interface for components responsible for gathering
+// contextual information about a workload running in a Kubernetes cluster.
 type Collector interface {
-	// Collect gathers information about Kubernetes resources related to a given workload,
+	// Collect gathers high-level information about Kubernetes resources (such as
+	// Pods, Services, and Deployments) that are related to a specific workload,
 	// identified by its namespace and a label selector.
+	//
+	// Parameters:
+	//   ctx (context.Context): The context for the API requests.
+	//   namespace (string): The namespace of the target workload.
+	//   labelSelector (string): The label selector to identify the workload's resources.
+	//
+	// Returns:
+	//   *models.KubernetesContext: A struct containing the collected resource information.
+	//   error: An error if the collection process fails.
 	Collect(ctx context.Context, namespace, labelSelector string) (*models.KubernetesContext, error)
 }
 
@@ -36,7 +47,15 @@ type collector struct {
 	client *Client
 }
 
-// NewCollector creates a new Kubernetes context collector.
+// NewCollector creates a new Kubernetes context collector that uses the provided
+// client to interact with the Kubernetes API.
+//
+// Parameters:
+//   client (*Client): An initialized Kubernetes client.
+//
+// Returns:
+//   Collector: A new instance of the Kubernetes collector.
+//   error: An error if the provided client is nil.
 func NewCollector(client *Client) (Collector, error) {
 	if client == nil {
 		return nil, fmt.Errorf("k8s client cannot be nil")
@@ -47,8 +66,19 @@ func NewCollector(client *Client) (Collector, error) {
 	}, nil
 }
 
-// Collect gathers information about Kubernetes resources (Pods, Services, Deployments, etc.)
-// that match the provided namespace and label selector.
+// Collect implements the Collector interface. It gathers information about key
+// Kubernetes resources (currently Pods, Services, and Deployments) that match the
+// provided namespace and label selector. It aggregates this information into a
+// `KubernetesContext` model for use by the diagnosis engine.
+//
+// Parameters:
+//   ctx (context.Context): The context for the Kubernetes API requests.
+//   namespace (string): The namespace to search for resources in.
+//   labelSelector (string): A label selector string to identify the relevant resources.
+//
+// Returns:
+//   *models.KubernetesContext: A pointer to a struct containing the collected resource information.
+//   error: An error if there is a failure in listing the core resources (like Pods).
 func (c *collector) Collect(ctx context.Context, namespace, labelSelector string) (*models.KubernetesContext, error) {
 	c.log.Infof("Collecting Kubernetes context for namespace '%s' with selector '%s'", namespace, labelSelector)
 

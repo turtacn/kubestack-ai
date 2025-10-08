@@ -21,6 +21,13 @@ import (
 
 // Truncate cuts a string to a maximum length and appends an ellipsis ("…") if it was cut.
 // This function is safe for multi-byte UTF-8 characters.
+//
+// Parameters:
+//   s (string): The input string to truncate.
+//   maxLength (int): The maximum number of characters to allow before truncating.
+//
+// Returns:
+//   string: The truncated string, with an ellipsis if it was shortened.
 func Truncate(s string, maxLength int) string {
 	if maxLength <= 0 {
 		return ""
@@ -35,6 +42,12 @@ func Truncate(s string, maxLength int) string {
 }
 
 // IsBlank checks if a string is empty ("") or consists only of whitespace characters.
+//
+// Parameters:
+//   s (string): The string to check.
+//
+// Returns:
+//   bool: True if the string is empty or contains only whitespace, false otherwise.
 func IsBlank(s string) bool {
 	return strings.TrimSpace(s) == ""
 }
@@ -42,6 +55,13 @@ func IsBlank(s string) bool {
 // Levenshtein calculates the Levenshtein distance between two strings. This distance is
 // the minimum number of single-character edits (insertions, deletions, or substitutions)
 // required to change one word into the other. It's a common way to measure string similarity.
+//
+// Parameters:
+//   a (string): The first string for comparison.
+//   b (string): The second string for comparison.
+//
+// Returns:
+//   int: The Levenshtein distance (edit distance) between the two strings.
 func Levenshtein(a, b string) int {
 	s1 := []rune(a)
 	s2 := []rune(b)

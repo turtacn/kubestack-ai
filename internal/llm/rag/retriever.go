@@ -23,15 +23,22 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store" // Will be created later
 )
 
-// Document represents a single chunk of retrieved information, ready to be injected into an LLM prompt.
+// Document represents a single chunk of retrieved information that is considered
+// relevant to a query. It is ready to be injected into an LLM prompt to provide context.
 type Document struct {
-	Content  string                 `json:"content"`
+	// Content is the text of the document chunk.
+	Content string `json:"content"`
+	// Metadata contains additional information about the document, such as its source URL.
 	Metadata map[string]interface{} `json:"metadata"`
-	Score    float32                `json:"score"` // The relevance score from the search.
+	// Score indicates the relevance of the document to the query, as determined by the search mechanism.
+	Score float32 `json:"score"`
 }
 
-// Retriever is the interface for retrieving relevant documents from a knowledge base in response to a query.
+// Retriever defines the interface for components that retrieve relevant documents
+// from a knowledge base in response to a user query. This is a core part of the
+// Retrieval-Augmented Generation (RAG) pattern.
 type Retriever interface {
+	// Retrieve finds the top K most relevant documents for a given query.
 	Retrieve(ctx context.Context, query string, topK int) ([]Document, error)
 }
 
@@ -43,8 +50,17 @@ type vectorRetriever struct {
 	vectorStore store.VectorStore // From knowledge/store/vector_store.go
 }
 
-// NewRetriever creates a new vector-based retriever. It requires an embedder to convert
-// the query to a vector and a vector store to search for similar document vectors.
+// NewRetriever creates a new vector-based retriever. It composes an embedder
+// (to convert the query to a vector) and a vector store (to search for similar
+// document vectors), which together form the core of a semantic search pipeline.
+//
+// Parameters:
+//   embedder (Embedder): The component used to create query embeddings.
+//   vectorStore (store.VectorStore): The vector database to search against.
+//
+// Returns:
+//   Retriever: A new instance of a vector-based retriever.
+//   error: An error if either the embedder or vector store is nil.
 func NewRetriever(embedder Embedder, vectorStore store.VectorStore) (Retriever, error) {
 	if embedder == nil {
 		return nil, fmt.Errorf("embedder cannot be nil")
@@ -59,7 +75,18 @@ func NewRetriever(embedder Embedder, vectorStore store.VectorStore) (Retriever, 
 	}, nil
 }
 
-// Retrieve finds the top K most relevant documents for a given query using semantic search.
+// Retrieve implements the Retriever interface. It finds the top K most relevant
+// documents for a given query by first converting the query into a vector
+// embedding and then using that vector to perform a similarity search in the vector store.
+//
+// Parameters:
+//   ctx (context.Context): The context for the retrieval operation.
+//   query (string): The natural language user query.
+//   topK (int): The number of top matching documents to retrieve.
+//
+// Returns:
+//   []Document: A ranked list of the most relevant documents.
+//   error: An error if embedding the query or searching the vector store fails.
 func (r *vectorRetriever) Retrieve(ctx context.Context, query string, topK int) ([]Document, error) {
 	r.log.Infof("Retrieving top %d documents for query: %s", topK, query)
 

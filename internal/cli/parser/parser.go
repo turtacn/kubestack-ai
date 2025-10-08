@@ -26,18 +26,31 @@ import (
 )
 
 // Parser provides centralized validation and parsing logic for CLI inputs.
+// It is used to ensure that user-provided arguments and flags conform to
+// application-specific rules that go beyond basic type checking.
 type Parser struct {
 	// This struct could hold configuration for validation rules in the future,
 	// allowing for more dynamic validation behavior.
 }
 
-// NewParser creates a new parser.
+// NewParser creates and returns a new instance of the Parser.
+// This constructor allows for a consistent way to initialize the parser.
+//
+// Returns:
+//   *Parser: A pointer to a new Parser object.
 func NewParser() *Parser {
 	return &Parser{}
 }
 
 // ValidateMiddlewareType checks if the given string is a supported middleware type
 // and returns the corresponding enum value. This centralizes the list of supported types.
+//
+// Parameters:
+//   arg (string): The user-provided middleware type string (e.g., "redis", "mysql").
+//
+// Returns:
+//   enum.MiddlewareType: The corresponding enum value if the type is valid.
+//   error: An error if the provided string is not a supported middleware type.
 func (p *Parser) ValidateMiddlewareType(arg string) (enum.MiddlewareType, error) {
 	// A map-based approach is scalable and clear.
 	supportedTypes := map[string]enum.MiddlewareType{
@@ -61,6 +74,12 @@ func (p *Parser) ValidateMiddlewareType(arg string) (enum.MiddlewareType, error)
 }
 
 // ValidateOutputFormat checks if the given string is a supported output format.
+//
+// Parameters:
+//   arg (string): The user-provided output format string (e.g., "json", "yaml").
+//
+// Returns:
+//   error: An error if the format is not supported, otherwise nil.
 func (p *Parser) ValidateOutputFormat(arg string) error {
 	supported := map[string]bool{
 		"text": true,
@@ -75,6 +94,15 @@ func (p *Parser) ValidateOutputFormat(arg string) error {
 
 // SanitizeInput performs basic sanitization on a user-provided string to remove
 // characters that are often used in shell command injection attacks.
+//
+// NOTE: This provides a basic layer of defense and should not be the sole security measure.
+// The primary security strategy should be to avoid executing shell commands from user input.
+//
+// Parameters:
+//   input (string): The raw string to be sanitized.
+//
+// Returns:
+//   string: The sanitized string with potentially harmful characters removed.
 func (p *Parser) SanitizeInput(input string) string {
 	// NOTE: This is a basic sanitizer and should not be solely relied upon for security.
 	// The best practice is to avoid executing arbitrary strings and instead use

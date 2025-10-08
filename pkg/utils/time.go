@@ -22,16 +22,36 @@ import (
 
 // ToUnixMilliseconds converts a time.Time object to Unix time in milliseconds.
 // This format is commonly used in APIs and databases.
+//
+// Parameters:
+//   t (time.Time): The time object to convert.
+//
+// Returns:
+//   int64: The Unix time in milliseconds.
 func ToUnixMilliseconds(t time.Time) int64 {
 	return t.UnixNano() / int64(time.Millisecond)
 }
 
 // FromUnixMilliseconds converts Unix time in milliseconds back to a time.Time object.
+//
+// Parameters:
+//   ms (int64): The Unix time in milliseconds.
+//
+// Returns:
+//   time.Time: The corresponding time.Time object.
 func FromUnixMilliseconds(ms int64) time.Time {
 	return time.Unix(0, ms*int64(time.Millisecond))
 }
 
 // TimeIn returns the time `t` converted to the specified timezone location string (e.g., "America/New_York").
+//
+// Parameters:
+//   t (time.Time): The time to convert.
+//   location (string): The IANA Time Zone database name (e.g., "UTC", "America/New_York").
+//
+// Returns:
+//   time.Time: The time in the new location.
+//   error: An error if the location cannot be loaded.
 func TimeIn(t time.Time, location string) (time.Time, error) {
 	loc, err := time.LoadLocation(location)
 	if err != nil {
@@ -42,6 +62,12 @@ func TimeIn(t time.Time, location string) (time.Time, error) {
 
 // FormatDuration formats a time.Duration into a more human-readable string,
 // showing days, hours, minutes, and seconds.
+//
+// Parameters:
+//   d (time.Duration): The duration to format.
+//
+// Returns:
+//   string: A human-readable representation of the duration (e.g., "2d 4h 30m 15s").
 func FormatDuration(d time.Duration) string {
 	if d < time.Second {
 		return "less than a second"

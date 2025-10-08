@@ -16,67 +16,98 @@ package models
 
 import "context"
 
-// ExecutionContext is the top-level context container for a single operation.
-// It aggregates various specific contexts and is passed through the system to provide
-// state and information to all components involved in processing a request.
+// ExecutionContext is the top-level data container for a single operation. It
+// aggregates various specific contexts (user, system, Kubernetes, etc.) and is
+// passed through the system to provide state and information to all components
+// involved in processing a request.
 type ExecutionContext struct {
-	Session    *SessionContext    `json:"session" yaml:"session"`
-	User       *UserContext       `json:"user" yaml:"user"`
-	System     *SystemContext     `json:"system,omitempty" yaml:"system,omitempty"`
+	// Session holds information about the current user session.
+	Session *SessionContext `json:"session" yaml:"session"`
+	// User holds information about the user executing the command.
+	User *UserContext `json:"user" yaml:"user"`
+	// System holds information about the host system being targeted.
+	System *SystemContext `json:"system,omitempty" yaml:"system,omitempty"`
+	// Kubernetes holds information about the Kubernetes cluster being targeted.
 	Kubernetes *KubernetesContext `json:"kubernetes,omitempty" yaml:"kubernetes,omitempty"`
+	// Middleware holds context specific to the middleware instance being diagnosed.
 	Middleware *MiddlewareContext `json:"middleware,omitempty" yaml:"middleware,omitempty"`
 
-	// GoContext is the standard Go context for handling cancellation, deadlines, and passing request-scoped values.
-	// It is not serialized.
+	// GoContext is the standard Go context for handling cancellation, deadlines, and
+	// passing request-scoped values. It is intentionally not serialized.
 	GoContext context.Context `json:"-" yaml:"-"`
 }
 
-// SessionContext holds information about the current user session.
+// SessionContext holds information about the current user session, which is
+// useful for tracking and auditing.
 type SessionContext struct {
+	// SessionID is a unique identifier for the user's session.
 	SessionID string `json:"sessionId" yaml:"sessionId"`
-	StartTime int64  `json:"startTime" yaml:"startTime"`
+	// StartTime is the Unix timestamp when the session began.
+	StartTime int64 `json:"startTime" yaml:"startTime"`
 }
 
-// UserContext holds information about the user executing the command.
+// UserContext holds information about the user executing the command, including
+// their identity and permissions.
 type UserContext struct {
-	Username    string            `json:"username" yaml:"username"`
-	Permissions []string          `json:"permissions" yaml:"permissions"`
+	// Username is the identifier for the user.
+	Username string `json:"username" yaml:"username"`
+	// Permissions is a list of permissions the user has, which can be used for RBAC checks.
+	Permissions []string `json:"permissions" yaml:"permissions"`
+	// Preferences holds any user-specific preferences that might affect command behavior.
 	Preferences map[string]string `json:"preferences,omitempty" yaml:"preferences,omitempty"`
 }
 
-// SystemContext holds information about the host system where the command is running or targeting.
+// SystemContext holds information about the host operating system where the
+// command is running or targeting.
 type SystemContext struct {
-	OS       string `json:"os" yaml:"os"`
-	Arch     string `json:"arch" yaml:"arch"`
+	// OS is the name of the operating system (e.g., "linux", "darwin").
+	OS string `json:"os" yaml:"os"`
+	// Arch is the system's architecture (e.g., "amd64", "arm64").
+	Arch string `json:"arch" yaml:"arch"`
+	// Hostname is the hostname of the system.
 	Hostname string `json:"hostname" yaml:"hostname"`
-	// Additional hardware and network info can be added here.
 }
 
-// KubernetesContext holds information about the Kubernetes cluster being targeted.
+// KubernetesContext holds information about the Kubernetes cluster being targeted,
+// including connection details and a list of relevant discovered resources.
 type KubernetesContext struct {
-	ClusterName string         `json:"clusterName" yaml:"clusterName"`
-	Kubeconfig  string         `json:"-" yaml:"-"` // Sensitive data, excluded from serialization.
-	Namespace   string         `json:"namespace" yaml:"namespace"`
-	Resources   []*K8sResource `json:"resources,omitempty" yaml:"resources,omitempty"`
+	// ClusterName is the name of the Kubernetes cluster.
+	ClusterName string `json:"clusterName" yaml:"clusterName"`
+	// Kubeconfig is the path to the kubeconfig file. It is excluded from serialization for security.
+	Kubeconfig string `json:"-" yaml:"-"`
+	// Namespace is the specific namespace being targeted within the cluster.
+	Namespace string `json:"namespace" yaml:"namespace"`
+	// Resources is a list of Kubernetes resources relevant to the current operation.
+	Resources []*K8sResource `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
-// K8sResource represents a single discovered Kubernetes resource relevant to the context.
+// K8sResource represents a single discovered Kubernetes resource, providing
+// enough information to uniquely identify it.
 type K8sResource struct {
+	// Kind is the type of the resource (e.g., "Pod", "Service", "Deployment").
 	Kind string `json:"kind" yaml:"kind"`
+	// Name is the name of the resource instance.
 	Name string `json:"name" yaml:"name"`
-	UID  string `json:"uid" yaml:"uid"`
+	// UID is the unique identifier for the resource provided by Kubernetes.
+	UID string `json:"uid" yaml:"uid"`
 }
 
-// MiddlewareContext holds context specific to the middleware instance being diagnosed.
+// MiddlewareContext holds context specific to the middleware instance being
+// diagnosed, such as its type and version.
 type MiddlewareContext struct {
-	Type    string `json:"type" yaml:"type"`
+	// Type is the type of the middleware (e.g., "Redis", "MySQL").
+	Type string `json:"type" yaml:"type"`
+	// Version is the detected version of the middleware instance.
 	Version string `json:"version" yaml:"version"`
-	// Other middleware-specific contextual information can be added here.
 }
 
-// Merge combines another ExecutionContext into the current one.
-// Non-nil fields from the 'other' context will overwrite the corresponding fields in the receiver.
-// This is useful for building up context as more information is discovered.
+// Merge combines another ExecutionContext into the current one. Non-nil fields
+// from the `other` context will overwrite the corresponding fields in the receiver.
+// This is useful for progressively building up the context as more information is
+// discovered during an operation.
+//
+// Parameters:
+//   other (*ExecutionContext): The context to merge into the current one.
 func (ec *ExecutionContext) Merge(other *ExecutionContext) {
 	if other.Session != nil {
 		ec.Session = other.Session
@@ -98,8 +129,12 @@ func (ec *ExecutionContext) Merge(other *ExecutionContext) {
 	}
 }
 
-// Sanitize returns a deep copy of the context with sensitive information removed or redacted.
-// This is useful for logging or exporting context data without leaking secrets.
+// Sanitize returns a deep copy of the context with sensitive information, such
+// as the Kubeconfig, removed or redacted. This is a crucial utility for logging
+// or exporting context data without leaking secrets.
+//
+// Returns:
+//   *ExecutionContext: A new, sanitized instance of the ExecutionContext.
 func (ec *ExecutionContext) Sanitize() *ExecutionContext {
 	// Create a shallow copy first
 	sanitized := *ec

@@ -34,7 +34,16 @@ type geminiClient struct {
 	log       logger.Logger
 }
 
-// NewGeminiClient creates a new client for interacting with Google Gemini.
+// NewGeminiClient creates a new client for interacting with the Google Gemini API.
+// It initializes the generative and embedding models using the provided API key.
+//
+// Parameters:
+//   ctx (context.Context): The context for client initialization.
+//   apiKey (string): The Google AI API key for authentication.
+//
+// Returns:
+//   interfaces.LLMClient: A new client that satisfies the LLMClient interface.
+//   error: An error if the API key is missing or client creation fails.
 func NewGeminiClient(ctx context.Context, apiKey string) (interfaces.LLMClient, error) {
 	if apiKey == "" {
 		return nil, errors.New("Google Gemini API key cannot be empty")
@@ -56,7 +65,17 @@ func NewGeminiClient(ctx context.Context, apiKey string) (interfaces.LLMClient, 
 	}, nil
 }
 
-// SendMessage sends a standard, non-streaming request.
+// SendMessage sends a standard, non-streaming request to the Gemini API.
+// It constructs a chat session from the provided message history and sends the
+// final message to get a complete response.
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   req (*interfaces.LLMRequest): The request containing the message history.
+//
+// Returns:
+//   *interfaces.LLMResponse: A response containing the assistant's complete message.
+//   error: An error if the API call fails.
 func (c *geminiClient) SendMessage(ctx context.Context, req *interfaces.LLMRequest) (*interfaces.LLMResponse, error) {
 	c.log.Debugf("Sending chat completion request to Gemini model")
 
@@ -85,7 +104,17 @@ func (c *geminiClient) SendMessage(ctx context.Context, req *interfaces.LLMReque
 	}, nil
 }
 
-// SendStreamingMessage sends a request and returns a channel for streaming the response.
+// SendStreamingMessage sends a request to the Gemini API and returns a channel
+// from which response chunks can be read in real-time. This is useful for
+// providing immediate feedback to the user in interactive applications.
+//
+// Parameters:
+//   ctx (context.Context): The context for the streaming API request.
+//   req (*interfaces.LLMRequest): The request containing the message history.
+//
+// Returns:
+//   <-chan interfaces.StreamingChunk: A read-only channel for receiving response chunks.
+//   error: An error if the initial request fails.
 func (c *geminiClient) SendStreamingMessage(ctx context.Context, req *interfaces.LLMRequest) (<-chan interfaces.StreamingChunk, error) {
 	c.log.Debugf("Sending streaming chat completion request to Gemini model")
 
@@ -126,7 +155,16 @@ func (c *geminiClient) SendStreamingMessage(ctx context.Context, req *interfaces
 	return chunkChan, nil
 }
 
-// GenerateEmbedding converts text to vector embeddings.
+// GenerateEmbedding converts a batch of text inputs into their vector embedding
+// representations using the configured Gemini embedding model.
+//
+// Parameters:
+//   ctx (context.Context): The context for the embedding API request.
+//   req (*interfaces.EmbeddingRequest): The request containing the text inputs.
+//
+// Returns:
+//   *interfaces.EmbeddingResponse: A response containing the generated embeddings.
+//   error: An error if the API call fails.
 func (c *geminiClient) GenerateEmbedding(ctx context.Context, req *interfaces.EmbeddingRequest) (*interfaces.EmbeddingResponse, error) {
 	batch := c.embModel.NewBatch()
 	for _, input := range req.Input {

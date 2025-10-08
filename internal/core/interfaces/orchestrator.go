@@ -23,26 +23,32 @@ import (
 	llm_interfaces "github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
 )
 
-// RequestContext holds all relevant information for a single user request,
-// passed down from the UI layer to the core components.
+// RequestContext encapsulates all relevant information for a single user request,
+// which is passed from the entrypoint (e.g., CLI) down to the core components.
 type RequestContext struct {
-	Context  context.Context
-	Command  string
-	Args     []string
-	Flags    map[string]string
-	RawInput string // Used specifically for the 'ask' command's natural language input.
+	// Context is the Go context for the request, used for cancellation and deadlines.
+	Context context.Context
+	// Command is the name of the command that was invoked (e.g., "diagnose").
+	Command string
+	// Args is a slice of positional arguments provided by the user.
+	Args []string
+	// Flags is a map of command-line flags and their values.
+	Flags map[string]string
+	// RawInput is the unprocessed input string, used specifically for the 'ask' command.
+	RawInput string
 }
 
-// OrchestratorConfig holds the configuration needed by the core orchestrator to initialize its components.
+// OrchestratorConfig holds the configuration needed by the core orchestrator to
+// initialize its sub-components, such as the diagnosis and execution managers.
 type OrchestratorConfig struct {
 	// This struct can hold configurations for sub-managers like PluginManager,
 	// DiagnosisManager, etc., if they need specific settings not available globally.
 }
 
-// Orchestrator is the central nervous system of KubeStack-AI. It receives requests
-// from the UI layer (e.g., CLI), coordinates the necessary components (plugins,
-// diagnosis, execution), and returns the results. Its methods are designed to be
-// asynchronous and cancellable via the context parameter.
+// Orchestrator defines the contract for the central nervous system of KubeStack-AI.
+// It receives requests from the UI layer (e.g., CLI), coordinates the necessary
+// sub-components (plugins, diagnosis, execution), and returns the results. Its
+// methods are designed to be asynchronous and cancellable via the context parameter.
 type Orchestrator interface {
 	// ProcessRequest is the main entry point for requests originating from the CLI or API.
 	// It inspects the RequestContext and routes the request to the appropriate specialized method.
@@ -55,20 +61,20 @@ type Orchestrator interface {
 	// It's a long-running operation that streams progress updates to the provided channel.
 	ExecuteDiagnosis(ctx context.Context, req *models.DiagnosisRequest, progressChan chan<- DiagnosisProgress) (*models.DiagnosisResult, error)
 
-	// ProcessNaturalLanguage handles a natural language query from the user.
-	// This is the non-streaming version.
+	// ProcessNaturalLanguage handles a natural language query from the user, providing a single, complete response.
 	ProcessNaturalLanguage(ctx context.Context, query string) (string, error)
 
-	// ProcessNaturalLanguageStream handles a natural language query and streams the response.
+	// ProcessNaturalLanguageStream handles a natural language query and streams the response
+	// back to the caller in real-time chunks.
 	ProcessNaturalLanguageStream(ctx context.Context, query string) (<-chan llm_interfaces.StreamingChunk, error)
 
 	// PlanExecution generates a detailed execution plan for a set of proposed actions.
 	PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error)
 
-	// ManageExecution handles the planning and execution of fix actions.
+	// ManageExecution handles the safe, user-confirmed execution of a plan.
 	ManageExecution(ctx context.Context, plan *models.ExecutionPlan, confirmFunc ConfirmationFunc) (*models.ExecutionResult, error)
 
-	// ValidateExecution checks if the execution was successful and the original issue is resolved.
+	// ValidateExecution checks if an execution was successful and the original issue is resolved.
 	ValidateExecution(ctx context.Context, result *models.ExecutionResult) error
 }
 

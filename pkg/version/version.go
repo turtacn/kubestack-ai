@@ -25,23 +25,38 @@ import (
 // go build -ldflags "-X 'github.com/kubestack-ai/kubestack-ai/pkg/version.Version=v1.0.0' \
 // -X 'github.com/kubestack-ai/kubestack-ai/pkg/version.GitCommit=...'"
 var (
-	Version   = "dev" // Default to 'dev' for local builds
+	// Version is the semantic version of the application. It is populated at build time.
+	Version = "dev" // Default to 'dev' for local builds
+	// GitCommit is the short git commit hash of the source code. It is populated at build time.
 	GitCommit = "unknown"
+	// BuildDate is the date when the binary was built. It is populated at build time.
 	BuildDate = "unknown"
+	// GoVersion is the version of the Go compiler used to build the binary.
 	GoVersion = runtime.Version()
-	Platform  = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	// Platform is the operating system and architecture for which the binary was built.
+	Platform = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 )
 
-// Info holds all version-related information.
+// Info holds all version-related information in a structured format.
+// This struct is useful for serializing version data to formats like JSON.
 type Info struct {
-	Version   string `json:"version"`
+	// Version is the semantic version of the application.
+	Version string `json:"version"`
+	// GitCommit is the short git commit hash of the source code.
 	GitCommit string `json:"gitCommit"`
+	// BuildDate is the date when the binary was built.
 	BuildDate string `json:"buildDate"`
+	// GoVersion is the version of the Go compiler used.
 	GoVersion string `json:"goVersion"`
-	Platform  string `json:"platform"`
+	// Platform is the operating system and architecture.
+	Platform string `json:"platform"`
 }
 
-// Get returns a struct containing all the version information.
+// Get returns a struct containing all the version information, populated from the
+// package-level variables.
+//
+// Returns:
+//   Info: A struct filled with the application's version details.
 func Get() Info {
 	return Info{
 		Version:   Version,
@@ -54,6 +69,9 @@ func Get() Info {
 
 // String returns a nicely formatted, multi-line string representation of the version info,
 // suitable for printing in a CLI `version` command.
+//
+// Returns:
+//   string: A formatted string containing all version details.
 func (i Info) String() string {
 	return fmt.Sprintf(
 		`Version: %s

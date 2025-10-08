@@ -33,7 +33,14 @@ type collector struct {
 	base   *base.CollectorBase
 }
 
-// newCollector creates a new Redis data collector.
+// newCollector creates a new data collector for Redis.
+//
+// Parameters:
+//   client (*redis.Client): An initialized Redis client.
+//   log (logger.Logger): A contextualized logger for the collector.
+//
+// Returns:
+//   *collector: A new instance of the Redis collector.
 func newCollector(client *redis.Client, log logger.Logger) *collector {
 	return &collector{
 		client: client,
@@ -42,8 +49,12 @@ func newCollector(client *redis.Client, log logger.Logger) *collector {
 	}
 }
 
-// CollectInfo retrieves and parses the output of the Redis INFO command.
-// This is a primary source of diagnostic data.
+// CollectInfo retrieves and parses the output of the Redis `INFO ALL` command,
+// which is a primary source of diagnostic data.
+//
+// Returns:
+//   map[string]string: A map of info fields to their values.
+//   error: An error if the command fails after retries.
 func (c *collector) CollectInfo(ctx context.Context) (map[string]string, error) {
 	c.log.Info("Collecting Redis INFO ALL.")
 	res, err := c.base.Retry("Redis_INFO", func() (interface{}, error) {
@@ -68,7 +79,11 @@ func (c *collector) CollectInfo(ctx context.Context) (map[string]string, error) 
 	return infoMap, nil
 }
 
-// CollectConfig retrieves the Redis configuration using the CONFIG GET command.
+// CollectConfig retrieves the live Redis configuration using the `CONFIG GET *` command.
+//
+// Returns:
+//   *models.ConfigData: A structured representation of the configuration.
+//   error: An error if the command fails after retries.
 func (c *collector) CollectConfig(ctx context.Context) (*models.ConfigData, error) {
 	c.log.Info("Collecting Redis CONFIG.")
 	res, err := c.base.Retry("Redis_CONFIG_GET", func() (interface{}, error) {
@@ -90,10 +105,14 @@ func (c *collector) CollectConfig(ctx context.Context) (*models.ConfigData, erro
 	return &models.ConfigData{Data: configMap}, nil
 }
 
-// CollectSlowLog retrieves entries from the Redis slow query log.
+// CollectSlowLog retrieves entries from the Redis slow query log using the
+// `SLOWLOG GET` command. It fetches up to 128 of the most recent slowlog entries.
+//
+// Returns:
+//   *models.LogData: A structured representation of the slowlog entries.
+//   error: An error if the command fails after retries.
 func (c *collector) CollectSlowLog(ctx context.Context) (*models.LogData, error) {
 	c.log.Info("Collecting Redis SLOWLOG.")
-	// Get up to 128 of the most recent slowlog entries.
 	res, err := c.base.Retry("Redis_SLOWLOG_GET", func() (interface{}, error) {
 		return c.client.SlowLogGet(ctx, 128).Result()
 	})
@@ -110,7 +129,13 @@ func (c *collector) CollectSlowLog(ctx context.Context) (*models.LogData, error)
 	return &models.LogData{Entries: logEntries}, nil
 }
 
-// CollectMetrics derives key performance indicators from the INFO command's data.
+// CollectMetrics derives a standardized set of key performance indicators from the
+// raw data collected from the `INFO` command. It converts key status variables
+// to numeric types and calculates derived metrics like the cache hit rate.
+//
+// Returns:
+//   *models.MetricsData: A structured representation of the key metrics.
+//   error: An error if the underlying `INFO` data collection fails.
 func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	c.log.Info("Collecting and deriving Redis metrics.")
 	info, err := c.CollectInfo(ctx)
@@ -119,14 +144,13 @@ func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, er
 	}
 
 	metrics := make(map[string]interface{})
-	stringToIntMetrics := []string{
+	stringToFloatMetrics := []string{
 		"connected_clients", "used_memory", "used_memory_rss", "mem_fragmentation_ratio",
 		"total_commands_processed", "instantaneous_ops_per_sec", "keyspace_hits", "keyspace_misses",
 	}
 
-	for _, key := range stringToIntMetrics {
+	for _, key := range stringToFloatMetrics {
 		if valStr, ok := info[key]; ok {
-			// Some values like mem_fragmentation_ratio can be floats
 			if val, err := strconv.ParseFloat(valStr, 64); err == nil {
 				metrics[key] = val
 			}

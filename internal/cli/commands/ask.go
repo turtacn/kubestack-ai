@@ -22,7 +22,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// This function creates and configures the `ask` command.
+// newAskCmd creates and configures the `ask` command.
+// This command allows users to ask questions in natural language to the KubeStack-AI assistant.
+// It sets up the command's usage, short and long descriptions, examples, and the execution logic (`RunE`).
+// The execution logic captures the user's question, sends it to the orchestrator,
+// and streams the response back to the console.
+//
+// Returns:
+//   *cobra.Command: A pointer to the configured cobra.Command object for the `ask` command.
 func newAskCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ask [question...]",

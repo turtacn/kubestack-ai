@@ -34,7 +34,31 @@ type pluginManager struct {
 	mu            sync.RWMutex
 }
 
-// NewManager creates a new instance of the plugin manager.
+// NewManager creates a new instance of the plugin manager. It requires a registry
+// to find available plugins and a loader to load them into memory.
+//
+// Parameters:
+//   registry (interfaces.PluginRegistry): The registry for discovering plugin manifests.
+//   loader (interfaces.PluginLoader): The loader for loading plugin code.
+//
+// Returns:
+// NewManager creates a new instance of the plugin manager. It requires a registry
+// to find available plugins and a loader to load them into memory.
+//
+// Parameters:
+//   registry (interfaces.PluginRegistry): The registry for discovering plugin manifests.
+//   loader (interfaces.PluginLoader): The loader for loading plugin code.
+//
+// Returns:
+// NewManager creates a new instance of the plugin manager. It requires a registry
+// to find available plugins and a loader to load them into memory.
+//
+// Parameters:
+//   registry (interfaces.PluginRegistry): The registry for discovering plugin manifests.
+//   loader (interfaces.PluginLoader): The loader for loading plugin code.
+//
+// Returns:
+//   interfaces.PluginManager: A new, configured plugin manager.
 func NewManager(registry interfaces.PluginRegistry, loader interfaces.PluginLoader) interfaces.PluginManager {
 	return &pluginManager{
 		log:           logger.NewLogger("plugin-manager"),
@@ -44,7 +68,16 @@ func NewManager(registry interfaces.PluginRegistry, loader interfaces.PluginLoad
 	}
 }
 
-// LoadPlugin finds, loads, and initializes a plugin by name. It is thread-safe.
+// LoadPlugin finds a plugin in the registry, uses the loader to load its code,
+// and stores the initialized instance for future use. It is thread-safe and
+// caches already loaded plugins to prevent redundant work.
+//
+// Parameters:
+//   pluginName (string): The name of the plugin to load.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: The loaded and initialized plugin.
+//   error: An error if the plugin cannot be found, loaded, or initialized.
 func (m *pluginManager) LoadPlugin(pluginName string) (interfaces.MiddlewarePlugin, error) {
 	m.mu.RLock()
 	plugin, loaded := m.loadedPlugins[pluginName]
@@ -96,7 +129,16 @@ func (m *pluginManager) LoadPlugin(pluginName string) (interfaces.MiddlewarePlug
 	return newPlugin, nil
 }
 
-// UnloadPlugin removes a plugin from the manager's control.
+// UnloadPlugin removes a plugin from the manager's control. This operation is thread-safe.
+// NOTE: For Go plugins, this does not truly unload the code from memory but makes
+// the plugin unavailable through the manager and eligible for garbage collection if
+// it has a `Shutdown` method to release its resources.
+//
+// Parameters:
+//   pluginName (string): The name of the plugin to unload.
+//
+// Returns:
+//   error: An error if the plugin is not currently loaded.
 func (m *pluginManager) UnloadPlugin(pluginName string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -105,17 +147,19 @@ func (m *pluginManager) UnloadPlugin(pluginName string) error {
 		return fmt.Errorf("plugin '%s' is not loaded", pluginName)
 	}
 
-	// NOTE: For Go plugins loaded from .so files, true unloading of the code from memory
-	// is not supported by the runtime. This operation primarily removes the plugin from
-	// the manager's control and allows for garbage collection if there are no other references.
-	// A robust implementation would require a `Shutdown()` method on the plugin interface
-	// to allow it to clean up its own resources (e.g., close network connections).
 	delete(m.loadedPlugins, pluginName)
 	m.log.Infof("Plugin '%s' unloaded.", pluginName)
 	return nil
 }
 
-// GetPlugin retrieves a loaded plugin by its name.
+// GetPlugin retrieves a loaded plugin from the cache by its name. This operation is thread-safe.
+//
+// Parameters:
+//   pluginName (string): The name of the plugin to retrieve.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: The plugin instance if found.
+//   bool: True if the plugin was found, false otherwise.
 func (m *pluginManager) GetPlugin(pluginName string) (interfaces.MiddlewarePlugin, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -123,7 +167,11 @@ func (m *pluginManager) GetPlugin(pluginName string) (interfaces.MiddlewarePlugi
 	return plugin, ok
 }
 
-// ListPlugins returns a slice of all currently loaded plugins.
+// ListPlugins returns a slice of all currently loaded and active plugins.
+// This operation is thread-safe.
+//
+// Returns:
+//   []interfaces.MiddlewarePlugin: A slice of the loaded plugins.
 func (m *pluginManager) ListPlugins() []interfaces.MiddlewarePlugin {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

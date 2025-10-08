@@ -29,7 +29,14 @@ type collector struct {
 	log logger.Logger
 }
 
-// newCollector creates a new MySQL data collector.
+// newCollector creates a new data collector for MySQL.
+//
+// Parameters:
+//   db (*sql.DB): An active database connection pool.
+//   log (logger.Logger): A contextualized logger for the collector.
+//
+// Returns:
+//   *collector: A new instance of the MySQL collector.
 func newCollector(db *sql.DB, log logger.Logger) *collector {
 	return &collector{db: db, log: log}
 }
@@ -55,19 +62,35 @@ func (c *collector) queryToMap(ctx context.Context, query string) (map[string]st
 	return results, nil
 }
 
-// CollectGlobalStatus executes `SHOW GLOBAL STATUS` to get performance counters and state variables.
+// CollectGlobalStatus executes `SHOW GLOBAL STATUS` to retrieve MySQL's performance
+// counters and state variables.
+//
+// Returns:
+//   map[string]string: A map of status variable names to their string values.
+//   error: An error if the query fails.
 func (c *collector) CollectGlobalStatus(ctx context.Context) (map[string]string, error) {
 	c.log.Info("Collecting MySQL global status.")
 	return c.queryToMap(ctx, "SHOW GLOBAL STATUS")
 }
 
-// CollectVariables executes `SHOW GLOBAL VARIABLES` to get the current server configuration.
+// CollectVariables executes `SHOW GLOBAL VARIABLES` to retrieve the current
+// server configuration settings.
+//
+// Returns:
+//   map[string]string: A map of configuration variable names to their string values.
+//   error: An error if the query fails.
 func (c *collector) CollectVariables(ctx context.Context) (map[string]string, error) {
 	c.log.Info("Collecting MySQL global variables.")
 	return c.queryToMap(ctx, "SHOW GLOBAL VARIABLES")
 }
 
-// CollectMetrics gets key performance indicators from the global status information.
+// CollectMetrics derives a standardized set of key performance indicators from the
+// raw data collected from `SHOW GLOBAL STATUS`. It converts key status variables
+// from strings to numeric types for easier analysis.
+//
+// Returns:
+//   *models.MetricsData: A structured representation of the key metrics.
+//   error: An error if the underlying data collection fails.
 func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	c.log.Info("Collecting and deriving MySQL metrics.")
 	status, err := c.CollectGlobalStatus(ctx)

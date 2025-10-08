@@ -28,13 +28,27 @@ type analyzer struct {
 	log logger.Logger
 }
 
-// newAnalyzer creates a new MySQL data analyzer.
+// newAnalyzer creates a new analyzer for MySQL data.
+//
+// Parameters:
+//   log (logger.Logger): A contextualized logger for the analyzer.
+//
+// Returns:
+//   *analyzer: A new instance of the MySQL analyzer.
 func newAnalyzer(log logger.Logger) *analyzer {
 	return &analyzer{log: log}
 }
 
-// Analyze is the main entry point for the analyzer. It orchestrates various specialized
-// analysis functions and aggregates the issues they find.
+// Analyze is the main entry point for the analyzer. It orchestrates calls to
+// various specialized analysis functions (e.g., for connections, performance)
+// and aggregates the issues they find into a single list.
+//
+// Parameters:
+//   status (map[string]string): A map of global status variables from `SHOW GLOBAL STATUS`.
+//   variables (map[string]string): A map of global configuration variables from `SHOW GLOBAL VARIABLES`.
+//
+// Returns:
+//   []*models.Issue: A slice of all issues identified from the data.
 func (a *analyzer) Analyze(status, variables map[string]string) []*models.Issue {
 	var issues []*models.Issue
 	a.log.Info("Analyzing collected MySQL data.")
@@ -48,7 +62,9 @@ func (a *analyzer) Analyze(status, variables map[string]string) []*models.Issue 
 	return issues
 }
 
-// analyzeConnections checks for issues related to client connections.
+// analyzeConnections checks for issues related to client connections, such as
+// high connection usage approaching the `max_connections` limit, and a high
+// number of aborted connections, which can indicate network or application issues.
 func (a *analyzer) analyzeConnections(status, variables map[string]string) []*models.Issue {
 	var issues []*models.Issue
 
@@ -83,7 +99,9 @@ func (a *analyzer) analyzeConnections(status, variables map[string]string) []*mo
 	return issues
 }
 
-// analyzePerformance checks for common performance bottlenecks based on status variables.
+// analyzePerformance checks for common performance bottlenecks by inspecting key
+// status variables, such as the number of slow queries and queries that result
+// in full table scans (inefficient joins).
 func (a *analyzer) analyzePerformance(status map[string]string) []*models.Issue {
 	var issues []*models.Issue
 
@@ -113,7 +131,9 @@ func (a *analyzer) analyzePerformance(status map[string]string) []*models.Issue 
 	return issues
 }
 
-// analyzeInnodb checks for common InnoDB storage engine misconfigurations.
+// analyzeInnodb checks for common misconfigurations related to the InnoDB storage
+// engine, focusing on the `innodb_buffer_pool_size`, which is one of the most
+// critical performance parameters in MySQL.
 func (a *analyzer) analyzeInnodb(status, variables map[string]string) []*models.Issue {
 	var issues []*models.Issue
 

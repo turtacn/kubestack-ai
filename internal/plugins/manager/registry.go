@@ -40,7 +40,15 @@ type localRegistry struct {
 	mu         sync.RWMutex
 }
 
-// NewRegistry creates a new local plugin registry and performs an initial scan of the plugin directories.
+// NewRegistry creates a new local plugin registry that discovers plugins from one
+// or more directories on the filesystem. It performs an initial scan upon creation.
+//
+// Parameters:
+//   pluginDirs ([]string): A slice of directory paths to scan for plugins.
+//
+// Returns:
+//   interfaces.PluginRegistry: A new, initialized local plugin registry.
+//   error: An error if the initial plugin scan fails.
 func NewRegistry(pluginDirs []string) (interfaces.PluginRegistry, error) {
 	r := &localRegistry{
 		log:        logger.NewLogger("plugin-registry"),
@@ -50,11 +58,18 @@ func NewRegistry(pluginDirs []string) (interfaces.PluginRegistry, error) {
 	if err := r.Scan(); err != nil {
 		return nil, fmt.Errorf("failed to perform initial plugin scan: %w", err)
 	}
-	// TODO: Implement a file watcher to auto-reload the registry on changes.
 	return r, nil
 }
 
-// Scan walks the plugin directories and loads all found plugin manifests into memory.
+// Scan walks the configured plugin directories, looking for subdirectories that
+// contain a `plugin.yaml` manifest file. It parses each manifest, resolves the
+// plugin's entrypoint path, and stores it in memory. It also sorts the available
+// versions for each plugin to ensure the latest is always first. This method is
+// thread-safe.
+//
+// Returns:
+//   error: An error is not expected in the current implementation, but the signature
+//          allows for future enhancements like returning errors on invalid manifests.
 func (r *localRegistry) Scan() error {
 	r.log.Info("Scanning for plugins...")
 	r.mu.Lock()
@@ -111,7 +126,17 @@ func (r *localRegistry) Scan() error {
 	return nil
 }
 
-// FindPlugin searches the registry for a plugin that matches the name and version constraint.
+// FindPlugin searches the in-memory cache for a plugin that matches the given
+// name and semantic version constraint. If the constraint is empty, it returns
+// the latest available version. This method is thread-safe.
+//
+// Parameters:
+//   name (string): The name of the plugin to find.
+//   versionConstraint (string): A semantic versioning constraint (e.g., ">=1.2.0, <2.0.0").
+//
+// Returns:
+//   *models.PluginManifest: The manifest of the first version found that satisfies the constraint.
+//   error: An error if the plugin is not found or the version constraint is invalid.
 func (r *localRegistry) FindPlugin(name string, versionConstraint string) (*models.PluginManifest, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -121,7 +146,6 @@ func (r *localRegistry) FindPlugin(name string, versionConstraint string) (*mode
 		return nil, fmt.Errorf("plugin '%s' not found in registry", name)
 	}
 
-	// If no constraint is provided, return the latest version (which is the first due to sorting).
 	if versionConstraint == "" {
 		r.log.Debugf("No version constraint for '%s', returning latest version %s.", name, versions[0].Version)
 		return versions[0], nil
@@ -135,7 +159,7 @@ func (r *localRegistry) FindPlugin(name string, versionConstraint string) (*mode
 	for _, manifest := range versions {
 		v, err := semver.NewVersion(manifest.Version)
 		if err != nil {
-			continue // Skip versions that are not valid semantic versions.
+			continue
 		}
 		if constraint.Check(v) {
 			r.log.Debugf("Found version %s for plugin '%s' matching constraint '%s'.", v.String(), name, versionConstraint)
@@ -146,7 +170,12 @@ func (r *localRegistry) FindPlugin(name string, versionConstraint string) (*mode
 	return nil, fmt.Errorf("no version of plugin '%s' matches constraint '%s'", name, versionConstraint)
 }
 
-// ListAvailablePlugins returns all discovered plugin manifests.
+// ListAvailablePlugins returns a slice of all discovered plugin manifests from the cache.
+// This method is thread-safe.
+//
+// Returns:
+//   []*models.PluginManifest: A slice containing all loaded plugin manifests.
+//   error: An error is not expected in this implementation.
 func (r *localRegistry) ListAvailablePlugins() ([]*models.PluginManifest, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

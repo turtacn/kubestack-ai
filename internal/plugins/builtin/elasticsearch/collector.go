@@ -31,7 +31,14 @@ type collector struct {
 	log    logger.Logger
 }
 
-// newCollector creates a new Elasticsearch data collector.
+// newCollector creates a new data collector for Elasticsearch.
+//
+// Parameters:
+//   client (*elasticsearch.Client): An initialized Elasticsearch client.
+//   log (logger.Logger): A contextualized logger for the collector.
+//
+// Returns:
+//   *collector: A new instance of the Elasticsearch collector.
 func newCollector(client *elasticsearch.Client, log logger.Logger) *collector {
 	return &collector{client: client, log: log}
 }
@@ -55,7 +62,11 @@ func (c *collector) apiToMap(ctx context.Context, apiCall func() (*esapi.Respons
 	return data, nil
 }
 
-// CollectClusterHealth fetches the cluster health status (green, yellow, or red) and related metrics.
+// CollectClusterHealth fetches data from the `_cluster/health` API endpoint.
+//
+// Returns:
+//   map[string]interface{}: The parsed JSON response from the API.
+//   error: An error if the API call or JSON decoding fails.
 func (c *collector) CollectClusterHealth(ctx context.Context) (map[string]interface{}, error) {
 	c.log.Info("Collecting Elasticsearch cluster health.")
 	return c.apiToMap(ctx, func() (*esapi.Response, error) {
@@ -63,10 +74,14 @@ func (c *collector) CollectClusterHealth(ctx context.Context) (map[string]interf
 	})
 }
 
-// CollectNodesStats fetches detailed statistics for all nodes, including JVM, OS, and thread pool information.
+// CollectNodesStats fetches detailed statistics for all nodes from the `_nodes/stats`
+// API endpoint, focusing on JVM, OS, process, and thread pool metrics.
+//
+// Returns:
+//   map[string]interface{}: The parsed JSON response from the API.
+//   error: An error if the API call or JSON decoding fails.
 func (c *collector) CollectNodesStats(ctx context.Context) (map[string]interface{}, error) {
 	c.log.Info("Collecting Elasticsearch nodes stats.")
-	// We can specify which metrics we want, e.g., jvm, os, process, thread_pool.
 	return c.apiToMap(ctx, func() (*esapi.Response, error) {
 		return c.client.Nodes.Stats(
 			c.client.Nodes.Stats.WithContext(ctx),
@@ -75,7 +90,12 @@ func (c *collector) CollectNodesStats(ctx context.Context) (map[string]interface
 	})
 }
 
-// CollectClusterSettings fetches the persistent and transient settings of the cluster.
+// CollectClusterSettings fetches the persistent and transient settings of the
+// cluster from the `_cluster/settings` API endpoint.
+//
+// Returns:
+//   *models.ConfigData: A structured representation of the cluster settings.
+//   error: An error if the API call or JSON decoding fails.
 func (c *collector) CollectClusterSettings(ctx context.Context) (*models.ConfigData, error) {
 	c.log.Info("Collecting Elasticsearch cluster settings.")
 	settingsMap, err := c.apiToMap(ctx, func() (*esapi.Response, error) {
@@ -85,7 +105,6 @@ func (c *collector) CollectClusterSettings(ctx context.Context) (*models.ConfigD
 		return nil, err
 	}
 
-	// The settings are nested. We can flatten them for the ConfigData model.
 	configMap := make(map[string]string)
 	for group, settings := range settingsMap {
 		if settingsGroup, ok := settings.(map[string]interface{}); ok {
@@ -97,7 +116,12 @@ func (c *collector) CollectClusterSettings(ctx context.Context) (*models.ConfigD
 	return &models.ConfigData{Data: configMap}, nil
 }
 
-// CollectMetrics derives key metrics from the various stats endpoints.
+// CollectMetrics derives a standardized set of key performance indicators from
+// the raw data collected from other endpoints, such as cluster health.
+//
+// Returns:
+//   *models.MetricsData: A structured representation of the key metrics.
+//   error: An error if the underlying data collection fails.
 func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	c.log.Info("Collecting and deriving Elasticsearch metrics.")
 	health, err := c.CollectClusterHealth(ctx)
@@ -107,7 +131,6 @@ func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, er
 
 	metrics := make(map[string]interface{})
 
-	// Health metrics
 	if val, ok := health["number_of_nodes"]; ok {
 		metrics["number_of_nodes"] = val
 	}
@@ -126,8 +149,6 @@ func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, er
 	if val, ok := health["initializing_shards"]; ok {
 		metrics["initializing_shards"] = val
 	}
-
-	// TODO: Extract key metrics from NodesStats, such as JVM heap usage, CPU load, and thread pool rejections.
 
 	return &models.MetricsData{Data: metrics}, nil
 }

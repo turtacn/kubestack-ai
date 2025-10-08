@@ -28,48 +28,74 @@ import (
 )
 
 // Config is the root configuration structure for the application.
-// It is composed of smaller, domain-specific configuration structs.
+// It is composed of smaller, domain-specific configuration structs and is used
+// to unmarshal the configuration data from Viper.
 type Config struct {
-	Logger  logger.Config `mapstructure:"logger"`
-	Server  ServerConfig  `mapstructure:"server"`
-	LLM     LLMConfig     `mapstructure:"llm"`
-	Plugins PluginConfig  `mapstructure:"plugins"`
+	// Logger holds all logging-related configurations.
+	Logger logger.Config `mapstructure:"logger"`
+	// Server holds configurations for the optional HTTP server component.
+	Server ServerConfig `mapstructure:"server"`
+	// LLM holds configurations for connecting to Large Language Model providers.
+	LLM LLMConfig `mapstructure:"llm"`
+	// Plugins holds configurations related to the plugin management system.
+	Plugins PluginConfig `mapstructure:"plugins"`
 }
 
-// ServerConfig holds HTTP server-related configurations.
+// ServerConfig holds HTTP server-related configurations, such as the listening
+// port and request timeouts.
 type ServerConfig struct {
-	Port    int `mapstructure:"port"`
+	// Port is the TCP port on which the HTTP server will listen.
+	Port int `mapstructure:"port"`
+	// Timeout is the request timeout for the HTTP server in seconds.
 	Timeout int `mapstructure:"timeout"`
 }
 
-// LLMConfig holds configurations for Large Language Model providers.
+// LLMConfig holds configurations for Large Language Model providers, including which
+// provider to use and the credentials for each.
 type LLMConfig struct {
-	Provider string       `mapstructure:"provider"`
-	OpenAI   OpenAIConfig `mapstructure:"openai"`
-	Gemini   GeminiConfig `mapstructure:"gemini"`
+	// Provider specifies the active LLM provider (e.g., "openai", "gemini").
+	Provider string `mapstructure:"provider"`
+	// OpenAI contains the specific configuration for the OpenAI provider.
+	OpenAI OpenAIConfig `mapstructure:"openai"`
+	// Gemini contains the specific configuration for the Google Gemini provider.
+	Gemini GeminiConfig `mapstructure:"gemini"`
 }
 
 // OpenAIConfig holds OpenAI-specific API configurations.
 type OpenAIConfig struct {
+	// APIKey is the secret key for authenticating with the OpenAI API.
 	APIKey string `mapstructure:"apiKey"` // Sensitive: Handle with care.
-	Model  string `mapstructure:"model"`
+	// Model is the specific model to use (e.g., "gpt-4", "gpt-3.5-turbo").
+	Model string `mapstructure:"model"`
 }
 
 // GeminiConfig holds Google Gemini-specific API configurations.
 type GeminiConfig struct {
+	// APIKey is the secret key for authenticating with the Google Gemini API.
 	APIKey string `mapstructure:"apiKey"` // Sensitive: Handle with care.
-	Model  string `mapstructure:"model"`
+	// Model is the specific model to use (e.g., "gemini-pro").
+	Model string `mapstructure:"model"`
 }
 
 // PluginConfig holds configurations for the plugin system.
 type PluginConfig struct {
+	// Directory is the path where plugins are stored.
 	Directory string `mapstructure:"directory"`
 }
 
 var appConfig *Config
 
-// LoadConfig initializes Viper, loads configuration from multiple sources,
-// and sets up hot-reloading.
+// LoadConfig initializes Viper, loads configuration from multiple sources (file,
+// environment variables), sets up defaults, and enables hot-reloading.
+// It follows a layered approach: defaults < file < environment variables.
+//
+// Parameters:
+//   configPath (string): The path to the configuration file. If empty, only defaults
+//     and environment variables will be used.
+//
+// Returns:
+//   *Config: A pointer to the loaded and unmarshaled configuration struct.
+//   error: An error if loading or unmarshaling fails.
 func LoadConfig(configPath string) (*Config, error) {
 	v := viper.New()
 	setDefaults(v)
@@ -110,12 +136,21 @@ func LoadConfig(configPath string) (*Config, error) {
 	return &cfg, nil
 }
 
-// GetConfig returns the loaded application configuration.
+// GetConfig returns the singleton instance of the loaded application configuration.
+// It is crucial to call LoadConfig before calling this function, otherwise it may
+// return nil.
+//
+// Returns:
+//   *Config: A pointer to the currently active application configuration.
 func GetConfig() *Config {
 	return appConfig
 }
 
-// Validate checks if the loaded configuration is valid.
+// Validate checks if the loaded configuration is valid by enforcing certain rules,
+// such as ensuring that API keys are present if a specific provider is selected.
+//
+// Returns:
+//   error: An error of type *errors.ConfigError if validation fails, otherwise nil.
 func (c *Config) Validate() error {
 	if c.LLM.Provider == "openai" && c.LLM.OpenAI.APIKey == "" {
 		return errors.NewConfigError(errors.ConfigValidationFailedCode, "OpenAI API key is missing", "Set the KSA_LLM_OPENAI_APIKEY environment variable or llm.openai.apiKey in the config file.")

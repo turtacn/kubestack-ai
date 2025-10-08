@@ -26,8 +26,18 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 )
 
-// WebCrawler defines the interface for a web crawling component.
+// WebCrawler defines the interface for a component that fetches and extracts
+// content from web pages.
 type WebCrawler interface {
+	// Crawl visits a given URL, extracts its primary text content, and returns
+	// it as a RawDocument.
+	//
+	// Parameters:
+	//   startURL (string): The URL to start crawling from.
+	//
+	// Returns:
+	//   *store.RawDocument: A document containing the extracted text content.
+	//   error: An error if the crawl fails.
 	Crawl(startURL string) (*store.RawDocument, error)
 }
 
@@ -37,7 +47,16 @@ type simpleWebCrawler struct {
 	collector *colly.Collector
 }
 
-// NewWebCrawler creates and configures a new web crawler.
+// NewWebCrawler creates and configures a new web crawler using the Colly library.
+// It sets up important configurations like allowed domains for safety and polite
+// rate limiting to avoid overwhelming servers.
+//
+// Parameters:
+//   allowedDomains ([]string): A slice of domains that the crawler is permitted to visit.
+//
+// Returns:
+//   WebCrawler: A new instance of a web crawler.
+//   error: An error if initialization fails (nil in this implementation).
 func NewWebCrawler(allowedDomains []string) (WebCrawler, error) {
 	c := colly.NewCollector(
 		// Restrict crawling to specified domains to prevent going off-topic.
@@ -62,8 +81,18 @@ func NewWebCrawler(allowedDomains []string) (WebCrawler, error) {
 	}, nil
 }
 
-// Crawl starts the crawling process from a given URL.
-// This simple implementation only crawls the single page provided and extracts its text content.
+// Crawl implements the WebCrawler interface. It starts the crawling process from
+// a given URL and extracts the text content from the body of the page.
+//
+// NOTE: This is a simple implementation that only crawls the single page provided.
+// A more advanced version would follow links to perform a deep crawl.
+//
+// Parameters:
+//   startURL (string): The URL of the page to crawl.
+//
+// Returns:
+//   *store.RawDocument: A document containing the extracted text content.
+//   error: An error if the HTTP request or crawling process fails.
 func (c *simpleWebCrawler) Crawl(startURL string) (*store.RawDocument, error) {
 	c.log.Infof("Starting crawl for URL: %s", startURL)
 

@@ -29,16 +29,30 @@ type goPluginLoader struct {
 	log logger.Logger
 }
 
-// NewLoader creates a new plugin loader. In the future, this could take a configuration
-// to decide which type of loader to create (e.g., for scripts, containers).
+// NewLoader creates a new plugin loader for standard Go plugins. In the future,
+// this could be extended to take a configuration to decide which type of loader
+// to create (e.g., for scripts, containers, or other plugin formats).
+//
+// Returns:
+//   interfaces.PluginLoader: A new instance of a Go plugin loader.
 func NewLoader() interfaces.PluginLoader {
 	return &goPluginLoader{
 		log: logger.NewLogger("plugin-loader"),
 	}
 }
 
-// Load takes a plugin manifest and loads the plugin's code into memory,
-// returning an initialized instance that implements the MiddlewarePlugin interface.
+// Load implements the PluginLoader interface for standard Go plugins. It opens the
+// shared object (.so) file specified in the manifest's entrypoint, looks up the
+// conventional `New` factory function, and executes it to create an instance of
+// the plugin.
+//
+// Parameters:
+//   manifest (*models.PluginManifest): The manifest describing the plugin to load.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: An initialized, ready-to-use plugin instance.
+//   error: An error if the file cannot be opened, the 'New' symbol is missing or
+//          has the wrong signature, or the factory function itself returns an error.
 func (l *goPluginLoader) Load(manifest *models.PluginManifest) (interfaces.MiddlewarePlugin, error) {
 	l.log.Infof("Attempting to load Go plugin from entrypoint: %s", manifest.Entrypoint)
 

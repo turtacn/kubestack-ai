@@ -95,8 +95,14 @@ Pay close attention to memory usage (especially fragmentation), persistence sett
 **Begin Analysis.**
 `
 
-// GetDefaultTemplates returns a slice of the default prompt templates for the application.
-// In a real application, these might be loaded from a `.toml` or `.yaml` file.
+// GetDefaultTemplates returns a slice containing all the default, built-in prompt
+// templates for the application. In a production system, these templates might be
+// loaded from an external configuration file or a dedicated template registry,
+// but providing them as code ensures that the application has a working set of
+// prompts out of the box.
+//
+// Returns:
+//   []*Template: A slice of the default prompt templates.
 func GetDefaultTemplates() []*Template {
 	return []*Template{
 		{

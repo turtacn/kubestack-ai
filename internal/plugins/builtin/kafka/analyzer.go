@@ -27,13 +27,26 @@ type analyzer struct {
 	log logger.Logger
 }
 
-// newAnalyzer creates a new Kafka data analyzer.
+// newAnalyzer creates a new analyzer for Kafka metadata.
+//
+// Parameters:
+//   log (logger.Logger): A contextualized logger for the analyzer.
+//
+// Returns:
+//   *analyzer: A new instance of the Kafka analyzer.
 func newAnalyzer(log logger.Logger) *analyzer {
 	return &analyzer{log: log}
 }
 
-// Analyze is the main entry point for the analyzer. It orchestrates various specialized
-// analysis functions and aggregates the issues they find.
+// Analyze is the main entry point for the analyzer. It orchestrates calls to
+// various specialized analysis functions (e.g., for cluster state, partition
+// health) and aggregates the issues they find into a single list.
+//
+// Parameters:
+//   metadata (*Metadata): The collected cluster metadata to be analyzed.
+//
+// Returns:
+//   []*models.Issue: A slice of all issues identified from the metadata.
 func (a *analyzer) Analyze(metadata *Metadata) []*models.Issue {
 	var issues []*models.Issue
 	a.log.Info("Analyzing collected Kafka cluster metadata.")
@@ -46,7 +59,8 @@ func (a *analyzer) Analyze(metadata *Metadata) []*models.Issue {
 	return issues
 }
 
-// analyzeClusterState checks for high-level cluster issues like a missing controller broker.
+// analyzeClusterState checks for high-level cluster issues, such as the absence
+// of an active controller broker, which is critical for cluster operations.
 func (a *analyzer) analyzeClusterState(metadata *Metadata) []*models.Issue {
 	var issues []*models.Issue
 
@@ -64,7 +78,9 @@ func (a *analyzer) analyzeClusterState(metadata *Metadata) []*models.Issue {
 	return issues
 }
 
-// analyzePartitionHealth checks for under-replicated or offline partitions, which are critical health indicators.
+// analyzePartitionHealth iterates through all topics and partitions to check for
+// under-replicated partitions (where the number of in-sync replicas is less than
+// the total replica count) and offline partitions (which have no leader).
 func (a *analyzer) analyzePartitionHealth(metadata *Metadata) []*models.Issue {
 	var issues []*models.Issue
 	var underReplicatedPartitions []string
@@ -114,7 +130,9 @@ func (a *analyzer) analyzePartitionHealth(metadata *Metadata) []*models.Issue {
 	return issues
 }
 
-// analyzeTopicConfiguration checks for risky topic settings, like a replication factor of 1.
+// analyzeTopicConfiguration checks for risky topic-level configurations, such as
+// a replication factor of 1, which provides no data redundancy and is highly
+// discouraged in production environments.
 func (a *analyzer) analyzeTopicConfiguration(metadata *Metadata) []*models.Issue {
 	var issues []*models.Issue
 	var singleReplicaTopics []string

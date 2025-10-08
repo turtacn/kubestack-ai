@@ -39,7 +39,18 @@ type orchestrator struct {
 	// llmClient, knowledgeManager, etc. will be added here
 }
 
-// NewOrchestrator creates a new instance of the core orchestrator, injecting all its dependencies.
+// NewOrchestrator creates a new instance of the core orchestrator. It acts as a
+// dependency injection hub, taking in all the major manager components and wiring
+// them together.
+//
+// Parameters:
+//   cfg (*config.Config): The global application configuration.
+//   pm (interfaces.PluginManager): The manager responsible for the plugin lifecycle.
+//   dm (interfaces.DiagnosisManager): The manager for running diagnoses.
+//   em (interfaces.ExecutionManager): The manager for executing fix plans.
+//
+// Returns:
+//   interfaces.Orchestrator: A new, fully initialized orchestrator.
 func NewOrchestrator(
 	cfg *config.Config,
 	pm interfaces.PluginManager,
@@ -55,8 +66,18 @@ func NewOrchestrator(
 	}
 }
 
-// ProcessRequest is the main entry point that routes requests from the UI layer (e.g., CLI)
-// to the appropriate specialized method.
+// ProcessRequest serves as the main entry point for requests originating from a UI
+// layer (like the CLI). It inspects the request context and routes the request to
+// the appropriate specialized method within the orchestrator.
+//
+// NOTE: This is a simplified router. A production implementation would use a more
+// robust command dispatch mechanism, likely integrated with the CLI framework.
+//
+// Parameters:
+//   reqCtx (*interfaces.RequestContext): The context containing all information about the user's request.
+//
+// Returns:
+//   error: An error if the command is unknown or if processing fails.
 func (o *orchestrator) ProcessRequest(reqCtx *interfaces.RequestContext) error {
 	o.log.Infof("Processing request for command: %s with args: %v", reqCtx.Command, reqCtx.Args)
 
@@ -87,40 +108,39 @@ func (o *orchestrator) ProcessRequest(reqCtx *interfaces.RequestContext) error {
 	}
 }
 
-// LoadPlugin delegates plugin loading to the plugin manager.
+// LoadPlugin delegates the task of loading a plugin to the plugin manager.
 func (o *orchestrator) LoadPlugin(ctx context.Context, pluginName string) (interfaces.MiddlewarePlugin, error) {
 	o.log.Infof("Orchestrating load for plugin: %s", pluginName)
 	return o.pluginManager.LoadPlugin(pluginName)
 }
 
-// ExecuteDiagnosis orchestrates the entire diagnosis process.
+// ExecuteDiagnosis delegates the entire diagnosis process to the diagnosis manager.
 func (o *orchestrator) ExecuteDiagnosis(ctx context.Context, req *models.DiagnosisRequest, progressChan chan<- interfaces.DiagnosisProgress) (*models.DiagnosisResult, error) {
 	o.log.Infof("Executing diagnosis for middleware: %s on instance: %s", req.TargetMiddleware.String(), req.Instance)
 	return o.diagnosisManager.RunDiagnosis(ctx, req, progressChan)
 }
 
 // ProcessNaturalLanguage orchestrates the handling of a natural language query.
+// NOTE: This is a placeholder. A full implementation would involve complex prompt
+// engineering, retrieval-augmented generation (RAG) from a knowledge base, and
+// interaction with the LLM client.
 func (o *orchestrator) ProcessNaturalLanguage(ctx context.Context, query string) (string, error) {
 	o.log.Infof("Processing natural language query: %s", query)
-	// The actual implementation would:
-	// 1. Build a detailed prompt using a prompt builder.
-	// 2. Retrieve relevant context from the knowledge base (RAG).
-	// 3. Send the enhanced prompt to the LLM client.
-	// 4. Parse and format the LLM's response.
-	// This is a placeholder for that complex logic.
 	return fmt.Sprintf("AI Response to '%s' (full implementation pending)", query), nil
 }
 
-// ManageExecution orchestrates the planning and execution of fixes.
+// ManageExecution delegates the safe, user-confirmed execution of a fix plan
+// to the execution manager.
 func (o *orchestrator) ManageExecution(ctx context.Context, plan *models.ExecutionPlan, confirmFunc interfaces.ConfirmationFunc) (*models.ExecutionResult, error) {
 	o.log.Infof("Managing execution for plan ID: %s", plan.ID)
 	return o.executionManager.ExecuteActions(ctx, plan, confirmFunc)
 }
 
 // ProcessNaturalLanguageStream handles a streaming 'ask' command query.
+// NOTE: This is a placeholder. A full implementation would call the LLM client's
+// streaming method and pipe the results to the returned channel.
 func (o *orchestrator) ProcessNaturalLanguageStream(ctx context.Context, query string) (<-chan llm_interfaces.StreamingChunk, error) {
 	o.log.Infof("Processing streaming natural language query: %s", query)
-	// This is a placeholder. A real implementation would call the LLM client's streaming method.
 	chunkChan := make(chan llm_interfaces.StreamingChunk)
 	go func() {
 		defer close(chunkChan)
@@ -132,13 +152,14 @@ func (o *orchestrator) ProcessNaturalLanguageStream(ctx context.Context, query s
 	return chunkChan, nil
 }
 
-// PlanExecution delegates plan generation to the execution manager.
+// PlanExecution delegates the task of generating an execution plan to the execution manager.
 func (o *orchestrator) PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
 	o.log.Info("Orchestrating execution planning.")
 	return o.executionManager.PlanExecution(ctx, recommendations)
 }
 
-// ValidateExecution delegates fix validation to the execution manager.
+// ValidateExecution delegates the task of validating a completed execution
+// to the execution manager.
 func (o *orchestrator) ValidateExecution(ctx context.Context, result *models.ExecutionResult) error {
 	o.log.Info("Orchestrating execution validation.")
 	return o.executionManager.ValidateExecution(ctx, result)

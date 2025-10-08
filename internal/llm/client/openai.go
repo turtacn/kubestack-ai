@@ -32,8 +32,18 @@ type openAIClient struct {
 	log    logger.Logger
 }
 
-// NewOpenAIClient creates a new client for interacting with OpenAI.
-// It requires an API key and allows for an optional API base URL for proxies.
+// NewOpenAIClient creates a new client for interacting with the OpenAI API.
+// It configures the underlying `go-openai` client with the provided API key and
+// an optional base URL, which is useful for connecting to proxy servers or
+// compatible local LLM providers.
+//
+// Parameters:
+//   apiKey (string): The OpenAI API key for authentication.
+//   apiBaseURL (...string): An optional list of strings, where the first element is used as the API base URL.
+//
+// Returns:
+//   interfaces.LLMClient: A new client that satisfies the LLMClient interface.
+//   error: An error if the API key is missing.
 func NewOpenAIClient(apiKey string, apiBaseURL ...string) (interfaces.LLMClient, error) {
 	if apiKey == "" {
 		return nil, errors.New("OpenAI API key cannot be empty")
@@ -54,7 +64,17 @@ func NewOpenAIClient(apiKey string, apiBaseURL ...string) (interfaces.LLMClient,
 	}, nil
 }
 
-// SendMessage sends a standard, non-streaming chat completion request.
+// SendMessage sends a standard, non-streaming chat completion request to the OpenAI API.
+// It converts the internal LLMRequest format to the `go-openai` library's format
+// and returns the response in the internal LLMResponse format.
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   req (*interfaces.LLMRequest): The request containing the model, messages, and other parameters.
+//
+// Returns:
+//   *interfaces.LLMResponse: A response containing the assistant's message and token usage stats.
+//   error: An error if the API call fails or the response is empty.
 func (c *openAIClient) SendMessage(ctx context.Context, req *interfaces.LLMRequest) (*interfaces.LLMResponse, error) {
 	c.log.Debugf("Sending chat completion request to model %s", req.Model)
 	resp, err := c.client.CreateChatCompletion(ctx, toOpenAIChatRequest(req))
@@ -79,7 +99,17 @@ func (c *openAIClient) SendMessage(ctx context.Context, req *interfaces.LLMReque
 	}, nil
 }
 
-// SendStreamingMessage sends a request and returns a channel for streaming the response.
+// SendStreamingMessage sends a request to the OpenAI API and returns a channel from
+// which response chunks can be read in real-time. It starts a goroutine to
+// manage the stream and ensures that channel and stream resources are properly closed.
+//
+// Parameters:
+//   ctx (context.Context): The context for the streaming API request.
+//   req (*interfaces.LLMRequest): The request containing the model and messages.
+//
+// Returns:
+//   <-chan interfaces.StreamingChunk: A read-only channel for receiving response chunks.
+//   error: An error if the initial stream creation fails.
 func (c *openAIClient) SendStreamingMessage(ctx context.Context, req *interfaces.LLMRequest) (<-chan interfaces.StreamingChunk, error) {
 	c.log.Debugf("Sending streaming chat completion request to model %s", req.Model)
 	req.Stream = true // Ensure stream is enabled in the request.
@@ -122,7 +152,17 @@ func (c *openAIClient) SendStreamingMessage(ctx context.Context, req *interfaces
 	return chunkChan, nil
 }
 
-// GenerateEmbedding converts text to vector embeddings using a specified model.
+// GenerateEmbedding converts a batch of text inputs into their vector embedding
+// representations using a specified OpenAI embedding model. If no model is provided
+// in the request, it defaults to the recommended `AdaEmbeddingV2`.
+//
+// Parameters:
+//   ctx (context.Context): The context for the embedding API request.
+//   req (*interfaces.EmbeddingRequest): The request containing the text inputs and optional model.
+//
+// Returns:
+//   *interfaces.EmbeddingResponse: A response containing the generated embeddings and token usage.
+//   error: An error if the API call fails.
 func (c *openAIClient) GenerateEmbedding(ctx context.Context, req *interfaces.EmbeddingRequest) (*interfaces.EmbeddingResponse, error) {
 	// Default to the recommended embedding model if not specified.
 	model := openai.AdaEmbeddingV2

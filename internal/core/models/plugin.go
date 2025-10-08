@@ -18,52 +18,78 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 )
 
-// PluginManifest is the structured representation of a plugin's metadata. It is typically
-// loaded from a manifest file (e.g., plugin.yaml) and serves as the blueprint for loading
-// and managing the plugin.
+// PluginManifest provides a structured representation of a plugin's metadata. It is
+// typically loaded from a manifest file (e.g., `plugin.yaml`) and serves as the
+// blueprint for the plugin manager to load, manage, and understand the plugin's
+// capabilities and dependencies.
 type PluginManifest struct {
-	APIVersion   string             `json:"apiVersion" yaml:"apiVersion"` // KubeStack-AI plugin API version this plugin conforms to.
-	Name         string             `json:"name" yaml:"name"`
-	Version      string             `json:"version" yaml:"version"` // Semantic version of the plugin.
-	Author       string             `json:"author,omitempty" yaml:"author,omitempty"`
-	Description  string             `json:"description,omitempty" yaml:"description,omitempty"`
-	Entrypoint   string             `json:"entrypoint" yaml:"entrypoint"` // e.g., path to the .so file for Go plugins.
+	// APIVersion specifies the version of the KubeStack-AI plugin API that this plugin conforms to.
+	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
+	// Name is the unique, machine-readable name of the plugin (e.g., "redis-plugin").
+	Name string `json:"name" yaml:"name"`
+	// Version is the semantic version of the plugin itself (e.g., "1.2.3").
+	Version string `json:"version" yaml:"version"`
+	// Author is the name or organization that created the plugin.
+	Author string `json:"author,omitempty" yaml:"author,omitempty"`
+	// Description is a brief, human-readable summary of the plugin's purpose.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// Entrypoint specifies the location of the plugin's executable code (e.g., a path to a .so file for Go plugins).
+	Entrypoint string `json:"entrypoint" yaml:"entrypoint"`
+	// Capabilities is a list of features or actions that the plugin supports.
 	Capabilities []PluginCapability `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	// Dependencies is a list of other plugins or external tools that this plugin requires to function.
 	Dependencies []PluginDependency `json:"dependencies,omitempty" yaml:"dependencies,omitempty"`
 }
 
-// PluginInfo contains basic, human-readable information about a plugin, often used for display purposes.
+// PluginInfo contains basic, human-readable information about a plugin, suitable
+// for display in command-line outputs like `plugin list`.
 type PluginInfo struct {
-	Name        string `json:"name" yaml:"name"`
-	Version     string `json:"version" yaml:"version"`
+	// Name is the display name of the plugin.
+	Name string `json:"name" yaml:"name"`
+	// Version is the semantic version of the plugin.
+	Version string `json:"version" yaml:"version"`
+	// Description is a brief summary of the plugin's purpose.
 	Description string `json:"description" yaml:"description"`
-	Author      string `json:"author" yaml:"author"`
+	// Author is the creator of the plugin.
+	Author string `json:"author" yaml:"author"`
 }
 
-// PluginCapability describes a specific feature or action that the plugin supports.
+// PluginCapability describes a specific feature or action that the plugin supports,
+// allowing the core engine to understand what a plugin can do.
 type PluginCapability struct {
-	Name        string `json:"name" yaml:"name"` // e.g., "diagnose:redis", "collect-metrics:redis"
+	// Name is a machine-readable identifier for the capability (e.g., "diagnose:redis", "collect-metrics:redis").
+	Name string `json:"name" yaml:"name"`
+	// Description is a human-readable explanation of the capability.
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
-// PluginDependency describes a dependency on another plugin or an external tool.
+// PluginDependency describes a dependency on another plugin or an external tool
+// that must be present for this plugin to function correctly.
 type PluginDependency struct {
-	Name    string `json:"name" yaml:"name"`
-	Version string `json:"version" yaml:"version"` // A version constraint, e.g., ">=1.2.0, <2.0.0"
+	// Name is the name of the required dependency.
+	Name string `json:"name" yaml:"name"`
+	// Version is a semantic version constraint for the dependency (e.g., ">=1.2.0, <2.0.0").
+	Version string `json:"version" yaml:"version"`
 }
 
-// PluginConfiguration defines the structure for a plugin's specific configuration.
-// It acts as a generic container; each plugin will define its own specific fields within the data map.
+// PluginConfiguration defines a generic structure for a plugin's specific
+// configuration. Each plugin can define its own key-value pairs within the data map.
 type PluginConfiguration struct {
+	// Data holds the plugin-specific configuration settings.
 	Data map[string]interface{} `json:"data" yaml:"data"`
 }
 
-// PluginStatus represents the runtime status of a loaded plugin, used for health monitoring and management.
+// PluginStatus represents the runtime status of a loaded plugin, which is used
+// for health monitoring and management by the plugin manager.
 type PluginStatus struct {
-	Name    string            `json:"name" yaml:"name"`
-	Version string            `json:"version" yaml:"version"`
-	Status  enum.PluginStatus `json:"status" yaml:"status"`
-	Message string            `json:"message,omitempty" yaml:"message,omitempty"` // Provides details on the status, e.g., error message on failure.
+	// Name is the name of the plugin.
+	Name string `json:"name" yaml:"name"`
+	// Version is the version of the plugin.
+	Version string `json:"version" yaml:"version"`
+	// Status is the current lifecycle status of the plugin (e.g., Active, Failed).
+	Status enum.PluginStatus `json:"status" yaml:"status"`
+	// Message provides additional details on the status, such as an error message if the status is "Failed".
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
 //Personal.AI order the ending

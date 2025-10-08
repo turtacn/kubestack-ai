@@ -36,7 +36,13 @@ type redisPlugin struct {
 }
 
 // New is the factory function that creates an instance of the Redis plugin.
-// This function is looked up by name by the plugin loader.
+// It initializes the base plugin, establishes a connection to a Redis instance,
+// and wires together the specific collector and analyzer for Redis.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: A new, fully initialized Redis plugin.
+//   error: An error if the Redis client fails to initialize (though the underlying
+//          library does not return an error on creation).
 func New() (interfaces.MiddlewarePlugin, error) {
 	p := &redisPlugin{}
 	p.Init("redis", "0.1.0", "Provides diagnostics for Redis instances.")
@@ -58,7 +64,9 @@ func New() (interfaces.MiddlewarePlugin, error) {
 	return p, nil
 }
 
-// Diagnose orchestrates the diagnosis process for Redis.
+// Diagnose orchestrates the diagnosis process for Redis. It collects INFO,
+// CONFIG, and SLOWLOG data, and then passes it to the analyzer to identify
+// potential issues.
 func (p *redisPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	p.Log.Info("Starting Redis diagnosis.")
 
@@ -90,34 +98,45 @@ func (p *redisPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) 
 	return result, nil
 }
 
-// --- Delegate core functions to the collector ---
+// --- Interface Method Implementations ---
 
+// CollectMetrics gathers key performance indicators for the Redis instance.
 func (p *redisPlugin) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	return p.collector.CollectMetrics(ctx)
 }
 
+// GetConfiguration retrieves the live configuration from the Redis instance.
 func (p *redisPlugin) GetConfiguration(ctx context.Context) (*models.ConfigData, error) {
 	return p.collector.CollectConfig(ctx)
 }
 
+// CollectLogs retrieves entries from the Redis slow query log.
 func (p *redisPlugin) CollectLogs(ctx context.Context, _ *models.LogOptions) (*models.LogData, error) {
 	return p.collector.CollectSlowLog(ctx)
 }
 
 // --- Health Checks ---
 
-// HealthCheck performs a detailed health check of the Redis instance.
+// HealthCheck performs a basic health check by pinging the Redis instance.
 func (p *redisPlugin) HealthCheck(ctx context.Context) (*models.HealthStatus, error) {
 	if err := p.Ping(ctx); err != nil {
 		return &models.HealthStatus{IsHealthy: false, Message: fmt.Sprintf("Failed to ping Redis: %v", err)}, nil
 	}
-	// A more detailed check could verify cluster status, replication lag, or memory usage against a threshold.
 	return &models.HealthStatus{IsHealthy: true, Message: "Redis instance is responsive."}, nil
 }
 
-// Ping is a simple check to see if the Redis server is reachable and responsive.
+// Ping sends a PING command to the Redis server to check for connectivity.
 func (p *redisPlugin) Ping(ctx context.Context) error {
 	return p.client.Ping(ctx).Err()
+}
+
+// Shutdown gracefully closes the Redis client connection to prevent resource leaks.
+func (p *redisPlugin) Shutdown() error {
+	p.Log.Info("Shutting down Redis plugin and closing client connection.")
+	if p.client != nil {
+		return p.client.Close()
+	}
+	return nil
 }
 
 //Personal.AI order the ending

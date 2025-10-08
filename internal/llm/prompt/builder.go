@@ -23,22 +23,34 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
 )
 
-// Template represents a single, versioned prompt template. Using Go's `text/template`
-// format allows for flexible and safe variable substitution.
+// Template represents a single, versioned prompt template. It uses Go's standard
+// `text/template` format, which allows for flexible and safe variable substitution.
 type Template struct {
-	ID      string
+	// ID is the unique identifier for the prompt template (e.g., "diagnose-redis").
+	ID string
+	// Version allows for tracking and managing different versions of the same prompt.
 	Version string
-	Text    string // The Go template string.
-	// Other metadata like a description or author could be added here.
+	// Text is the Go template string that forms the body of the prompt.
+	Text string
 }
 
-// Builder is responsible for constructing final prompts from templates and dynamic data.
-// It separates the logic of prompt engineering from the application's core logic.
+// Builder is responsible for constructing final prompts from templates and dynamic
+// data. It encapsulates the logic of prompt engineering, separating it from the
+// application's core operational logic. It pre-parses templates for efficiency.
 type Builder struct {
 	templates map[string]*template.Template
 }
 
-// NewBuilder creates a new prompt builder and pre-parses the provided templates for efficiency.
+// NewBuilder creates a new prompt builder. It takes a slice of Template objects,
+// pre-parses them using Go's `text/template` engine, and stores them in a map
+// for efficient access.
+//
+// Parameters:
+//   templates ([]*Template): A slice of prompt templates to be loaded into the builder.
+//
+// Returns:
+//   *Builder: A new, initialized prompt builder.
+//   error: An error if any of the templates fail to parse.
 func NewBuilder(templates []*Template) (*Builder, error) {
 	parsedTmpls := make(map[string]*template.Template)
 	for _, t := range templates {
@@ -51,13 +63,20 @@ func NewBuilder(templates []*Template) (*Builder, error) {
 	return &Builder{templates: parsedTmpls}, nil
 }
 
-// Build constructs a final list of messages to be sent to an LLM. It combines a system
-// prompt (generated from a template) with conversation history and optional few-shot examples.
+// Build constructs a final list of messages to be sent to an LLM. It selects a
+// template by its ID, executes it with the provided data to generate a system
+// prompt, and then combines this with the conversation history and any optional
+// few-shot examples to create the final message sequence.
 //
-// - templateID: The ID of the prompt template to use (e.g., "diagnose-redis").
-// - data: A struct or map containing data to be injected into the template's variables.
-// - history: The existing conversation history between the user and the assistant.
-// - fewShotExamples: Optional one-shot or few-shot examples to guide the model's response.
+// Parameters:
+//   templateID (string): The ID of the prompt template to use (e.g., "diagnose-redis").
+//   data (interface{}): A struct or map containing data to be injected into the template's variables.
+//   history ([]interfaces.Message): The existing conversation history between the user and the assistant.
+//   fewShotExamples (...interfaces.Message): Optional one-shot or few-shot examples to guide the model's response.
+//
+// Returns:
+//   []interfaces.Message: The final, ordered list of messages ready to be sent to the LLM.
+//   error: An error if the template is not found or fails to execute.
 func (b *Builder) Build(templateID string, data interface{}, history []interfaces.Message, fewShotExamples ...interfaces.Message) ([]interfaces.Message, error) {
 	tmpl, ok := b.templates[templateID]
 	if !ok {

@@ -22,7 +22,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// This function creates and configures the `fix` command.
+// newFixCmd creates and configures the `fix` command.
+// This command is designed to apply automated fixes based on the results of a previous diagnosis.
+// It sets up the command's usage, descriptions, examples, and the core execution logic (`RunE`).
+// The execution flow includes fetching recommendations, generating a safe execution plan,
+// requiring user confirmation, executing the plan, and validating the outcome.
+//
+// Returns:
+//   *cobra.Command: A pointer to the configured cobra.Command object for the `fix` command.
 func newFixCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fix [diagnosis-id]",

@@ -24,7 +24,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// This function creates and configures the `diagnose` command.
+// newDiagnoseCmd creates and configures the `diagnose` command.
+// This command is responsible for running a comprehensive diagnosis on a specified middleware instance.
+// It defines the command's usage, descriptions, examples, arguments, and the main execution logic (`RunE`).
+// The RunE function parses arguments, builds a diagnosis request, executes the diagnosis via the
+// orchestrator, and prints a formatted report of the findings.
+//
+// Returns:
+//   *cobra.Command: A pointer to the configured cobra.Command object for the `diagnose` command.
 func newDiagnoseCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diagnose [middleware-type] [instance-name]",

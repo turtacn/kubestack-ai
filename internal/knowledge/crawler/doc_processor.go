@@ -23,18 +23,36 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 )
 
-// Chunk represents a single, embeddable piece of a larger document.
-// It contains the text content and metadata linking it back to the original source.
+// Chunk represents a single, embeddable piece of text derived from a larger
+// document. It contains the clean text content and metadata linking it back to
+// its original source. These chunks are the units that get converted into
+// vector embeddings for similarity searches.
 type Chunk struct {
-	ID        string
-	Content   string
-	SourceID  string // ID of the original store.RawDocument
+	// ID is the unique identifier for this specific chunk.
+	ID string
+	// Content is the processed, clean text content of the chunk.
+	Content string
+	// SourceID is the ID of the original RawDocument from which this chunk was derived.
+	SourceID string
+	// SourceURL is the URL or path of the original document.
 	SourceURL string
-	Metadata  map[string]interface{}
+	// Metadata contains any additional, chunk-specific information.
+	Metadata map[string]interface{}
 }
 
-// DocProcessor defines the interface for processing raw documents into clean, embeddable chunks.
+// DocProcessor defines the interface for components that process raw documents
+// into clean, embeddable chunks. This allows for different chunking strategies
+// (e.g., simple text splitting, markdown-aware splitting) to be used interchangeably.
 type DocProcessor interface {
+	// Process takes a raw document, cleans its content, and splits it into
+	// one or more chunks suitable for embedding.
+	//
+	// Parameters:
+	//   doc (*store.RawDocument): The raw document to be processed.
+	//
+	// Returns:
+	//   []Chunk: A slice of chunks derived from the document.
+	//   error: An error if processing fails.
 	Process(doc *store.RawDocument) ([]Chunk, error)
 }
 
@@ -47,9 +65,16 @@ type textSplitter struct {
 	spaceNormalizer *regexp.Regexp
 }
 
-// NewTextSplitter creates a new document processor with a simple text splitting strategy.
-// chunkSize is the target size of each chunk in characters.
-// chunkOverlap is the number of characters to overlap between consecutive chunks.
+// NewTextSplitter creates a new document processor that uses a simple, fixed-size
+// text splitting strategy. This is a common and effective baseline for chunking documents.
+//
+// Parameters:
+//   chunkSize (int): The target size of each chunk in characters.
+//   chunkOverlap (int): The number of characters to overlap between consecutive chunks to preserve context.
+//
+// Returns:
+//   DocProcessor: A new instance of a text-splitting document processor.
+//   error: An error if initialization fails (nil in this implementation).
 func NewTextSplitter(chunkSize, chunkOverlap int) (DocProcessor, error) {
 	return &textSplitter{
 		log:             logger.NewLogger("doc-processor"),
@@ -59,7 +84,16 @@ func NewTextSplitter(chunkSize, chunkOverlap int) (DocProcessor, error) {
 	}, nil
 }
 
-// Process cleans and chunks a raw document.
+// Process implements the DocProcessor interface for the textSplitter. It first
+// cleans the raw text by normalizing whitespace, then splits the cleaned text
+// into fixed-size chunks with a specified overlap.
+//
+// Parameters:
+//   doc (*store.RawDocument): The raw document to be processed.
+//
+// Returns:
+//   []Chunk: A slice of chunks derived from the document.
+//   error: An error if processing fails (nil in this implementation).
 func (p *textSplitter) Process(doc *store.RawDocument) ([]Chunk, error) {
 	p.log.Infof("Processing document from source: %s", doc.Source)
 

@@ -21,30 +21,46 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 )
 
-// Collector is a generic interface for a component that collects data.
-// While the MiddlewarePlugin interface defines specific collection methods, this can be
-// used for more generic, internal collector components.
+// Collector defines a generic interface for a component that collects a specific
+// piece of data. While the `interfaces.MiddlewarePlugin` defines high-level collection
+// methods (e.g., `CollectMetrics`), this can be used for more granular, internal
+// collector components within a plugin.
 type Collector interface {
+	// Collect performs the data collection and returns the result as a generic interface{}.
 	Collect(ctx context.Context) (interface{}, error)
 }
 
-// CollectorConfig holds common configuration parameters for data collectors,
-// such as timeout and retry settings.
+// CollectorConfig holds common configuration parameters for data collectors, such
+// as timeout and retry settings, promoting consistent behavior across different collectors.
 type CollectorConfig struct {
-	Timeout    time.Duration
+	// Timeout is the maximum time to allow for a single collection attempt.
+	Timeout time.Duration
+	// RetryCount is the number of times to retry a failed collection attempt.
 	RetryCount int
+	// RetryDelay is the duration to wait between retry attempts.
 	RetryDelay time.Duration
 }
 
-// CollectorBase provides common utilities and configuration for data collection tasks.
-// It can be embedded into specific collectors within a plugin (e.g., a Redis slowlog collector)
-// to handle common concerns like connection management and resilient data fetching.
+// CollectorBase is a foundational struct that provides common utilities and
+// configuration for data collection tasks. It is designed to be embedded into
+// specific collector implementations within a plugin (e.g., a Redis slowlog
+// collector) to handle shared concerns like logging and resilient data fetching.
 type CollectorBase struct {
-	Log    logger.Logger
+	// Log is a contextualized logger for the collector.
+	Log logger.Logger
+	// Config holds common settings like timeouts and retries.
 	Config *CollectorConfig
 }
 
-// NewCollectorBase creates and initializes a new CollectorBase with a logger and configuration.
+// NewCollectorBase creates and initializes a new CollectorBase with a logger and
+// configuration. If no configuration is provided, it applies a set of sane defaults.
+//
+// Parameters:
+//   log (logger.Logger): The logger to be used by the collector.
+//   cfg (*CollectorConfig): The configuration for the collector. Can be nil.
+//
+// Returns:
+//   *CollectorBase: A pointer to a new, initialized CollectorBase.
 func NewCollectorBase(log logger.Logger, cfg *CollectorConfig) *CollectorBase {
 	// Provide default config values if none are given
 	if cfg == nil {
@@ -60,8 +76,18 @@ func NewCollectorBase(log logger.Logger, cfg *CollectorConfig) *CollectorBase {
 	}
 }
 
-// Retry is a high-order function that executes a given collection function with a retry mechanism.
-// This is a key utility for making data collection more resilient to transient network errors.
+// Retry is a higher-order function that executes a given collection function
+// with a retry mechanism based on the collector's configuration. This is a key
+// utility for making data collection more resilient to transient network errors or
+// other temporary failures.
+//
+// Parameters:
+//   operationName (string): A descriptive name for the operation being attempted, used for logging.
+//   collectFunc (func() (interface{}, error)): The function to be executed and retried upon failure.
+//
+// Returns:
+//   interface{}: The data returned by a successful execution of `collectFunc`.
+//   error: The last error returned by `collectFunc` after all retry attempts have been exhausted.
 func (b *CollectorBase) Retry(operationName string, collectFunc func() (interface{}, error)) (interface{}, error) {
 	var data interface{}
 	var err error
@@ -84,9 +110,17 @@ func (b *CollectorBase) Retry(operationName string, collectFunc func() (interfac
 	return nil, err // Return the last error after all retries have been exhausted
 }
 
-// Connect is a placeholder for establishing a connection to a data source.
-// Each specific collector (e.g., for Redis, MySQL) will implement its own connection logic.
-// This base method can be used to encapsulate common logic like setting up TLS.
+// Connect provides a placeholder for establishing a connection to a data source.
+// Specific collectors (e.g., for Redis, MySQL) should override this method with
+// their actual connection logic. This base method can be used to encapsulate
+// common logic like validating host and port, setting up TLS, or implementing timeouts.
+//
+// Parameters:
+//   host (string): The hostname or IP address of the data source.
+//   port (int): The port number of the data source.
+//
+// Returns:
+//   error: An error if the connection fails (nil in this placeholder implementation).
 func (b *CollectorBase) Connect(host string, port int) error {
 	b.Log.Infof("Base connect method called for %s:%d. This should be overridden by a specific collector.", host, port)
 	// Placeholder for common connection logic. For example:

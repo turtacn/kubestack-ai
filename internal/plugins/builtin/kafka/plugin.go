@@ -35,7 +35,13 @@ type kafkaPlugin struct {
 	analyzer  *analyzer
 }
 
-// New is the factory function that creates an instance of the Kafka plugin.
+// New is the factory function that creates an instance of the Kafka plugin. It
+// initializes the base plugin, establishes a connection to a Kafka broker for
+// metadata queries, and wires together the specific collector and analyzer for Kafka.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: A new, fully initialized Kafka plugin.
+//   error: An error if the initial connection to a Kafka broker fails.
 func New() (interfaces.MiddlewarePlugin, error) {
 	p := &kafkaPlugin{}
 	p.Init("kafka", "0.1.0", "Provides diagnostics for Apache Kafka clusters.")
@@ -57,7 +63,8 @@ func New() (interfaces.MiddlewarePlugin, error) {
 	return p, nil
 }
 
-// Diagnose orchestrates the diagnosis process for Kafka.
+// Diagnose orchestrates the diagnosis process for Kafka. It collects cluster
+// metadata and then passes it to the analyzer to identify potential issues.
 func (p *kafkaPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	p.Log.Info("Starting Kafka diagnosis.")
 
@@ -66,7 +73,6 @@ func (p *kafkaPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect kafka metadata: %w", err)
 	}
-	// TODO: Collect other data points like consumer group lags.
 
 	// 2. Analyze data
 	issues := p.analyzer.Analyze(metadata)
@@ -84,42 +90,47 @@ func (p *kafkaPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) 
 
 // --- Interface Method Implementations ---
 
+// Ping checks connectivity to the Kafka cluster by attempting to read partition metadata.
 func (p *kafkaPlugin) Ping(ctx context.Context) error {
-	// A simple ping can be to try and read metadata.
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Second)
+	}
+	p.conn.SetReadDeadline(deadline)
 	_, err := p.conn.ReadPartitions()
 	p.conn.SetReadDeadline(time.Time{}) // Reset deadline
 	return err
 }
 
+// HealthCheck performs a basic health check by pinging the cluster.
 func (p *kafkaPlugin) HealthCheck(ctx context.Context) (*models.HealthStatus, error) {
 	if err := p.Ping(ctx); err != nil {
 		return &models.HealthStatus{IsHealthy: false, Message: fmt.Sprintf("Failed to get metadata from Kafka: %v", err)}, nil
 	}
-	// A more detailed check could verify that all brokers are reachable.
 	return &models.HealthStatus{IsHealthy: true, Message: "Kafka is responsive."}, nil
 }
 
-// GetConfiguration for Kafka is complex as configuration is distributed across broker files.
-// Some configs can be fetched via the Admin API, but this is a placeholder.
+// GetConfiguration provides a placeholder implementation. A full implementation would
+// use the Kafka Admin API to describe cluster and broker configurations.
 func (p *kafkaPlugin) GetConfiguration(_ context.Context) (*models.ConfigData, error) {
 	p.Log.Info("Kafka configuration collection via client is a placeholder. Configuration is typically managed in server.properties files on each broker.")
-	// A real implementation would use the Admin API to describe cluster and broker configurations.
 	return &models.ConfigData{Data: make(map[string]string)}, nil
 }
 
+// CollectMetrics gathers key performance indicators for the cluster, derived from metadata.
 func (p *kafkaPlugin) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	return p.collector.CollectMetrics(ctx)
 }
 
-// CollectLogs for Kafka typically involves connecting via JMX or reading log files from the broker servers,
-// which is beyond the scope of a simple client-side collector.
+// CollectLogs provides a placeholder implementation. A full implementation would
+// require reading log files from broker servers or connecting via JMX, which is
+// beyond the scope of a simple client.
 func (p *kafkaPlugin) CollectLogs(_ context.Context, _ *models.LogOptions) (*models.LogData, error) {
 	p.Log.Info("Kafka log collection is a placeholder. Logs are typically collected via other means (e.g., filebeat, JMX exporter).")
 	return &models.LogData{Entries: []string{}}, nil
 }
 
-// Shutdown gracefully closes the Kafka connection.
+// Shutdown gracefully closes the underlying Kafka connection to prevent resource leaks.
 func (p *kafkaPlugin) Shutdown() error {
 	p.Log.Info("Shutting down Kafka plugin and closing connection.")
 	if p.conn != nil {

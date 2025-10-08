@@ -80,7 +80,16 @@ type manager struct {
 	executor interfaces.ActionExecutor
 }
 
-// NewManager creates a new instance of the execution manager.
+// NewManager creates a new instance of the execution manager. The manager is
+// responsible for coordinating the entire execution process, from planning to
+// applying and validating actions. It uses a planner to generate the execution
+// steps and an internal executor to run them.
+//
+// Parameters:
+//   planner (interfaces.ExecutionPlanner): The planner component used to generate execution plans.
+//
+// Returns:
+//   interfaces.ExecutionManager: A new, configured execution manager.
 func NewManager(planner interfaces.ExecutionPlanner) interfaces.ExecutionManager {
 	return &manager{
 		log:      logger.NewLogger("execution-manager"),
@@ -89,11 +98,33 @@ func NewManager(planner interfaces.ExecutionPlanner) interfaces.ExecutionManager
 	}
 }
 
+// PlanExecution delegates the task of generating an execution plan to the
+// configured planner component.
+//
+// Parameters:
+//   ctx (context.Context): The context for the planning operation.
+//   recommendations ([]*models.Recommendation): A slice of recommendations from a diagnosis report.
+//
+// Returns:
+//   *models.ExecutionPlan: The generated plan containing the steps to be executed.
+//   error: An error if plan generation fails.
 func (m *manager) PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
 	m.log.Info("Delegating execution planning to the planner component.")
 	return m.planner.GeneratePlan(ctx, recommendations)
 }
 
+// ExecuteActions carries out the steps defined in an execution plan. It follows
+// the specified strategy (e.g., serial) and uses a confirmation function to
+// prompt the user before executing each step, providing a critical safety check.
+//
+// Parameters:
+//   ctx (context.Context): The context for the entire execution operation.
+//   plan (*models.ExecutionPlan): The plan to be executed.
+//   confirmFunc (interfaces.ConfirmationFunc): A function that prompts the user for confirmation.
+//
+// Returns:
+//   *models.ExecutionResult: A struct containing the outcome of the execution, including logs and step results.
+//   error: An error if a step fails and the execution is halted.
 func (m *manager) ExecuteActions(ctx context.Context, plan *models.ExecutionPlan, confirmFunc interfaces.ConfirmationFunc) (*models.ExecutionResult, error) {
 	m.log.Infof("Starting execution of plan ID: %s with strategy: %s", plan.ID, plan.Strategy)
 
@@ -152,6 +183,17 @@ func (m *manager) ExecuteActions(ctx context.Context, plan *models.ExecutionPlan
 	return result, nil
 }
 
+// ValidateExecution is responsible for verifying that an executed plan has
+// successfully resolved the underlying issue.
+// NOTE: This is a placeholder implementation. A real implementation would
+// re-run a relevant health check or diagnosis to confirm the fix.
+//
+// Parameters:
+//   ctx (context.Context): The context for the validation operation.
+//   result (*models.ExecutionResult): The result of the execution to be validated.
+//
+// Returns:
+//   error: An error if validation fails or if the execution was not successful.
 func (m *manager) ValidateExecution(ctx context.Context, result *models.ExecutionResult) error {
 	m.log.Infof("Validating execution result for plan ID: %s", result.PlanID)
 	// Placeholder. A real implementation would re-run a health check or a specific

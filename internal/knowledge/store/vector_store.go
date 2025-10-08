@@ -25,23 +25,32 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 )
 
-// StoreDocument represents a single document (a text chunk and its vector)
-// as it is stored in the vector database.
+// StoreDocument represents a single, embeddable unit of text (a "chunk") and its
+// corresponding vector representation. This is the core data model for storage
+// and retrieval in a vector database.
 type StoreDocument struct {
-	ID       string
-	Content  string
-	Vector   []float32
+	// ID is the unique identifier for this document chunk.
+	ID string
+	// Content is the text content of the chunk.
+	Content string
+	// Vector is the numerical representation of the content's semantics.
+	Vector []float32
+	// Metadata contains additional information about the chunk, such as its source document.
 	Metadata map[string]interface{}
-	Score    float32 // Used for returning search results, not for storage.
+	// Score is populated during a search operation and indicates the relevance of the
+	// document to the query. It is not a stored field.
+	Score float32
 }
 
-// VectorStore is the interface for any vector database implementation.
-// It abstracts the storage and retrieval of vector embeddings, allowing for different
-// backends like in-memory, Chroma, or Qdrant.
+// VectorStore defines the interface for a vector database. It abstracts the
+// storage and retrieval of vector embeddings, allowing for different backends
+// (e.g., in-memory, Chroma, Qdrant) to be used interchangeably.
 type VectorStore interface {
+	// AddDocuments adds a batch of documents (chunks and their vectors) to the store.
 	AddDocuments(ctx context.Context, docs []StoreDocument) error
+	// SimilaritySearch finds the top K documents in the store that are most
+	// semantically similar to a given query vector.
 	SimilaritySearch(ctx context.Context, queryVector []float32, topK int) ([]StoreDocument, error)
-	// TODO: Add other methods like DeleteDocuments, UpdateDocuments if needed.
 }
 
 // --- In-Memory Vector Store Implementation ---
@@ -55,6 +64,13 @@ type inMemoryVectorStore struct {
 }
 
 // NewInMemoryVectorStore creates a new, empty in-memory vector store.
+// This implementation is simple and useful for testing or small-scale deployments,
+// but it is not durable and performs a brute-force search, making it inefficient
+// for large datasets.
+//
+// Returns:
+//   VectorStore: A new instance of an in-memory vector store.
+//   error: An error if initialization fails (nil in this implementation).
 func NewInMemoryVectorStore() (VectorStore, error) {
 	return &inMemoryVectorStore{
 		log:       logger.NewLogger("in-memory-vector-store"),
@@ -62,7 +78,7 @@ func NewInMemoryVectorStore() (VectorStore, error) {
 	}, nil
 }
 
-// AddDocuments adds a batch of documents to the in-memory store in a thread-safe manner.
+// AddDocuments appends a batch of documents to the in-memory store in a thread-safe manner.
 func (s *inMemoryVectorStore) AddDocuments(_ context.Context, docs []StoreDocument) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -71,8 +87,10 @@ func (s *inMemoryVectorStore) AddDocuments(_ context.Context, docs []StoreDocume
 	return nil
 }
 
-// SimilaritySearch performs a brute-force k-Nearest-Neighbor search using cosine similarity.
-// While inefficient for large datasets, it's perfect for a simple implementation.
+// SimilaritySearch performs a brute-force k-Nearest-Neighbor (k-NN) search
+// over all documents in the store. It calculates the cosine similarity between the
+// query vector and every document vector, then returns the top K most similar documents.
+// This operation is thread-safe.
 func (s *inMemoryVectorStore) SimilaritySearch(_ context.Context, queryVector []float32, topK int) ([]StoreDocument, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

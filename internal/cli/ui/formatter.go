@@ -26,13 +26,29 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Formatter is the interface for components that format data for CLI output.
+// Formatter defines the interface for components that format data for CLI output.
+// It provides a standardized way to print structured data in various formats.
 type Formatter interface {
+	// Print takes an arbitrary data structure and prints it to standard output
+	// in a specific format (e.g., JSON, YAML, or human-readable text).
+	//
+	// Parameters:
+	//   data (interface{}): The data to be formatted and printed.
+	//
+	// Returns:
+	//   error: An error if formatting or printing fails.
 	Print(data interface{}) error
 }
 
 // NewFormatter is a factory function that returns the appropriate formatter
 // based on the requested output format (e.g., from the --output flag).
+// It defaults to the 'text' formatter if the requested format is not recognized.
+//
+// Parameters:
+//   format (string): The desired output format (e.g., "json", "yaml", "text").
+//
+// Returns:
+//   Formatter: An implementation of the Formatter interface.
 func NewFormatter(format string) Formatter {
 	switch strings.ToLower(format) {
 	case "json":
@@ -47,6 +63,13 @@ func NewFormatter(format string) Formatter {
 // --- JSON Formatter ---
 type jsonFormatter struct{}
 
+// Print formats the provided data as a pretty-printed JSON string and writes it to standard output.
+//
+// Parameters:
+//   data (interface{}): The data to be marshaled into JSON.
+//
+// Returns:
+//   error: An error if JSON marshaling fails.
 func (f *jsonFormatter) Print(data interface{}) error {
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -59,6 +82,13 @@ func (f *jsonFormatter) Print(data interface{}) error {
 // --- YAML Formatter ---
 type yamlFormatter struct{}
 
+// Print formats the provided data as a YAML string and writes it to standard output.
+//
+// Parameters:
+//   data (interface{}): The data to be marshaled into YAML.
+//
+// Returns:
+//   error: An error if YAML marshaling fails.
 func (f *yamlFormatter) Print(data interface{}) error {
 	b, err := yaml.Marshal(data)
 	if err != nil {
@@ -71,7 +101,16 @@ func (f *yamlFormatter) Print(data interface{}) error {
 // --- Human-Readable Text Formatter ---
 type textFormatter struct{}
 
-// Print determines the type of the data and calls the appropriate printing function.
+// Print formats the data into a human-readable, colorized text format.
+// It uses a type switch to delegate the actual formatting to type-specific
+// helper methods. If a type is not explicitly supported, it prints a warning
+// and falls back to the JSON formatter.
+//
+// Parameters:
+//   data (interface{}): The data to be formatted, typically a struct like *models.DiagnosisResult.
+//
+// Returns:
+//   error: An error if printing fails.
 func (f *textFormatter) Print(data interface{}) error {
 	switch v := data.(type) {
 	case *models.DiagnosisResult:

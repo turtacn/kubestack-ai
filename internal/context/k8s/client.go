@@ -30,8 +30,9 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-// Client is a wrapper around the official Kubernetes client-go library.
-// It simplifies common operations like loading configuration and fetching resources.
+// Client is a wrapper around the official Kubernetes client-go library that
+// simplifies common operations like loading configuration and fetching resources.
+// It provides a higher-level abstraction for interacting with the Kubernetes API.
 type Client struct {
 	log       logger.Logger
 	clientset kubernetes.Interface
@@ -39,8 +40,14 @@ type Client struct {
 }
 
 // NewClient creates a new Kubernetes client. It automatically handles loading the
-// kubeconfig from standard locations (~/.kube/config) or from an in-cluster service account
-// if the application is running inside a pod.
+// kubeconfig from standard locations (e.g., ~/.kube/config) or from an in-cluster
+// service account if the application is running inside a pod. This dual-mode
+// initialization makes it easy to run the application both locally for development
+// and inside a Kubernetes cluster for production.
+//
+// Returns:
+//   *Client: A pointer to the initialized Kubernetes client.
+//   error: An error if both in-cluster and local kubeconfig loading fail.
 func NewClient() (*Client, error) {
 	log := logger.NewLogger("k8s-client")
 
@@ -82,22 +89,59 @@ func NewClient() (*Client, error) {
 
 // --- Resource Accessor Methods ---
 
-// GetPod fetches a specific Pod resource by name and namespace.
+// GetPod fetches a specific Pod resource by name and namespace from the Kubernetes API.
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   namespace (string): The namespace where the Pod is located.
+//   name (string): The name of the Pod.
+//
+// Returns:
+//   *corev1.Pod: A pointer to the retrieved Pod object.
+//   error: An error if the API call fails (e.g., Pod not found).
 func (c *Client) GetPod(ctx context.Context, namespace, name string) (*corev1.Pod, error) {
 	return c.clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-// ListPods lists all Pods in a namespace, optionally filtered by a label selector.
+// ListPods lists all Pods in a given namespace. It can optionally filter the
+// results based on a label selector string (e.g., "app=my-app,tier=frontend").
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   namespace (string): The namespace to list Pods from.
+//   labelSelector (string): An optional label selector to filter the Pods.
+//
+// Returns:
+//   *corev1.PodList: A list containing the matching Pods.
+//   error: An error if the API call fails.
 func (c *Client) ListPods(ctx context.Context, namespace, labelSelector string) (*corev1.PodList, error) {
 	return c.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 }
 
-// GetDeployment fetches a specific Deployment resource by name and namespace.
+// GetDeployment fetches a specific Deployment resource by name and namespace from the Kubernetes API.
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   namespace (string): The namespace where the Deployment is located.
+//   name (string): The name of the Deployment.
+//
+// Returns:
+//   *appsv1.Deployment: A pointer to the retrieved Deployment object.
+//   error: An error if the API call fails.
 func (c *Client) GetDeployment(ctx context.Context, namespace, name string) (*appsv1.Deployment, error) {
 	return c.clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
-// GetService fetches a specific Service resource by name and namespace.
+// GetService fetches a specific Service resource by name and namespace from the Kubernetes API.
+//
+// Parameters:
+//   ctx (context.Context): The context for the API request.
+//   namespace (string): The namespace where the Service is located.
+//   name (string): The name of the Service.
+//
+// Returns:
+//   *corev1.Service: A pointer to the retrieved Service object.
+//   error: An error if the API call fails.
 func (c *Client) GetService(ctx context.Context, namespace, name string) (*corev1.Service, error) {
 	return c.clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 }

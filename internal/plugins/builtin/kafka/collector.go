@@ -29,20 +29,36 @@ type collector struct {
 	log  logger.Logger
 }
 
-// newCollector creates a new Kafka data collector.
+// newCollector creates a new data collector for Kafka.
+//
+// Parameters:
+//   conn (*kafka.Conn): An active connection to a Kafka broker.
+//   log (logger.Logger): A contextualized logger for the collector.
+//
+// Returns:
+//   *collector: A new instance of the Kafka collector.
 func newCollector(conn *kafka.Conn, log logger.Logger) *collector {
 	return &collector{conn: conn, log: log}
 }
 
-// Metadata is a custom struct to hold the rich metadata fetched from Kafka.
+// Metadata is a custom struct that aggregates the rich metadata fetched from a
+// Kafka cluster, including details about topics, partitions, brokers, and the active controller.
 type Metadata struct {
-	Topics      []kafka.Topic
-	Brokers     []kafka.Broker
-	Controller  kafka.Broker
+	// Topics is a list of all topics in the cluster, including their partition information.
+	Topics []kafka.Topic
+	// Brokers is a list of all brokers in the cluster.
+	Brokers []kafka.Broker
+	// Controller is the broker currently acting as the cluster controller.
+	Controller kafka.Broker
 }
 
-// CollectMetadata reads the cluster metadata, which includes topics, partitions, and brokers.
-// This is the primary source of information for diagnosing cluster state.
+// CollectMetadata reads the core cluster metadata from Kafka, including details
+// about topics, partitions, brokers, and the active controller. This is the primary
+// source of information for diagnosing the cluster's structural health.
+//
+// Returns:
+//   *Metadata: An aggregated struct containing the cluster metadata.
+//   error: An error if reading partitions, brokers, or the controller fails.
 func (c *collector) CollectMetadata(_ context.Context) (*Metadata, error) {
 	c.log.Info("Collecting Kafka cluster metadata.")
 
@@ -51,7 +67,6 @@ func (c *collector) CollectMetadata(_ context.Context) (*Metadata, error) {
 		return nil, fmt.Errorf("failed to read partitions: %w", err)
 	}
 
-	// The kafka-go library returns a flat list of partitions. We need to group them by topic for easier analysis.
 	topicMap := make(map[string][]kafka.Partition)
 	for _, p := range partitions {
 		topicMap[p.Topic] = append(topicMap[p.Topic], p)
@@ -79,7 +94,12 @@ func (c *collector) CollectMetadata(_ context.Context) (*Metadata, error) {
 	}, nil
 }
 
-// CollectMetrics derives simple metrics from the cluster metadata.
+// CollectMetrics derives a standardized set of key performance indicators from
+// the raw metadata collected from the cluster.
+//
+// Returns:
+//   *models.MetricsData: A structured representation of the key metrics.
+//   error: An error if the underlying metadata collection fails.
 func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	c.log.Info("Collecting and deriving Kafka metrics.")
 	metadata, err := c.CollectMetadata(ctx)
@@ -96,7 +116,6 @@ func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, er
 	for _, t := range metadata.Topics {
 		partitionCount += len(t.Partitions)
 		for _, p := range t.Partitions {
-			// Check for under-replicated partitions (ISR count < replica count)
 			if len(p.Isr) < len(p.Replicas) {
 				underReplicatedPartitions++
 			}
@@ -105,8 +124,6 @@ func (c *collector) CollectMetrics(ctx context.Context) (*models.MetricsData, er
 	metrics["partition_count"] = float64(partitionCount)
 	metrics["under_replicated_partitions_count"] = float64(underReplicatedPartitions)
 
-	// Note: Real performance metrics (throughput, latency, request rates) require a dedicated monitoring system
-	// like Prometheus with JMX Exporter, as this data is not typically available via the standard client protocol.
 	c.log.Info("Note: Throughput and latency metrics require a dedicated monitoring setup (e.g., JMX Exporter).")
 
 	return &models.MetricsData{Data: metrics}, nil

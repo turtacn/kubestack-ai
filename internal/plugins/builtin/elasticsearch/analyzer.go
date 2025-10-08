@@ -27,12 +27,26 @@ type analyzer struct {
 	log logger.Logger
 }
 
-// newAnalyzer creates a new Elasticsearch data analyzer.
+// newAnalyzer creates a new analyzer for Elasticsearch data.
+//
+// Parameters:
+//   log (logger.Logger): A contextualized logger for the analyzer.
+//
+// Returns:
+//   *analyzer: A new instance of the Elasticsearch analyzer.
 func newAnalyzer(log logger.Logger) *analyzer {
 	return &analyzer{log: log}
 }
 
-// AnalyzeClusterHealth is a primary analysis function that checks the cluster health status.
+// AnalyzeClusterHealth is a primary analysis function that checks the cluster
+// health status from the `_cluster/health` API endpoint. It creates issues for
+// "red" or "yellow" statuses and for any unassigned shards.
+//
+// Parameters:
+//   health (map[string]interface{}): The parsed JSON data from the cluster health API.
+//
+// Returns:
+//   []*models.Issue: A slice of issues identified from the cluster health data.
 func (a *analyzer) AnalyzeClusterHealth(health map[string]interface{}) []*models.Issue {
 	var issues []*models.Issue
 	a.log.Info("Analyzing Elasticsearch cluster health.")
@@ -76,7 +90,15 @@ func (a *analyzer) AnalyzeClusterHealth(health map[string]interface{}) []*models
 	return issues
 }
 
-// AnalyzeNodesStats checks for issues at the node level, like high JVM heap or thread pool rejections.
+// AnalyzeNodesStats checks for common issues at the node level by parsing data
+// from the `_nodes/stats` API endpoint. It currently checks for high JVM heap
+// usage and thread pool rejections.
+//
+// Parameters:
+//   stats (map[string]interface{}): The parsed JSON data from the nodes stats API.
+//
+// Returns:
+//   []*models.Issue: A slice of issues identified from the node-level stats.
 func (a *analyzer) AnalyzeNodesStats(stats map[string]interface{}) []*models.Issue {
 	var issues []*models.Issue
 	a.log.Info("Analyzing Elasticsearch nodes stats.")

@@ -19,6 +19,9 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/cli/commands"
 )
 
+// main is the entry point for the KubeStack-AI (ksa) command-line application.
+// It initializes the command structure and executes the root command, which handles
+// all command-line parsing, flag processing, and execution logic.
 func main() {
 	// The Execute function from the commands package handles all command parsing,
 	// flag handling, and execution logic.

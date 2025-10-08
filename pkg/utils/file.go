@@ -24,6 +24,12 @@ import (
 )
 
 // FileExists checks if a file or directory exists at the given path.
+//
+// Parameters:
+//   path (string): The full path to the file or directory.
+//
+// Returns:
+//   bool: True if the file or directory exists, false otherwise.
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	// os.IsNotExist is the most reliable way to check for non-existence.
@@ -33,6 +39,14 @@ func FileExists(path string) bool {
 // WriteFileSafe writes data to a file in a safe, atomic manner. It first writes to a
 // temporary file in the same directory and then renames it to the final destination.
 // This prevents file corruption if the write operation is interrupted.
+//
+// Parameters:
+//   path (string): The final destination path for the file.
+//   data ([]byte): The byte slice of data to be written to the file.
+//   perm (os.FileMode): The file permissions to set for the new file (e.g., 0644).
+//
+// Returns:
+//   error: An error if any step of the process fails, otherwise nil.
 func WriteFileSafe(path string, data []byte, perm os.FileMode) error {
 	// Ensure the target directory exists.
 	dir := filepath.Dir(path)
@@ -74,6 +88,13 @@ func WriteFileSafe(path string, data []byte, perm os.FileMode) error {
 
 // CalculateSHA256 computes the SHA256 checksum of a file, returning it as a hex string.
 // This is useful for verifying file integrity after download or transfer.
+//
+// Parameters:
+//   path (string): The path to the file to be checksummed.
+//
+// Returns:
+//   string: The SHA256 checksum as a hexadecimal string.
+//   error: An error if the file cannot be opened or read, otherwise nil.
 func CalculateSHA256(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

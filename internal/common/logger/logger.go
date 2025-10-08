@@ -25,18 +25,32 @@ import (
 )
 
 // Logger defines the standard logging interface used across the application.
+// This abstraction allows the underlying logging implementation (e.g., logrus)
+// to be swapped out without changing application code.
 type Logger interface {
+	// WithField adds a single structured field to the logger's context.
 	WithField(key string, value interface{}) Logger
+	// WithFields adds multiple structured fields to the logger's context.
 	WithFields(fields map[string]interface{}) Logger
+	// Debug logs a message at the debug level.
 	Debug(args ...interface{})
+	// Info logs a message at the info level.
 	Info(args ...interface{})
+	// Warn logs a message at the warning level.
 	Warn(args ...interface{})
+	// Error logs a message at the error level.
 	Error(args ...interface{})
+	// Fatal logs a message at the fatal level and then calls os.Exit(1).
 	Fatal(args ...interface{})
+	// Debugf logs a formatted message at the debug level.
 	Debugf(format string, args ...interface{})
+	// Infof logs a formatted message at the info level.
 	Infof(format string, args ...interface{})
+	// Warnf logs a formatted message at the warning level.
 	Warnf(format string, args ...interface{})
+	// Errorf logs a formatted message at the error level.
 	Errorf(format string, args ...interface{})
+	// Fatalf logs a formatted message at the fatal level and then calls os.Exit(1).
 	Fatalf(format string, args ...interface{})
 }
 
@@ -45,22 +59,36 @@ type logrusLogger struct {
 	entry *logrus.Entry
 }
 
-// Config holds all configuration for the logger.
+// Config holds all configuration for the logger, allowing for detailed control
+// over log levels, formats, outputs, and rotation policies.
 type Config struct {
-	Level      string `mapstructure:"level"`      // Logging level: "debug", "info", "warn", "error", "fatal"
-	Format     string `mapstructure:"format"`     // Log format: "json" or "text"
-	Output     string `mapstructure:"output"`     // Output target: "console", "file", "both"
-	File       string `mapstructure:"file"`       // Log file path
-	MaxSize    int    `mapstructure:"maxSize"`    // Max size in MB of a log file before it gets rotated
-	MaxBackups int    `mapstructure:"maxBackups"` // Max number of old log files to retain
-	MaxAge     int    `mapstructure:"maxAge"`     // Max number of days to retain old log files
-	Compress   bool   `mapstructure:"compress"`   // Whether to compress old log files
+	// Level is the minimum logging level to output (e.g., "debug", "info", "warn").
+	Level string `mapstructure:"level"`
+	// Format specifies the log format, either "json" for structured logs or "text" for human-readable logs.
+	Format string `mapstructure:"format"`
+	// Output defines where logs should be sent: "console", "file", or "both".
+	Output string `mapstructure:"output"`
+	// File is the path to the log file, used when Output is "file" or "both".
+	File string `mapstructure:"file"`
+	// MaxSize is the maximum size in megabytes of a log file before it gets rotated.
+	MaxSize int `mapstructure:"maxSize"`
+	// MaxBackups is the maximum number of old log files to retain.
+	MaxBackups int `mapstructure:"maxBackups"`
+	// MaxAge is the maximum number of days to retain old log files.
+	MaxAge int `mapstructure:"maxAge"`
+	// Compress determines whether to compress rotated log files using gzip.
+	Compress bool `mapstructure:"compress"`
 }
 
 var globalLogger Logger = &logrusLogger{entry: logrus.NewEntry(logrus.New())}
 
 // InitGlobalLogger initializes the global logger instance with the given configuration.
-// It is not thread-safe and should be called once at application startup.
+// It configures the logging level, format, output (console, file, or both), and
+// sets up log rotation using the lumberjack library. This function should be
+// called once at application startup and is not thread-safe.
+//
+// Parameters:
+//   cfg (*Config): A pointer to the logger configuration struct.
 func InitGlobalLogger(cfg *Config) {
 	l := logrus.New()
 
@@ -103,20 +131,37 @@ func InitGlobalLogger(cfg *Config) {
 	globalLogger = &logrusLogger{entry: logrus.NewEntry(l)}
 }
 
-// GetLogger returns the configured global logger.
+// GetLogger returns the configured global logger instance. This function provides
+// a convenient way to access the logger from anywhere in the application after it
+// has been initialized.
+//
+// Returns:
+//   Logger: The singleton logger instance.
 func GetLogger() Logger {
 	return globalLogger
 }
 
-// NewLogger returns a new logger with a "module" field, useful for contextual logging.
+// NewLogger returns a new logger with a "module" field already added to its
+// context. This is a factory function for creating contextual loggers that
+// automatically tag log entries with the name of the component or module.
+//
+// Parameters:
+//   module (string): The name of the module to be added as a field.
+//
+// Returns:
+//   Logger: A new logger instance with the "module" field.
 func NewLogger(module string) Logger {
 	return GetLogger().WithField("module", module)
 }
 
+// WithField returns a new logger entry with the specified field added to its context.
+// This is used to add structured data to log messages.
 func (l *logrusLogger) WithField(key string, value interface{}) Logger {
 	return &logrusLogger{entry: l.entry.WithField(key, value)}
 }
 
+// WithFields returns a new logger entry with the specified fields added to its context.
+// This is used to add multiple structured data fields to log messages.
 func (l *logrusLogger) WithFields(fields map[string]interface{}) Logger {
 	return &logrusLogger{entry: l.entry.WithFields(fields)}
 }

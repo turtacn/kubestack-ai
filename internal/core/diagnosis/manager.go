@@ -37,7 +37,16 @@ type manager struct {
 	// dbClient would be here for persistence.
 }
 
-// NewManager creates a new instance of the diagnosis manager.
+// NewManager creates a new instance of the diagnosis manager, which orchestrates
+// the entire diagnosis process. It takes a plugin manager to load the appropriate
+// middleware-specific logic and a slice of analyzers to process the collected data.
+//
+// Parameters:
+//   pm (interfaces.PluginManager): The plugin manager used to load diagnosis plugins.
+//   analyzers ([]interfaces.DiagnosisAnalyzer): A slice of analyzers to be run on the collected data.
+//
+// Returns:
+//   interfaces.DiagnosisManager: A new, configured diagnosis manager.
 func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer) interfaces.DiagnosisManager {
 	return &manager{
 		log:           logger.NewLogger("diagnosis-manager"),
@@ -47,7 +56,18 @@ func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAna
 	}
 }
 
-// RunDiagnosis executes the full diagnosis workflow from data collection to analysis.
+// RunDiagnosis executes the full, end-to-end diagnosis workflow. It handles
+// caching, plugin loading, data collection, analysis, and result summarization.
+// Progress updates are sent to the provided channel throughout the process.
+//
+// Parameters:
+//   ctx (context.Context): The context for the entire diagnosis operation.
+//   req (*models.DiagnosisRequest): The request detailing what to diagnose.
+//   progressChan (chan<- interfaces.DiagnosisProgress): A channel to send real-time progress updates.
+//
+// Returns:
+//   *models.DiagnosisResult: The final result of the diagnosis, including any identified issues.
+//   error: An error if a critical step in the workflow fails.
 func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest, progressChan chan<- interfaces.DiagnosisProgress) (*models.DiagnosisResult, error) {
 	if result, found := m.cache.Get(req); found {
 		m.log.Info("Returning diagnosis result from cache.")
@@ -130,6 +150,16 @@ func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewareP
 	return data, nil
 }
 
+// AnalyzeData runs all registered diagnosis analyzers concurrently on the collected
+// data. It aggregates the issues identified by each analyzer into a single slice.
+//
+// Parameters:
+//   ctx (context.Context): The context for the analysis operations.
+//   data (*models.CollectedData): The collected data to be analyzed.
+//
+// Returns:
+//   []*models.Issue: A slice containing all issues identified by the analyzers.
+//   error: An error if the analysis process itself fails (nil in this implementation).
 func (m *manager) AnalyzeData(ctx context.Context, data *models.CollectedData) ([]*models.Issue, error) {
 	var allIssues []*models.Issue
 	var wg sync.WaitGroup
@@ -160,6 +190,16 @@ func (m *manager) AnalyzeData(ctx context.Context, data *models.CollectedData) (
 	return allIssues, nil
 }
 
+// GenerateReport creates a simple, human-readable string summary of a diagnosis result.
+// NOTE: This is a placeholder. A more advanced implementation would use the
+// `internal/cli/ui/formatter` for rich, structured output.
+//
+// Parameters:
+//   result (*models.DiagnosisResult): The diagnosis result to be reported.
+//
+// Returns:
+//   string: A formatted string summarizing the report.
+//   error: An error if report generation fails (nil in this implementation).
 func (m *manager) GenerateReport(result *models.DiagnosisResult) (string, error) {
 	// This is a placeholder for a proper report generator, which might use text/template.
 	return fmt.Sprintf("Diagnosis Report (ID: %s)\nStatus: %s\nSummary: %s\nFound %d issues.",

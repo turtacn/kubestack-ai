@@ -27,8 +27,17 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
-// MetricsCollector is the interface for collecting OS-level metrics.
+// MetricsCollector defines the interface for components that collect OS-level metrics,
+// such as CPU, memory, disk, and network usage.
 type MetricsCollector interface {
+	// Collect gathers a snapshot of various OS-level metrics.
+	//
+	// Parameters:
+	//   ctx (context.Context): The context for the collection operation.
+	//
+	// Returns:
+	//   map[string]interface{}: A map of metric names to their collected values.
+	//   error: An error if a critical part of the collection process fails.
 	Collect(ctx context.Context) (map[string]interface{}, error)
 }
 
@@ -38,15 +47,30 @@ type gopsutilCollector struct {
 	log logger.Logger
 }
 
-// NewMetricsCollector creates a new system metrics collector.
+// NewMetricsCollector creates a new system metrics collector that uses the gopsutil
+// library as its backend.
+//
+// Returns:
+//   MetricsCollector: A new instance of a metrics collector.
+//   error: An error if initialization fails (nil in this implementation).
 func NewMetricsCollector() (MetricsCollector, error) {
 	return &gopsutilCollector{
 		log: logger.NewLogger("system-metrics"),
 	}, nil
 }
 
-// Collect gathers a wide range of OS metrics. It collects as much as possible,
-// logging warnings for any metrics that fail to be collected.
+// Collect implements the MetricsCollector interface using the gopsutil library.
+// It gathers a wide range of OS metrics, including CPU usage, load average,
+// memory statistics, disk usage for the root partition, and network I/O counters.
+// It is designed to be resilient, logging warnings for individual metric collection
+// failures while still returning successfully with the metrics that were collected.
+//
+// Parameters:
+//   ctx (context.Context): The context for the gopsutil library calls.
+//
+// Returns:
+//   map[string]interface{}: A map containing the collected metrics.
+//   error: An error is not expected in the current implementation, so it returns nil.
 func (c *gopsutilCollector) Collect(ctx context.Context) (map[string]interface{}, error) {
 	c.log.Info("Collecting system-level OS metrics.")
 	metrics := make(map[string]interface{})

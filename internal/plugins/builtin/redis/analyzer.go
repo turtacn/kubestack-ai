@@ -29,13 +29,28 @@ type analyzer struct {
 	log logger.Logger
 }
 
-// newAnalyzer creates a new Redis data analyzer.
+// newAnalyzer creates a new analyzer for Redis data.
+//
+// Parameters:
+//   log (logger.Logger): A contextualized logger for the analyzer.
+//
+// Returns:
+//   *analyzer: A new instance of the Redis analyzer.
 func newAnalyzer(log logger.Logger) *analyzer {
 	return &analyzer{log: log}
 }
 
-// Analyze is the main entry point for the analyzer. It orchestrates various specialized
-// analysis functions and aggregates the issues they find.
+// Analyze is the main entry point for the analyzer. It orchestrates calls to
+// various specialized analysis functions (e.g., for memory, persistence) and
+// aggregates the issues they find into a single list.
+//
+// Parameters:
+//   info (map[string]string): A map of data from the `INFO` command.
+//   config (*models.ConfigData): The structured configuration data.
+//   slowlogs (*models.LogData): A list of entries from the slowlog.
+//
+// Returns:
+//   []*models.Issue: A slice of all issues identified from the data.
 func (a *analyzer) Analyze(info map[string]string, config *models.ConfigData, slowlogs *models.LogData) []*models.Issue {
 	var issues []*models.Issue
 	a.log.Info("Analyzing collected Redis data.")
@@ -50,7 +65,9 @@ func (a *analyzer) Analyze(info map[string]string, config *models.ConfigData, sl
 	return issues
 }
 
-// analyzeMemory checks for memory-related issues like high fragmentation or problematic eviction policies.
+// analyzeMemory checks for memory-related issues, such as high fragmentation,
+// which can indicate wasted memory, and a risky `noeviction` policy, which can
+// cause write failures when the memory limit is reached.
 func (a *analyzer) analyzeMemory(info map[string]string, config *models.ConfigData) []*models.Issue {
 	var issues []*models.Issue
 
@@ -83,7 +100,9 @@ func (a *analyzer) analyzeMemory(info map[string]string, config *models.ConfigDa
 	return issues
 }
 
-// analyzePersistence checks for potential issues with RDB and AOF configuration.
+// analyzePersistence checks for potential issues with RDB and AOF configurations,
+// such as when both persistence methods are disabled, which could lead to total
+// data loss on restart.
 func (a *analyzer) analyzePersistence(info map[string]string, config *models.ConfigData) []*models.Issue {
 	var issues []*models.Issue
 
@@ -103,7 +122,9 @@ func (a *analyzer) analyzePersistence(info map[string]string, config *models.Con
 	return issues
 }
 
-// analyzeSecurity checks for common security misconfigurations.
+// analyzeSecurity checks for common security misconfigurations, such as disabled
+// password protection (`requirepass`) or binding to all network interfaces, which
+// can expose the instance to untrusted networks.
 func (a *analyzer) analyzeSecurity(config *models.ConfigData) []*models.Issue {
 	var issues []*models.Issue
 
@@ -134,7 +155,8 @@ func (a *analyzer) analyzeSecurity(config *models.ConfigData) []*models.Issue {
 	return issues
 }
 
-// analyzePerformance checks for slow queries and other performance indicators.
+// analyzePerformance checks for performance issues by inspecting the slowlog for
+// any recorded long-running commands.
 func (a *analyzer) analyzePerformance(info map[string]string, slowlogs *models.LogData) []*models.Issue {
 	var issues []*models.Issue
 

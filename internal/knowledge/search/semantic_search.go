@@ -23,9 +23,21 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
-// Searcher is a high-level interface for performing searches over the knowledge base.
-// It abstracts away the details of the underlying search strategy (e.g., semantic, keyword, hybrid).
+// Searcher defines a high-level interface for performing searches over the knowledge
+// base. It abstracts away the details of the underlying search strategy (e.g.,
+// semantic, keyword, hybrid), allowing different search methods to be used
+// interchangeably by the application's core logic.
 type Searcher interface {
+	// Search takes a user query and returns a ranked list of relevant documents
+	// from the knowledge base.
+	//
+	// Parameters:
+	//   ctx (context.Context): The context for the search operation.
+	//   query (string): The user's search query.
+	//
+	// Returns:
+	//   []rag.Document: A slice of documents, ordered by relevance.
+	//   error: An error if the search operation fails.
 	Search(ctx context.Context, query string) ([]rag.Document, error)
 }
 
@@ -36,7 +48,16 @@ type semanticSearcher struct {
 	retriever rag.Retriever
 }
 
-// NewSemanticSearcher creates a new semantic search component.
+// NewSemanticSearcher creates a new searcher that performs semantic searches.
+// It relies on an underlying RAG (Retrieval-Augmented Generation) retriever to
+// find documents based on vector similarity.
+//
+// Parameters:
+//   retriever (rag.Retriever): The retriever component that performs the vector search.
+//
+// Returns:
+//   Searcher: A new instance of a semantic searcher.
+//   error: An error if the provided retriever is nil.
 func NewSemanticSearcher(retriever rag.Retriever) (Searcher, error) {
 	if retriever == nil {
 		return nil, fmt.Errorf("retriever cannot be nil")
@@ -47,8 +68,18 @@ func NewSemanticSearcher(retriever rag.Retriever) (Searcher, error) {
 	}, nil
 }
 
-// Search executes a semantic search query. This implementation provides a framework
-// where more advanced RAG techniques can be added.
+// Search implements the Searcher interface for semantic search. It takes a user
+// query, passes it to the underlying RAG retriever, and returns the results.
+// This implementation provides a framework where more advanced RAG techniques,
+// such as query transformation and result re-ranking, can be added in the future.
+//
+// Parameters:
+//   ctx (context.Context): The context for the search operation.
+//   query (string): The user's search query.
+//
+// Returns:
+//   []rag.Document: A slice of documents retrieved based on semantic similarity.
+//   error: An error if the retrieval process fails.
 func (s *semanticSearcher) Search(ctx context.Context, query string) ([]rag.Document, error) {
 	s.log.Infof("Performing semantic search for query: %.50s...", query)
 

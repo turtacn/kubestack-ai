@@ -26,10 +26,12 @@ import (
 )
 
 var (
-	// Used for flags.
+	// cfgFile holds the path to the configuration file provided via a command-line flag.
 	cfgFile string
 
 	// rootCmd represents the base command when called without any subcommands.
+	// It is the root of the command tree and is responsible for global setup,
+	// such as initializing configuration and logging.
 	rootCmd = &cobra.Command{
 		Use:   "ksa",
 		Short: "KubeStack-AI is an intelligent SRE assistant for middleware.",
@@ -64,8 +66,11 @@ running on Kubernetes or bare metal servers.`,
 	}
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute is the main entry point for the command-line interface.
+// It executes the root command, which in turn handles all subcommand logic.
+// This function is called directly by `main.main()` and is the starting point
+// for the entire application's command-line functionality. If the root command
+// returns an error, it prints the error and exits with a non-zero status code.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		// Cobra prints the error, so we just need to exit with a non-zero code.
@@ -73,6 +78,11 @@ func Execute() {
 	}
 }
 
+// init is a special Go function that is executed when the package is initialized.
+// It sets up the command-line interface by:
+// 1. Defining and binding global flags (e.g., --config, --log-level) to Viper for configuration management.
+// 2. Adding all subcommands (like `diagnose`, `ask`, `fix`) to the root command.
+// 3. Adding a built-in `version` command.
 func init() {
 	// Add global flags that will apply to all subcommands.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is /etc/kubestack-ai/config.yaml or $HOME/.ksa.yaml)")

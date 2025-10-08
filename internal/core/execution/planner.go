@@ -32,14 +32,30 @@ type planner struct {
 	// This could have dependencies like a risk database or a best-practices template engine.
 }
 
-// NewPlanner creates a new instance of the execution planner.
+// NewPlanner creates a new instance of the execution planner. The planner is
+// responsible for the "brains" of the execution engine, converting high-level
+// recommendations into a safe and optimized, step-by-step execution plan.
+//
+// Returns:
+//   interfaces.ExecutionPlanner: A new instance of the execution planner.
 func NewPlanner() interfaces.ExecutionPlanner {
 	return &planner{
 		log: logger.NewLogger("execution-planner"),
 	}
 }
 
-// GeneratePlan creates a detailed, step-by-step execution plan from a list of high-level recommendations.
+// GeneratePlan creates a detailed, step-by-step execution plan from a list of
+// high-level recommendations. It filters for autofixable recommendations,
+// converts them into execution steps, and then performs a risk analysis on the
+// resulting plan.
+//
+// Parameters:
+//   _ (context.Context): The context for the operation (currently unused).
+//   recommendations ([]*models.Recommendation): A slice of recommendations from a diagnosis.
+//
+// Returns:
+//   *models.ExecutionPlan: A structured plan containing executable steps and a risk assessment.
+//   error: An error if risk analysis fails.
 func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
 	p.log.Infof("Generating execution plan from %d recommendations.", len(recommendations))
 
@@ -83,7 +99,18 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 	return plan, nil
 }
 
-// AnalyzeRisk assesses the potential risks of an execution plan by inspecting its actions.
+// AnalyzeRisk assesses the potential risks of an execution plan by inspecting the
+// commands in each step. It uses a simple, keyword-based approach to classify
+// commands as low, medium, or high risk. This is a critical safety feature to
+// inform the user before they approve a plan.
+//
+// Parameters:
+//   _ (context.Context): The context for the operation (currently unused).
+//   plan (*models.ExecutionPlan): The plan to be analyzed.
+//
+// Returns:
+//   *models.RiskAssessment: A struct containing the assessed risk level and a description.
+//   error: An error if the analysis fails (nil in this implementation).
 func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
 	p.log.Info("Analyzing risk for generated execution plan.")
 
@@ -119,7 +146,19 @@ func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*m
 	return assessment, nil
 }
 
-// OptimizeSequence reorders the steps in a plan for maximum safety and efficiency.
+// OptimizeSequence is responsible for reordering the steps in a plan to ensure
+// maximum safety and efficiency.
+// NOTE: This is a placeholder implementation. A complete implementation would
+// perform a topological sort on the dependency graph of the steps to guarantee
+// correct execution order (e.g., apply a config change before restarting a service).
+//
+// Parameters:
+//   _ (context.Context): The context for the operation (currently unused).
+//   plan (*models.ExecutionPlan): The plan to be optimized.
+//
+// Returns:
+//   *models.ExecutionPlan: The optimized plan (or the original plan in this placeholder).
+//   error: An error if optimization fails (nil in this implementation).
 func (p *planner) OptimizeSequence(_ context.Context, plan *models.ExecutionPlan) (*models.ExecutionPlan, error) {
 	p.log.Info("Optimizing execution sequence.")
 	// This is a placeholder. A real implementation would perform a topological sort

@@ -186,6 +186,23 @@ $ ksa diagnose clickhouse --cluster analytics
 * [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
 * [**API Reference**](docs/api.md) - REST API and SDK documentation
 
+## 🏗️ Codebase Structure
+
+A brief overview of the key directories in the KubeStack-AI repository:
+
+- **`/cmd`**: Main application entry points. The `ksa` CLI application lives here.
+- **`/internal`**: All of the core application logic. As this is an `internal` package, it is not meant to be imported by external applications.
+  - **`/cli`**: Defines the command-line interface using Cobra, including command definitions, flag parsing, and UI formatters.
+  - **`/core`**: The heart of the application. It contains the central orchestrator and the primary interfaces for diagnosis, execution, and plugins.
+  - **`/llm`**: Abstractions and clients for interacting with Large Language Models (LLMs) and the Retrieval-Augmented Generation (RAG) pipeline.
+  - **`/knowledge`**: Components for the knowledge base, including storage, crawling, and search functionalities.
+  - **`/plugins`**: The plugin management system and all built-in middleware plugins (e.g., Redis, Kafka).
+- **`/pkg`**: Shared utility packages that could theoretically be used by external applications.
+- **`/deployments`**: Kubernetes manifests, Dockerfiles, and other deployment-related artifacts.
+- **`/docs`**: Project documentation, including architecture and contribution guides.
+- **`/scripts`**: Helper scripts for development tasks like building, testing, and linting.
+- **`/web`**: Contains frontend assets for a potential web-based UI.
+
 ## 🤝 Contributing
 
 We welcome contributions from the community! KubeStack-AI is built by middleware experts for middleware experts.

@@ -23,9 +23,20 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 )
 
-// LogCollector is the interface for collecting system-level logs from sources like journald or syslog.
+// LogCollector defines the interface for components that collect system-level logs
+// from sources like journald or syslog.
 type LogCollector interface {
-	// Collect retrieves the last N log entries, optionally filtered by a specific systemd unit.
+	// Collect retrieves a specified number of recent log entries from the system's log
+	// manager. It can be filtered to a specific service or unit (e.g., a systemd unit).
+	//
+	// Parameters:
+	//   ctx (context.Context): The context for the operation.
+	//   lines (int): The maximum number of log lines to retrieve.
+	//   unit (string): The name of the systemd unit to filter logs for. If empty, logs are collected system-wide.
+	//
+	// Returns:
+	//   *models.LogData: A struct containing the collected log entries.
+	//   error: An error if log collection fails.
 	Collect(ctx context.Context, lines int, unit string) (*models.LogData, error)
 }
 
@@ -35,6 +46,10 @@ type dummyLogCollector struct {
 	log logger.Logger
 }
 
+// Collect is the dummy implementation of the LogCollector interface. It logs a
+// warning that system log collection is disabled and returns an empty LogData struct.
+// This approach avoids runtime errors in environments where systemd is not available
+// or when CGO is disabled during the build.
 func (c *dummyLogCollector) Collect(ctx context.Context, lines int, unit string) (*models.LogData, error) {
 	c.log.Warn("System log collection is disabled because this build of KubeStack-AI was compiled without CGO or systemd headers.")
 	c.log.Warn("Returning empty log data.")
@@ -42,8 +57,15 @@ func (c *dummyLogCollector) Collect(ctx context.Context, lines int, unit string)
 }
 
 
-// NewLogCollector creates a new system log collector.
-// It returns a dummy collector to avoid CGO dependencies.
+// NewLogCollector creates a new system log collector. In the default build configuration,
+// this function returns a `dummyLogCollector` to avoid introducing a CGO dependency
+// for the systemd library. This ensures the application can be built and run easily
+// on a wide range of systems. A full implementation for journald is available in the
+// source code and can be enabled if required.
+//
+// Returns:
+//   LogCollector: An instance of a log collector (dummy by default).
+//   error: An error if the collector cannot be initialized (nil in the dummy implementation).
 func NewLogCollector() (LogCollector, error) {
 	return &dummyLogCollector{
 		log: logger.NewLogger("dummy-log-collector"),

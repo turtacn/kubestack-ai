@@ -35,6 +35,12 @@ type elasticsearchPlugin struct {
 }
 
 // New is the factory function that creates an instance of the Elasticsearch plugin.
+// It initializes the base plugin, sets up the official Elasticsearch client, and
+// wires together the specific collector and analyzer for this plugin.
+//
+// Returns:
+//   interfaces.MiddlewarePlugin: A new, fully initialized Elasticsearch plugin.
+//   error: An error if the Elasticsearch client fails to initialize.
 func New() (interfaces.MiddlewarePlugin, error) {
 	p := &elasticsearchPlugin{}
 	p.Init("elasticsearch", "0.1.0", "Provides diagnostics for Elasticsearch clusters.")
@@ -58,7 +64,9 @@ func New() (interfaces.MiddlewarePlugin, error) {
 	return p, nil
 }
 
-// Diagnose orchestrates the diagnosis process for Elasticsearch.
+// Diagnose orchestrates the diagnosis process for Elasticsearch by collecting
+// data from various endpoints and then passing that data to the analyzer to
+// identify potential issues.
 func (p *elasticsearchPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	p.Log.Info("Starting Elasticsearch diagnosis.")
 
@@ -71,7 +79,6 @@ func (p *elasticsearchPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisR
 	if err != nil {
 		p.Log.Warnf("Failed to collect nodes stats: %v", err)
 	}
-	// TODO: Collect other data points like indices stats, settings, etc.
 
 	// 2. Analyze data
 	var issues []*models.Issue
@@ -93,6 +100,7 @@ func (p *elasticsearchPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisR
 
 // --- Interface Method Implementations ---
 
+// Ping checks the connectivity to the Elasticsearch cluster by calling the Ping API.
 func (p *elasticsearchPlugin) Ping(ctx context.Context) error {
 	res, err := p.client.Ping(p.client.Ping.WithContext(ctx))
 	if err != nil {
@@ -105,6 +113,8 @@ func (p *elasticsearchPlugin) Ping(ctx context.Context) error {
 	return nil
 }
 
+// HealthCheck performs a detailed health check by fetching the cluster's health
+// status and reports whether it is "green".
 func (p *elasticsearchPlugin) HealthCheck(ctx context.Context) (*models.HealthStatus, error) {
 	health, err := p.collector.CollectClusterHealth(ctx)
 	if err != nil {
@@ -116,18 +126,21 @@ func (p *elasticsearchPlugin) HealthCheck(ctx context.Context) (*models.HealthSt
 	return &models.HealthStatus{IsHealthy: isHealthy, Message: fmt.Sprintf("Cluster health status is '%s'.", status)}, nil
 }
 
+// GetConfiguration retrieves the cluster's settings.
 func (p *elasticsearchPlugin) GetConfiguration(ctx context.Context) (*models.ConfigData, error) {
 	return p.collector.CollectClusterSettings(ctx)
 }
 
+// CollectMetrics gathers key performance indicators for the cluster.
 func (p *elasticsearchPlugin) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
 	return p.collector.CollectMetrics(ctx)
 }
 
-// CollectLogs for Elasticsearch would involve querying the `_cat/tasks` endpoint or reading log files from each node.
+// CollectLogs provides a placeholder implementation for log collection. A full
+// implementation would involve querying the `_cat/tasks` endpoint for slow tasks
+// or reading log files from each node.
 func (p *elasticsearchPlugin) CollectLogs(_ context.Context, _ *models.LogOptions) (*models.LogData, error) {
 	p.Log.Info("Elasticsearch log collection is a placeholder.")
-	// A potential implementation could query the Tasks API for long-running tasks.
 	return &models.LogData{Entries: []string{}}, nil
 }
 
