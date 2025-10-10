@@ -38,3 +38,4 @@ Thumbs.db
 !/.env.example
 
 # Personal.AI order the ending
+/ai/
