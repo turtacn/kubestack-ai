@@ -55,12 +55,13 @@ type DiagnosisManager interface {
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the analysis operation.
+	//   req (*models.DiagnosisRequest): The original request, providing context.
 	//   collectedData (*models.CollectedData): The aggregated data collected from the plugin.
 	//
 	// Returns:
 	//   []*models.Issue: A slice containing all issues identified by the analyzers.
 	//   error: An error if the analysis process itself fails.
-	AnalyzeData(ctx context.Context, collectedData *models.CollectedData) ([]*models.Issue, error)
+	AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, collectedData *models.CollectedData) ([]*models.Issue, error)
 
 	// GenerateReport takes a final diagnosis result and formats it into a human-readable report.
 	//

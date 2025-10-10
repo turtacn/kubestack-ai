@@ -16,14 +16,17 @@ package diagnosis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	llm_interfaces "github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/prompt"
 )
 
 // --- Rule-Based Analyzer Implementation ---
@@ -174,48 +177,189 @@ func (a *RuleBasedAnalyzer) CorrelateSystems(_ context.Context, _ *models.System
 	return nil, nil
 }
 
-// --- AI-Based Analyzer (Conceptual Placeholder) ---
+// --- AI-Based Analyzer Implementation ---
 
-// AIAnalyzer is a conceptual placeholder for a more advanced, AI-powered analyzer.
-// It demonstrates how a component that leverages a Large Language Model (LLM) would
-// fit into the diagnosis framework by also implementing the DiagnosisAnalyzer interface.
-// This approach would enable features like anomaly detection, advanced pattern
-// recognition, and sophisticated root cause analysis.
+// AIAnalyzer uses a Large Language Model (LLM) to perform advanced, holistic
+// analysis of collected data. It implements the DiagnosisAnalyzer interface.
 type AIAnalyzer struct {
-	log       logger.Logger
-	llmClient llm_interfaces.LLMClient // Assumes an LLMClient interface exists.
+	log           logger.Logger
+	llmClient     llm_interfaces.LLMClient
+	promptBuilder *prompt.Builder
+}
+
+// NewAIAnalyzer creates a new, configured instance of the AIAnalyzer.
+func NewAIAnalyzer(llmClient llm_interfaces.LLMClient) (interfaces.DiagnosisAnalyzer, error) {
+	pb, err := prompt.NewBuilder(prompt.GetDefaultTemplates())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create prompt builder for AIAnalyzer: %w", err)
+	}
+	return &AIAnalyzer{
+		log:           logger.NewLogger("ai-analyzer"),
+		llmClient:     llmClient,
+		promptBuilder: pb,
+	}, nil
 }
 
 // Name returns the unique identifier for this analyzer.
 func (a *AIAnalyzer) Name() string { return "AIAnalyzer" }
 
-// AnalyzeMetrics is a placeholder for an AI-driven metric analysis implementation.
-// It would involve sending the metric data to an LLM and parsing the response to identify issues.
-func (a *AIAnalyzer) AnalyzeMetrics(ctx context.Context, data *models.MetricsData) ([]*models.Issue, error) {
-	// 1. Serialize metric data into a format the LLM can understand.
-	// 2. Create a prompt asking the LLM to analyze the metrics for anomalies, trends, or known bad patterns.
-	// 3. Call the llmClient.
-	// 4. Parse the structured response (e.g., JSON) from the LLM back into []*models.Issue.
-	a.log.Info("AI-based metric analysis is a placeholder and not yet implemented.")
+// AnalyzeMetrics is a no-op for the AIAnalyzer. The core analysis is performed
+// in CorrelateSystems, which has access to all data sources for a more
+// holistic analysis, preventing redundant or partial analyses.
+func (a *AIAnalyzer) AnalyzeMetrics(_ context.Context, _ *models.MetricsData) ([]*models.Issue, error) {
+	a.log.Debug("Skipping metric analysis; handled by CorrelateSystems.")
 	return nil, nil
 }
 
-// AnalyzeLogs is a placeholder for an AI-driven log analysis implementation.
-// It would involve sending log summaries or filtered entries to an LLM to identify complex error patterns.
-func (a *AIAnalyzer) AnalyzeLogs(ctx context.Context, data *models.LogData) ([]*models.Issue, error) {
-	a.log.Info("AI-based log analysis is a placeholder and not yet implemented.")
+// AnalyzeLogs is a no-op for the AIAnalyzer. The core analysis is performed
+// in CorrelateSystems to ensure all data is analyzed together.
+func (a *AIAnalyzer) AnalyzeLogs(_ context.Context, _ *models.LogData) ([]*models.Issue, error) {
+	a.log.Debug("Skipping log analysis; handled by CorrelateSystems.")
 	return nil, nil
 }
 
-// CorrelateSystems is a placeholder for an AI-driven correlation analysis implementation.
-// This is where an LLM could be particularly powerful, finding non-obvious connections
-// between different data sources (e.g., a metric spike and a specific log error) to
-// perform advanced root cause analysis.
+// CorrelateSystems performs a holistic analysis of all collected data using an LLM.
+// It serializes the metrics, logs, and config, builds a prompt, sends it to the LLM,
+// and parses the structured JSON response into a list of identified issues.
 func (a *AIAnalyzer) CorrelateSystems(ctx context.Context, data *models.SystemCorrelationData) ([]*models.Issue, error) {
-	// This is where an LLM would excel, finding non-obvious connections between different data sources
-	// to perform advanced root cause analysis.
-	a.log.Info("AI-based correlation analysis is a placeholder and not yet implemented.")
-	return nil, nil
+	a.log.Info("Starting AI-based correlation analysis...")
+
+	// 1. Serialize the collected data for the prompt
+	promptData, err := a.preparePromptData(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare data for prompt: %w", err)
+	}
+
+	// 2. Build the prompt messages
+	messages, err := a.promptBuilder.Build("generic-diagnosis", promptData, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build diagnosis prompt: %w", err)
+	}
+
+	// 3. Send the request to the LLM
+	req := &llm_interfaces.LLMRequest{
+		Messages:    messages,
+		Temperature: 0.2, // Lower temperature for more deterministic, factual analysis
+	}
+	a.log.Debug("Sending analysis request to LLM...")
+	resp, err := a.llmClient.SendMessage(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("LLM API call failed: %w", err)
+	}
+	a.log.Debugf("Received LLM response. Prompt tokens: %d, Completion tokens: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+
+	// 4. Parse the structured JSON response
+	return a.parseLLMResponse(resp.Message.Content)
+}
+
+// Helper struct for serializing data into the prompt template
+type diagnosisPromptData struct {
+	MiddlewareName string
+	InstanceName   string
+	Timestamp      string
+	CollectedData  string
+}
+
+// Helper struct for parsing the JSON response from the LLM
+type llmIssuesResponse struct {
+	Issues []struct {
+		Title           string `json:"title"`
+		Severity        string `json:"severity"`
+		Description     string `json:"description"`
+		Recommendations []struct {
+			Description string `json:"description"`
+			Command     string `json:"command,omitempty"`
+		} `json:"recommendations"`
+	} `json:"issues"`
+}
+
+func (a *AIAnalyzer) preparePromptData(data *models.SystemCorrelationData) (*diagnosisPromptData, error) {
+	// Helper to safely extract and marshal data from the map
+	marshalDataSource := func(key string) []byte {
+		if source, ok := data.DataSources[key]; ok && source != nil {
+			bytes, err := json.MarshalIndent(source, "", "  ")
+			if err == nil {
+				return bytes
+			}
+			a.log.Warnf("Failed to marshal data source '%s': %v", key, err)
+		}
+		return []byte("{}") // Return empty JSON object on failure
+	}
+
+	var dataBuilder strings.Builder
+	dataBuilder.WriteString("Metrics:\n" + string(marshalDataSource("metrics")) + "\n\n")
+	dataBuilder.WriteString("Logs:\n" + string(marshalDataSource("logs")) + "\n\n")
+	dataBuilder.WriteString("Configuration:\n" + string(marshalDataSource("config")))
+
+	// Safely extract string and time values with type assertions
+	getString := func(key string) string {
+		if val, ok := data.DataSources[key].(string); ok {
+			return val
+		}
+		return "N/A"
+	}
+	getTime := func(key string) time.Time {
+		if val, ok := data.DataSources[key].(time.Time); ok {
+			return val
+		}
+		return time.Now()
+	}
+
+	return &diagnosisPromptData{
+		MiddlewareName: getString("middlewareName"),
+		InstanceName:   getString("instanceName"),
+		Timestamp:      getTime("timestamp").String(),
+		CollectedData:  dataBuilder.String(),
+	}, nil
+}
+
+func (a *AIAnalyzer) parseLLMResponse(responseContent string) ([]*models.Issue, error) {
+	var llmResp llmIssuesResponse
+	// The LLM sometimes wraps the JSON in markdown code blocks, so we need to clean it.
+	cleanedJSON := strings.Trim(responseContent, " \n\t`json")
+	if err := json.Unmarshal([]byte(cleanedJSON), &llmResp); err != nil {
+		a.log.Errorf("Failed to unmarshal LLM response JSON. Raw response: %s", responseContent)
+		return nil, fmt.Errorf("failed to parse LLM response: %w. Raw response: %s", err, responseContent)
+	}
+
+	var issues []*models.Issue
+	for _, llmIssue := range llmResp.Issues {
+		var recommendations []*models.Recommendation
+		for _, llmRec := range llmIssue.Recommendations {
+			recommendations = append(recommendations, &models.Recommendation{
+				Description: llmRec.Description,
+				Command:     llmRec.Command,
+				// AI-generated fixes should be reviewed by default
+				CanAutoFix: llmRec.Command != "",
+			})
+		}
+
+		issue := &models.Issue{
+			Title:           llmIssue.Title,
+			Severity:        stringToSeverity(llmIssue.Severity),
+			Description:     llmIssue.Description,
+			Recommendations: recommendations,
+		}
+		issues = append(issues, issue)
+	}
+	return issues, nil
+}
+
+// stringToSeverity converts the severity string from the LLM response to the internal enum type.
+func stringToSeverity(s string) enum.SeverityLevel {
+	switch strings.ToLower(s) {
+	case "critical":
+		return enum.SeverityCritical
+	case "high":
+		return enum.SeverityHigh
+	case "medium":
+		return enum.SeverityMedium
+	case "low":
+		return enum.SeverityLow
+	default:
+		// Default to the lowest severity if the LLM provides an unknown value.
+		return enum.SeverityLow
+	}
 }
 
 //Personal.AI order the ending

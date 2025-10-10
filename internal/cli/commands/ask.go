@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/spf13/cobra"
 )
 
@@ -46,11 +45,9 @@ The response will be streamed to the console in real-time.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			question := strings.Join(args, " ")
 
-			// TODO: Get a fully initialized orchestrator.
-			var orchestrator interfaces.Orchestrator // = getOrchestrator()
+			// The orchestrator is now initialized in root.go's PersistentPreRunE.
 			if orchestrator == nil {
-				// This is a placeholder to prevent a nil pointer dereference.
-				return fmt.Errorf("orchestrator not initialized (placeholder error)")
+				return fmt.Errorf("orchestrator not initialized")
 			}
 
 			fmt.Print("🤖 KubeStack-AI: ")

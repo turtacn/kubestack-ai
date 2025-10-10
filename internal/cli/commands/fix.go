@@ -17,7 +17,6 @@ package commands
 import (
 	"fmt"
 
-	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/spf13/cobra"
 )
@@ -45,10 +44,9 @@ This command follows a safe, multi-step process:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			diagnosisID := args[0]
 
-			// TODO: Get a fully initialized orchestrator.
-			var orchestrator interfaces.Orchestrator // = getOrchestrator()
+			// The orchestrator is now initialized in root.go's PersistentPreRunE.
 			if orchestrator == nil {
-				return fmt.Errorf("orchestrator not initialized (placeholder error)")
+				return fmt.Errorf("orchestrator not initialized")
 			}
 
 			// 1. Fetch recommendations from the diagnosis report.
