@@ -23,6 +23,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 )
 
 // planner is the concrete implementation of interfaces.ExecutionPlanner.
@@ -82,6 +83,7 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 	// Placeholder for dependency analysis. A real implementation would analyze the steps
 	// to build a dependency graph and populate the `DependsOn` field of each step.
 	// For example, a step that restarts a service should depend on a step that applies a config change.
+	p.inferActionTypes(steps)
 
 	plan := &models.ExecutionPlan{
 		ID:       uuid.New().String(),
@@ -89,14 +91,34 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 		Steps:    steps,
 	}
 
-	// After generating the basic plan, analyze its risk.
+	// After generating the basic plan, analyze its risk and optimize the sequence.
 	risk, err := p.AnalyzeRisk(context.Background(), plan)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze plan risk: %w", err)
 	}
 	plan.Risk = risk
 
-	return plan, nil
+	optimizedPlan, err := p.OptimizeSequence(context.Background(), plan)
+	if err != nil {
+		return nil, fmt.Errorf("failed to optimize plan sequence: %w", err)
+	}
+
+	return optimizedPlan, nil
+}
+
+// inferActionTypes is a helper to temporarily classify actions based on their command string.
+// In a real system, this information would likely come from the plugin or recommendation itself.
+func (p *planner) inferActionTypes(steps []*models.ExecutionStep) {
+	for _, step := range steps {
+		cmd := strings.ToLower(step.Action.Command)
+		if strings.Contains(cmd, "restart") || strings.Contains(cmd, "reload") {
+			step.Action.ActionType = enum.FixActionRestart
+		} else if strings.Contains(cmd, "set") || strings.Contains(cmd, "update") || strings.Contains(cmd, "config") {
+			step.Action.ActionType = enum.FixActionConfigChange
+		} else {
+			step.Action.ActionType = enum.FixActionUnknown
+		}
+	}
 }
 
 // AnalyzeRisk assesses the potential risks of an execution plan by inspecting the
@@ -114,24 +136,30 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
 	p.log.Info("Analyzing risk for generated execution plan.")
 
-	// This is a very basic risk analysis. A real-world system would have a more sophisticated engine,
-	// possibly checking against a database of risky operations or using policies.
-	var highRiskCommands = []string{"rm -rf", "kill -9", "reboot", "format", "mkfs"}
-	var mediumRiskCommands = []string{"rm ", "kill ", "systemctl restart", "kubectl delete"}
+	var criticalRiskCommands = []string{"rm -rf", "dd ", "format", "mkfs", "drop database", "delete from "}
+	var highRiskCommands = []string{"reboot", "shutdown", "kill -9", "chmod -R 777"}
+	var mediumRiskCommands = []string{"rm ", "kill ", "systemctl restart", "kubectl delete", "docker stop"}
 
 	assessment := &models.RiskAssessment{
 		Level:       "Low",
-		Description: "No significant risks detected.",
+		Description: "No significant risks detected. Plan contains informational or configuration-read commands.",
 	}
 
 	for _, step := range plan.Steps {
 		cmd := strings.ToLower(step.Action.Command)
+		for _, riskyCmd := range criticalRiskCommands {
+			if strings.Contains(cmd, riskyCmd) {
+				assessment.Level = "Critical"
+				assessment.Description = "Plan contains CRITICAL-risk operations (e.g., irreversible data deletion or disk formatting)."
+				p.log.Warnf("Critical-risk command '%s' detected in step '%s'", riskyCmd, step.Name)
+				return assessment, nil // Return on first critical finding
+			}
+		}
 		for _, riskyCmd := range highRiskCommands {
 			if strings.Contains(cmd, riskyCmd) {
 				assessment.Level = "High"
-				assessment.Description = "Plan contains high-risk operations (e.g., data deletion, system reboot)."
+				assessment.Description = "Plan contains high-risk operations (e.g., system reboots, permission changes)."
 				p.log.Warnf("High-risk command '%s' detected in step '%s'", riskyCmd, step.Name)
-				return assessment, nil // Return on first high-risk finding
 			}
 		}
 		for _, riskyCmd := range mediumRiskCommands {
@@ -146,26 +174,76 @@ func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*m
 	return assessment, nil
 }
 
-// OptimizeSequence is responsible for reordering the steps in a plan to ensure
-// maximum safety and efficiency.
-// NOTE: This is a placeholder implementation. A complete implementation would
-// perform a topological sort on the dependency graph of the steps to guarantee
-// correct execution order (e.g., apply a config change before restarting a service).
-//
-// Parameters:
-//   _ (context.Context): The context for the operation (currently unused).
-//   plan (*models.ExecutionPlan): The plan to be optimized.
-//
-// Returns:
-//   *models.ExecutionPlan: The optimized plan (or the original plan in this placeholder).
-//   error: An error if optimization fails (nil in this implementation).
+// OptimizeSequence reorders the steps in a plan based on a predefined dependency graph.
+// It uses a topological sort to ensure that steps are executed in a safe and logical order.
 func (p *planner) OptimizeSequence(_ context.Context, plan *models.ExecutionPlan) (*models.ExecutionPlan, error) {
 	p.log.Info("Optimizing execution sequence.")
-	// This is a placeholder. A real implementation would perform a topological sort
-	// on the dependency graph of the steps to ensure correct execution order.
-	// It could also reorder independent steps to, for example, perform read-only
-	// operations first, followed by config changes, and finally service restarts.
-	p.log.Info("Sequence optimization is not yet implemented; returning original plan.")
+
+	// 1. Define the dependency graph for action types.
+	// A depends on B means B must be executed before A.
+	dependencyGraph := map[enum.FixActionType][]enum.FixActionType{
+		enum.FixActionRestart: {enum.FixActionConfigChange, enum.FixActionDataMigration},
+		// Add other dependencies here, e.g., DATA_MIGRATION depends on CONFIG_CHANGE
+	}
+
+	// 2. Build the graph for the specific steps in the plan.
+	// The graph is represented by an adjacency list and an in-degree map.
+	adj := make(map[string][]string)
+	inDegree := make(map[string]int)
+	stepsMap := make(map[string]*models.ExecutionStep)
+
+	for _, step := range plan.Steps {
+		inDegree[step.ID] = 0
+		stepsMap[step.ID] = step
+	}
+
+	for _, stepA := range plan.Steps {
+		deps, ok := dependencyGraph[stepA.Action.ActionType]
+		if !ok {
+			continue
+		}
+		for _, stepB := range plan.Steps {
+			if stepA.ID == stepB.ID {
+				continue
+			}
+			for _, depType := range deps {
+				if stepB.Action.ActionType == depType {
+					adj[stepB.ID] = append(adj[stepB.ID], stepA.ID)
+					inDegree[stepA.ID]++
+				}
+			}
+		}
+	}
+
+	// 3. Perform Topological Sort (Kahn's algorithm).
+	queue := make([]string, 0)
+	for id, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, id)
+		}
+	}
+
+	var sortedSteps []*models.ExecutionStep
+	for len(queue) > 0 {
+		currentID := queue[0]
+		queue = queue[1:]
+		sortedSteps = append(sortedSteps, stepsMap[currentID])
+
+		for _, neighborID := range adj[currentID] {
+			inDegree[neighborID]--
+			if inDegree[neighborID] == 0 {
+				queue = append(queue, neighborID)
+			}
+		}
+	}
+
+	// 4. Check for cycles.
+	if len(sortedSteps) != len(plan.Steps) {
+		return nil, fmt.Errorf("a cycle was detected in the execution plan dependencies, cannot optimize sequence")
+	}
+
+	plan.Steps = sortedSteps
+	p.log.Info("Successfully optimized execution sequence.")
 	return plan, nil
 }
 

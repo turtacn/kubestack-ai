@@ -18,11 +18,8 @@ package models
 
 import (
 	"time"
-
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 )
-
-// DiagnosisRequest contains all the parameters required to initiate a diagnosis run.
 // It specifies the target middleware and its location.
 type DiagnosisRequest struct {
 	// TargetMiddleware is the type of middleware to be diagnosed (e.g., Redis, MySQL).
@@ -158,6 +155,8 @@ type FixAction struct {
 	Command string `json:"command" yaml:"command"`
 	// Parameters provides any additional parameters needed to execute the fix.
 	Parameters map[string]string `json:"parameters" yaml:"parameters"`
+	// ActionType categorizes the action for dependency analysis.
+	ActionType enum.FixActionType `json:"actionType" yaml:"actionType"`
 }
 
 // FixResult represents the outcome of a single executed fix action.

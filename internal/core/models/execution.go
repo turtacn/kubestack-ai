@@ -14,7 +14,9 @@
 
 package models
 
-import "time"
+import (
+	"time"
+)
 
 // ExecutionStrategy defines the method for executing the steps in a plan.
 type ExecutionStrategy string

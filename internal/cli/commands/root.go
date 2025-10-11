@@ -145,6 +145,7 @@ func init() {
 	rootCmd.AddCommand(newDiagnoseCmd())
 	rootCmd.AddCommand(newAskCmd())
 	rootCmd.AddCommand(newFixCmd())
+	rootCmd.AddCommand(newServerCmd())
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

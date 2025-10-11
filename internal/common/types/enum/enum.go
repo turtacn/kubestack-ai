@@ -177,6 +177,22 @@ func (a ActionType) IsValid() bool {
 	return a >= ActionCollect && a <= ActionMonitor
 }
 
+// FixActionType defines the specific category of a fix action. This is used for dependency analysis.
+type FixActionType int
+
+const (
+	// FixActionUnknown is the default, unknown action type.
+	FixActionUnknown FixActionType = iota
+	// FixActionConfigChange represents a change to a configuration file.
+	FixActionConfigChange
+	// FixActionRestart represents a service restart.
+	FixActionRestart
+	// FixActionDataMigration represents a data migration or modification.
+	FixActionDataMigration
+	// FixActionSecurity represents a security-related change (e.g., changing a password).
+	FixActionSecurity
+)
+
 // PluginStatus defines the lifecycle status of a dynamically loaded plugin.
 type PluginStatus int
 
