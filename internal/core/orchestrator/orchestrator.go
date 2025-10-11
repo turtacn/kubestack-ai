@@ -36,7 +36,7 @@ type orchestrator struct {
 	pluginManager    interfaces.PluginManager
 	diagnosisManager interfaces.DiagnosisManager
 	executionManager interfaces.ExecutionManager
-	// llmClient, knowledgeManager, etc. will be added here
+	knowledgeManager interfaces.KnowledgeManager
 }
 
 // NewOrchestrator creates a new instance of the core orchestrator. It acts as a
@@ -48,6 +48,7 @@ type orchestrator struct {
 //   pm (interfaces.PluginManager): The manager responsible for the plugin lifecycle.
 //   dm (interfaces.DiagnosisManager): The manager for running diagnoses.
 //   em (interfaces.ExecutionManager): The manager for executing fix plans.
+//   km (interfaces.KnowledgeManager): The manager for accessing the knowledge base.
 //
 // Returns:
 //   interfaces.Orchestrator: A new, fully initialized orchestrator.
@@ -56,6 +57,7 @@ func NewOrchestrator(
 	pm interfaces.PluginManager,
 	dm interfaces.DiagnosisManager,
 	em interfaces.ExecutionManager,
+	km interfaces.KnowledgeManager,
 ) interfaces.Orchestrator {
 	return &orchestrator{
 		cfg:              cfg,
@@ -63,6 +65,7 @@ func NewOrchestrator(
 		pluginManager:    pm,
 		diagnosisManager: dm,
 		executionManager: em,
+		knowledgeManager: km,
 	}
 }
 

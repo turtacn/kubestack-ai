@@ -24,8 +24,12 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/execution"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	orch "github.com/kubestack-ai/kubestack-ai/internal/core/orchestrator"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/client"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugins/manager"
+	km "github.com/kubestack-ai/kubestack-ai/internal/knowledge/manager"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -85,11 +89,34 @@ running on Kubernetes or bare metal servers.`,
 		analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
 		diagManager := diagnosis.NewManager(pluginManager, analyzers)
 
+		// Knowledge base components
+		vectorStore, err := store.NewVectorStoreFromConfig(&cfg.KnowledgeBase.VectorStore)
+		if err != nil {
+			return fmt.Errorf("failed to create vector store: %w", err)
+		}
+		docStore, err := store.NewDocumentStoreFromConfig(&cfg.KnowledgeBase.DocumentStore)
+		if err != nil {
+			return fmt.Errorf("failed to create document store: %w", err)
+		}
+		embedder, err := rag.NewEmbedder(llmClient, "") // Use default embedding model
+		if err != nil {
+			return fmt.Errorf("failed to create embedder: %w", err)
+		}
+		retriever, err := rag.NewRetriever(embedder, vectorStore)
+		if err != nil {
+			return fmt.Errorf("failed to create retriever: %w", err)
+		}
+		searcher, err := search.NewHybridSearcher(docStore, retriever)
+		if err != nil {
+			return fmt.Errorf("failed to create hybrid searcher: %w", err)
+		}
+		knowManager := km.NewManager(searcher)
+
 		// Execution components (using placeholder)
 		execManager := &execution.PlaceholderManager{}
 
 		// --- Orchestrator ---
-		orchestrator = orch.NewOrchestrator(cfg, pluginManager, diagManager, execManager)
+		orchestrator = orch.NewOrchestrator(cfg, pluginManager, diagManager, execManager, knowManager)
 		log.Info("Orchestrator and all dependencies initialized successfully.")
 
 		return nil

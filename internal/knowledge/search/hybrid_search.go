@@ -16,6 +16,7 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -95,6 +96,11 @@ func (s *hybridSearcher) Search(ctx context.Context, query string) ([]rag.Docume
 		s.log.Warnf("Semantic search failed during hybrid search: %v", errSemantic)
 	}
 
+	// If both searches fail, return an error.
+	if errKeyword != nil && errSemantic != nil {
+		return nil, fmt.Errorf("both keyword and semantic searches failed (keyword: %w, semantic: %w)", errKeyword, errSemantic)
+	}
+
 	// Fuse the results from both searches.
 	fusedDocs := s.reciprocalRankFusion(keywordResults, semanticResults)
 
@@ -113,29 +119,35 @@ func (s *hybridSearcher) reciprocalRankFusion(keywordDocs []*store.RawDocument, 
 
 	// Process semantic results.
 	for i, doc := range semanticDocs {
-		sourceID, ok := doc.Metadata["SourceID"].(string)
-		if !ok {
-			continue // Skip chunks without a source document ID.
-		}
+		// Use the document chunk's content as the key for fusion.
+		key := doc.Content
 		rank := i + 1
 		score := 1.0 / float32(rrfK+rank)
-		scores[sourceID] += score
-		// Keep the first chunk we see from a source document.
-		if _, exists := docsMap[sourceID]; !exists {
-			docsMap[sourceID] = doc
-		}
+		scores[key] += score
+		docsMap[key] = doc
 	}
 
-	// Process keyword results.
+	// Process keyword results by breaking them into chunks (simplified for now).
+	// In a real system, you would have a more sophisticated chunking strategy.
 	for i, doc := range keywordDocs {
+		// Simplified chunking: treat the first 512 characters as the most relevant chunk.
+		chunkContent := doc.Content
+		if len(chunkContent) > 512 {
+			chunkContent = chunkContent[:512]
+		}
+
+		key := chunkContent
 		rank := i + 1
 		score := 1.0 / float32(rrfK+rank)
-		scores[doc.ID] += score
-		// If we haven't seen this document from the semantic search, add it.
-		// Note: The content here is the full document, not a chunk.
-		if _, exists := docsMap[doc.ID]; !exists {
-			docsMap[doc.ID] = rag.Document{
-				Content: doc.Content,
+
+		if existingScore, exists := scores[key]; exists {
+			// If the chunk already exists from semantic search, just add to its score.
+			scores[key] = existingScore + score
+		} else {
+			// If it's a new chunk, add it to the map.
+			scores[key] = score
+			docsMap[key] = rag.Document{
+				Content: chunkContent,
 				Metadata: map[string]interface{}{
 					"SourceID":  doc.ID,
 					"SourceURL": doc.Source,
@@ -146,8 +158,8 @@ func (s *hybridSearcher) reciprocalRankFusion(keywordDocs []*store.RawDocument, 
 
 	// Create a single list of documents with their new RRF scores.
 	var fusedDocs []rag.Document
-	for id, score := range scores {
-		doc := docsMap[id]
+	for key, score := range scores {
+		doc := docsMap[key]
 		doc.Score = score
 		fusedDocs = append(fusedDocs, doc)
 	}
