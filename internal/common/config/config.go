@@ -39,6 +39,8 @@ type Config struct {
 	LLM LLMConfig `mapstructure:"llm"`
 	// Plugins holds configurations related to the plugin management system.
 	Plugins PluginConfig `mapstructure:"plugins"`
+	// KnowledgeBase holds configurations for the knowledge base system.
+	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledgeBase"`
 }
 
 // ServerConfig holds HTTP server-related configurations, such as the listening
@@ -81,6 +83,47 @@ type GeminiConfig struct {
 type PluginConfig struct {
 	// Directory is the path where plugins are stored.
 	Directory string `mapstructure:"directory"`
+}
+
+// KnowledgeBaseConfig holds configurations for the knowledge base, including the
+// vector store and document store backends.
+type KnowledgeBaseConfig struct {
+	// VectorStore defines the configuration for the vector database.
+	VectorStore VectorStoreConfig `mapstructure:"vectorStore"`
+	// DocumentStore defines the configuration for the document store.
+	DocumentStore DocumentStoreConfig `mapstructure:"documentStore"`
+}
+
+// DocumentStoreConfig specifies which document store provider to use and its settings.
+type DocumentStoreConfig struct {
+	// Provider is the active document store provider (e.g., "in-memory", "elasticsearch").
+	Provider string `mapstructure:"provider"`
+	// Elasticsearch contains the specific configuration for the Elasticsearch provider.
+	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
+}
+
+// ElasticsearchConfig holds Elasticsearch-specific connection configurations.
+type ElasticsearchConfig struct {
+	// Addresses is a list of Elasticsearch server URLs.
+	Addresses []string `mapstructure:"addresses"`
+	// IndexName is the name of the index to use within Elasticsearch.
+	IndexName string `mapstructure:"indexName"`
+}
+
+// VectorStoreConfig specifies which vector store provider to use and its settings.
+type VectorStoreConfig struct {
+	// Provider is the active vector store provider (e.g., "in-memory", "chroma").
+	Provider string `mapstructure:"provider"`
+	// Chroma contains the specific configuration for the ChromaDB provider.
+	Chroma ChromaDBConfig `mapstructure:"chroma"`
+}
+
+// ChromaDBConfig holds ChromaDB-specific connection configurations.
+type ChromaDBConfig struct {
+	// URL is the endpoint of the ChromaDB server.
+	URL string `mapstructure:"url"`
+	// CollectionName is the name of the collection to use within ChromaDB.
+	CollectionName string `mapstructure:"collectionName"`
 }
 
 var appConfig *Config
@@ -181,6 +224,14 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("llm.gemini.model", "gemini-pro")
 
 	v.SetDefault("plugins.directory", constants.DefaultPluginDir)
+
+	v.SetDefault("knowledgeBase.vectorStore.provider", "in-memory")
+	v.SetDefault("knowledgeBase.vectorStore.chroma.url", "http://localhost:8000")
+	v.SetDefault("knowledgeBase.vectorStore.chroma.collectionName", "kubestack-ai")
+
+	v.SetDefault("knowledgeBase.documentStore.provider", "in-memory")
+	v.SetDefault("knowledgeBase.documentStore.elasticsearch.addresses", []string{"http://localhost:9200"})
+	v.SetDefault("knowledgeBase.documentStore.elasticsearch.indexName", "kubestack-ai-documents")
 }
 
 //Personal.AI order the ending

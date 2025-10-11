@@ -93,7 +93,7 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	sendProgress(progressChan, "Data Collection", "Completed", "Data collection finished.")
 
 	sendProgress(progressChan, "Analysis", "InProgress", "Analyzing collected data...")
-	issues, err := m.AnalyzeData(ctx, collectedData)
+	issues, err := m.AnalyzeData(ctx, req, collectedData)
 	if err != nil {
 		sendProgress(progressChan, "Analysis", "Failed", err.Error())
 		return nil, fmt.Errorf("failed during data analysis: %w", err)
@@ -152,41 +152,93 @@ func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewareP
 
 // AnalyzeData runs all registered diagnosis analyzers concurrently on the collected
 // data. It aggregates the issues identified by each analyzer into a single slice.
+// This method ensures that each type of analysis (metrics, logs, correlation) is
+// performed, allowing different analyzers to specialize.
 //
 // Parameters:
 //   ctx (context.Context): The context for the analysis operations.
+//   req (*models.DiagnosisRequest): The original request, used for context.
 //   data (*models.CollectedData): The collected data to be analyzed.
 //
 // Returns:
 //   []*models.Issue: A slice containing all issues identified by the analyzers.
 //   error: An error if the analysis process itself fails (nil in this implementation).
-func (m *manager) AnalyzeData(ctx context.Context, data *models.CollectedData) ([]*models.Issue, error) {
+func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, data *models.CollectedData) ([]*models.Issue, error) {
 	var allIssues []*models.Issue
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	var errs []error
+
+	addIssues := func(issues []*models.Issue) {
+		if len(issues) > 0 {
+			mu.Lock()
+			allIssues = append(allIssues, issues...)
+			mu.Unlock()
+		}
+	}
+
+	addErr := func(err error) {
+		if err != nil {
+			mu.Lock()
+			errs = append(errs, err)
+			mu.Unlock()
+		}
+	}
 
 	for _, analyzer := range m.analyzers {
-		wg.Add(1)
+		wg.Add(3) // One for each analysis type
+
+		// Analyze Metrics
 		go func(an interfaces.DiagnosisAnalyzer) {
 			defer wg.Done()
-			m.log.Debugf("Running analyzer: %s", an.Name())
-			var issues []*models.Issue
-			var err error
-			// Simplified analysis dispatch. A real implementation might have a more sophisticated way to route data to analyzers.
 			if data.Metrics != nil {
-				issues, err = an.AnalyzeMetrics(ctx, data.Metrics)
-				if err != nil {
-					m.log.Warnf("Analyzer %s failed on metrics: %v", an.Name(), err)
-				} else {
-					mu.Lock()
-					allIssues = append(allIssues, issues...)
-					mu.Unlock()
-				}
+				m.log.Debugf("Running %s.AnalyzeMetrics", an.Name())
+				issues, err := an.AnalyzeMetrics(ctx, data.Metrics)
+				addErr(err)
+				addIssues(issues)
 			}
+		}(analyzer)
+
+		// Analyze Logs
+		go func(an interfaces.DiagnosisAnalyzer) {
+			defer wg.Done()
+			if data.Logs != nil {
+				m.log.Debugf("Running %s.AnalyzeLogs", an.Name())
+				issues, err := an.AnalyzeLogs(ctx, data.Logs)
+				addErr(err)
+				addIssues(issues)
+			}
+		}(analyzer)
+
+		// Correlate Systems
+		go func(an interfaces.DiagnosisAnalyzer) {
+			defer wg.Done()
+			correlationData := &models.SystemCorrelationData{
+				DataSources: map[string]interface{}{
+					"middlewareName": req.TargetMiddleware.String(),
+					"instanceName":   req.Instance,
+					"timestamp":      time.Now(),
+					"metrics":        data.Metrics,
+					"logs":           data.Logs,
+					"config":         data.Config,
+				},
+			}
+			m.log.Debugf("Running %s.CorrelateSystems", an.Name())
+			issues, err := an.CorrelateSystems(ctx, correlationData)
+			addErr(err)
+			addIssues(issues)
 		}(analyzer)
 	}
 
 	wg.Wait()
+
+	if len(errs) > 0 {
+		// In a real system, you might wrap these errors. For now, we'll log them.
+		for _, err := range errs {
+			m.log.Warnf("An error occurred during analysis: %v", err)
+		}
+	}
+
 	return allIssues, nil
 }
 

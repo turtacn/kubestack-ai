@@ -47,14 +47,9 @@ It collects data, analyzes it for common issues, and provides a report with acti
 			instanceName := args[1]
 			namespace, _ := cmd.Flags().GetString("namespace")
 
-			// 2. Get a fully initialized orchestrator instance.
-			// In a real application, this would be retrieved from a central registry or context
-			// that is initialized in `root.go`.
-			var orchestrator interfaces.Orchestrator // = getOrchestrator()
+			// 2. The orchestrator is now initialized in root.go's PersistentPreRunE.
 			if orchestrator == nil {
-				// This is a placeholder to prevent a nil pointer dereference.
-				// The actual wiring would happen in a main function.
-				return fmt.Errorf("orchestrator not initialized (placeholder error)")
+				return fmt.Errorf("orchestrator not initialized")
 			}
 
 			// 3. Validate and build the diagnosis request.
