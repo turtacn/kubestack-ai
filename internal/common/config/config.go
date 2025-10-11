@@ -41,6 +41,14 @@ type Config struct {
 	Plugins PluginConfig `mapstructure:"plugins"`
 	// KnowledgeBase holds configurations for the knowledge base system.
 	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledgeBase"`
+	// Report holds configurations for storing diagnosis reports.
+	Report ReportConfig `mapstructure:"report"`
+}
+
+// ReportConfig holds configurations related to where diagnosis reports are stored.
+type ReportConfig struct {
+	// Directory is the path where diagnosis report files are saved.
+	Directory string `mapstructure:"directory"`
 }
 
 // ServerConfig holds HTTP server-related configurations, such as the listening
@@ -232,6 +240,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("knowledgeBase.documentStore.provider", "in-memory")
 	v.SetDefault("knowledgeBase.documentStore.elasticsearch.addresses", []string{"http://localhost:9200"})
 	v.SetDefault("knowledgeBase.documentStore.elasticsearch.indexName", "kubestack-ai-documents")
+
+	v.SetDefault("report.directory", constants.DefaultReportDir)
 }
 
 //Personal.AI order the ending

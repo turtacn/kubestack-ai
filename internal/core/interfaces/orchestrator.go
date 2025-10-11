@@ -76,6 +76,9 @@ type Orchestrator interface {
 
 	// ValidateExecution checks if an execution was successful and the original issue is resolved.
 	ValidateExecution(ctx context.Context, result *models.ExecutionResult) error
+
+	// GetDiagnosis retrieves a specific diagnosis result by its unique ID.
+	GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error)
 }
 
 //Personal.AI order the ending

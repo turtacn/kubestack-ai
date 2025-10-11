@@ -168,4 +168,10 @@ func (o *orchestrator) ValidateExecution(ctx context.Context, result *models.Exe
 	return o.executionManager.ValidateExecution(ctx, result)
 }
 
+// GetDiagnosis delegates the retrieval of a diagnosis report to the diagnosis manager.
+func (o *orchestrator) GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error) {
+	o.log.Infof("Retrieving diagnosis report with ID: %s", id)
+	return o.diagnosisManager.GetDiagnosis(ctx, id)
+}
+
 //Personal.AI order the ending

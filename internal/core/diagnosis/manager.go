@@ -28,32 +28,59 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 )
 
+import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
+)
+
 // manager is the concrete implementation of the interfaces.DiagnosisManager.
 type manager struct {
 	log           logger.Logger
 	pluginManager interfaces.PluginManager
 	analyzers     []interfaces.DiagnosisAnalyzer
 	cache         *diagnosisCache
-	// dbClient would be here for persistence.
+	reportDir     string
 }
 
 // NewManager creates a new instance of the diagnosis manager, which orchestrates
 // the entire diagnosis process. It takes a plugin manager to load the appropriate
 // middleware-specific logic and a slice of analyzers to process the collected data.
-//
-// Parameters:
-//   pm (interfaces.PluginManager): The plugin manager used to load diagnosis plugins.
-//   analyzers ([]interfaces.DiagnosisAnalyzer): A slice of analyzers to be run on the collected data.
-//
-// Returns:
-//   interfaces.DiagnosisManager: A new, configured diagnosis manager.
-func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer) interfaces.DiagnosisManager {
+func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer, cfg *config.Config) (interfaces.DiagnosisManager, error) {
+	reportDir := cfg.Report.Directory
+	if err := os.MkdirAll(reportDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create report directory '%s': %w", reportDir, err)
+	}
+
 	return &manager{
 		log:           logger.NewLogger("diagnosis-manager"),
 		pluginManager: pm,
 		analyzers:     analyzers,
-		cache:         newDiagnosisCache(10 * time.Minute), // Default 10 min cache TTL
+		cache:         newDiagnosisCache(10 * time.Minute),
+		reportDir:     reportDir,
+	}, nil
+}
+
+// GetDiagnosis loads a diagnosis report from the file system by its ID.
+func (m *manager) GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error) {
+	filePath := filepath.Join(m.reportDir, fmt.Sprintf("%s.json", id))
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("diagnosis report with ID '%s' not found", id)
+		}
+		return nil, fmt.Errorf("failed to read diagnosis report file: %w", err)
 	}
+
+	var result models.DiagnosisResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse diagnosis report file: %w", err)
+	}
+
+	return &result, nil
 }
 
 // RunDiagnosis executes the full, end-to-end diagnosis workflow. It handles
@@ -108,10 +135,26 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 		Issues:    issues,
 	}
 
+	if err := m.persistResult(ctx, result); err != nil {
+		// Log the error but don't fail the entire diagnosis, as the result is still usable.
+		m.log.Warnf("Failed to persist diagnosis report %s: %v", result.ID, err)
+	}
+
 	m.cache.Set(req, result)
-	// m.persistResult(ctx, result) // Placeholder for DB persistence and history
 	m.log.Infof("Diagnosis completed for %s. Found %d issues.", req.TargetMiddleware, len(issues))
 	return result, nil
+}
+
+func (m *manager) persistResult(ctx context.Context, result *models.DiagnosisResult) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal diagnosis result: %w", err)
+	}
+
+	filePath := filepath.Join(m.reportDir, fmt.Sprintf("%s.json", result.ID))
+	m.log.Debugf("Persisting diagnosis report to %s", filePath)
+
+	return ioutil.WriteFile(filePath, data, 0644)
 }
 
 func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewarePlugin) (*models.CollectedData, error) {

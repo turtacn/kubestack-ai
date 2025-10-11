@@ -87,7 +87,10 @@ running on Kubernetes or bare metal servers.`,
 			return fmt.Errorf("failed to create AI analyzer: %w", err)
 		}
 		analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
-		diagManager := diagnosis.NewManager(pluginManager, analyzers)
+		diagManager, err := diagnosis.NewManager(pluginManager, analyzers, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create diagnosis manager: %w", err)
+		}
 
 		// Knowledge base components
 		vectorStore, err := store.NewVectorStoreFromConfig(&cfg.KnowledgeBase.VectorStore)

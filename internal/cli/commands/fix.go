@@ -49,23 +49,31 @@ This command follows a safe, multi-step process:
 				return fmt.Errorf("orchestrator not initialized")
 			}
 
-			// 1. Fetch recommendations from the diagnosis report.
-			// This requires a persistence layer for diagnosis results, which is not yet implemented.
-			// We will use placeholder recommendations to demonstrate the flow.
-			fmt.Printf("Fetching recommendations for diagnosis ID: %s (using placeholder data)\n", diagnosisID)
-			recommendations := []*models.Recommendation{
-				{ID: "rec-001", Description: "Increase the max_connections parameter.", Command: "mysql -e 'SET GLOBAL max_connections = 500;'", CanAutoFix: true},
-				{ID: "rec-002", Description: "Restart the database server to apply changes.", Command: "systemctl restart mysqld", CanAutoFix: true},
+			// 1. Fetch the diagnosis report using the orchestrator.
+			fmt.Printf("Fetching diagnosis report for ID: %s\n", diagnosisID)
+			result, err := orchestrator.GetDiagnosis(cmd.Context(), diagnosisID)
+			if err != nil {
+				return fmt.Errorf("failed to get diagnosis report: %w", err)
+			}
+			if len(result.Issues) == 0 {
+				fmt.Println("No issues found in the report. Nothing to fix.")
+				return nil
 			}
 
-			// 2. Generate the execution plan.
+			// 2. Extract recommendations from the report.
+			var recommendations []*models.Recommendation
+			for _, issue := range result.Issues {
+				recommendations = append(recommendations, issue.Recommendations...)
+			}
+
+			// 3. Generate the execution plan.
 			fmt.Println("Generating execution plan...")
 			plan, err := orchestrator.PlanExecution(cmd.Context(), recommendations)
 			if err != nil {
 				return fmt.Errorf("failed to generate execution plan: %w", err)
 			}
 
-			// 3. Display the plan and ask for user confirmation. This is a critical safety step.
+			// 4. Display the plan and ask for user confirmation. This is a critical safety step.
 			// TODO: Use a proper UI component from `internal/cli/ui` to render the plan nicely.
 			fmt.Println("\n--- [Execution Plan Review] ---")
 			fmt.Printf(" Risk Level: %s\n", plan.Risk.Level)
@@ -84,7 +92,7 @@ This command follows a safe, multi-step process:
 				return nil
 			}
 
-			// 4. Execute the plan.
+			// 5. Execute the plan.
 			fmt.Println("\nExecuting plan...")
 			// The confirmation function for individual steps is created here and passed down to the executor.
 			stepConfirmFunc := func(prompt string) bool {
@@ -106,12 +114,12 @@ This command follows a safe, multi-step process:
 				return err
 			}
 
-			// 5. Display final result.
+			// 6. Display final result.
 			fmt.Println("\n--- [Execution Result] ---")
 			fmt.Printf("Final Status: %s\n", execResult.Status)
 			// TODO: Print detailed step results and logs from execResult.
 
-			// 6. Validate the fix.
+			// 7. Validate the fix.
 			if execResult.Status == "Success" {
 				fmt.Println("\nValidating that the fix was successful...")
 				if err := orchestrator.ValidateExecution(cmd.Context(), execResult); err != nil {
