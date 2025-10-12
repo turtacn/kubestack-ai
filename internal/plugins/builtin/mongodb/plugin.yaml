@@ -1,0 +1,11 @@
+name: mongodb
+version: 0.1.0
+description: "Provides diagnostics for MongoDB instances."
+author: "KubeStack-AI"
+entrypoint: "mongodb.so" # This will be the name of the compiled plugin file
+supportedVersions:
+  - "4.x"
+  - "5.x"
+  - "6.x"
+apiVersion: "v1"
+dependencies: []
