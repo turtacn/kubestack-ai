@@ -38,6 +38,23 @@ Your task is to analyze the provided data, identify the root cause of any proble
 
 // redisDiagnosisTemplate is a more specific template for Redis. It includes a few-shot example
 // to guide the LLM in generating the correct output format and reasoning process.
+const queryExpansionTemplate = `You are an expert in query expansion. Your task is to expand the given user query with synonyms and related terms to improve the recall of a semantic search system.
+Provide a list of 3 to 5 alternative queries. The original query should be included in the list.
+Return the list as a single line of text, with each query separated by a newline character (\n).
+
+Original Query: {{.Query}}`
+
+const rerankTemplate = `You are an expert in information retrieval. Your task is to re-rank the following documents based on their relevance to the user's query.
+The documents are provided as a JSON array. Your response should be a JSON array of the same documents, re-ordered from most relevant to least relevant.
+Do not add, remove, or modify any documents.
+
+**User Query:**
+{{.Query}}
+
+**Documents to Re-rank:**
+{{.Documents}}
+`
+
 const redisDiagnosisTemplate = `You are KubeStack-AI, a Redis performance and reliability expert.
 Your task is to analyze the provided Redis INFO and CONFIG data to identify issues and provide solutions.
 
@@ -114,6 +131,16 @@ func GetDefaultTemplates() []*Template {
 			ID:      "redis-diagnosis",
 			Version: "1.0",
 			Text:    redisDiagnosisTemplate,
+		},
+		{
+			ID:      "query-expansion",
+			Version: "1.0",
+			Text:    queryExpansionTemplate,
+		},
+		{
+			ID:      "rerank",
+			Version: "1.0",
+			Text:    rerankTemplate,
 		},
 		// TODO: Add other templates here, e.g., for MySQL, Kafka, etc.
 	}

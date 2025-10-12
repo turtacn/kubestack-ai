@@ -115,8 +115,9 @@ running on Kubernetes or bare metal servers.`,
 		}
 		knowManager := km.NewManager(searcher)
 
-		// Execution components (using placeholder)
-		execManager := &execution.PlaceholderManager{}
+		// Execution components
+		execPlanner := execution.NewPlanner()
+		execManager := execution.NewManager(execPlanner)
 
 		// --- Orchestrator ---
 		orchestrator = orch.NewOrchestrator(cfg, pluginManager, diagManager, execManager, knowManager)

@@ -60,6 +60,9 @@ func (s *Server) setupRoutes() {
 		// Natural Language Query routes
 		api.POST("/ask", s.handleAsk)
 
+		// Plugin routes
+		api.GET("/plugins", s.handleListPlugins)
+
 		// Add other routes here in subsequent steps
 	}
 }

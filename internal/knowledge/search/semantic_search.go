@@ -17,9 +17,13 @@ package search
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/prompt"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
@@ -44,8 +48,10 @@ type Searcher interface {
 // semanticSearcher implements the Searcher interface. It orchestrates the process
 // of retrieving relevant documents using semantic understanding, powered by a RAG retriever.
 type semanticSearcher struct {
-	log       logger.Logger
-	retriever rag.Retriever
+	log           logger.Logger
+	retriever     rag.Retriever
+	llmClient     interfaces.LLMClient
+	promptBuilder *prompt.Builder
 }
 
 // NewSemanticSearcher creates a new searcher that performs semantic searches.
@@ -58,13 +64,21 @@ type semanticSearcher struct {
 // Returns:
 //   Searcher: A new instance of a semantic searcher.
 //   error: An error if the provided retriever is nil.
-func NewSemanticSearcher(retriever rag.Retriever) (Searcher, error) {
+func NewSemanticSearcher(retriever rag.Retriever, llmClient interfaces.LLMClient, promptBuilder *prompt.Builder) (Searcher, error) {
 	if retriever == nil {
 		return nil, fmt.Errorf("retriever cannot be nil")
 	}
+	if llmClient == nil {
+		return nil, fmt.Errorf("llmClient cannot be nil")
+	}
+	if promptBuilder == nil {
+		return nil, fmt.Errorf("promptBuilder cannot be nil")
+	}
 	return &semanticSearcher{
-		log:       logger.NewLogger("semantic-searcher"),
-		retriever: retriever,
+		log:           logger.NewLogger("semantic-searcher"),
+		retriever:     retriever,
+		llmClient:     llmClient,
+		promptBuilder: promptBuilder,
 	}, nil
 }
 
@@ -84,30 +98,87 @@ func (s *semanticSearcher) Search(ctx context.Context, query string) ([]rag.Docu
 	s.log.Infof("Performing semantic search for query: %.50s...", query)
 
 	// **Pre-retrieval Step (Placeholder): Query Transformation**
-	// In a more advanced implementation, this is where you would enhance the user's query.
-	// 1. Query Understanding: Analyze the query to determine user intent (e.g., "how-to", "what-is", "error-code").
-	// 2. Query Expansion: Expand the query with synonyms or related terms, potentially using an LLM call.
-	//    `expandedQuery := s.expandQuery(ctx, query)`
-	// For now, we use the original query directly.
-	processedQuery := query
+	expandedQuery, err := s.expandQuery(ctx, query)
+	if err != nil {
+		s.log.Warnf("Failed to expand query, falling back to original query: %v", err)
+		expandedQuery = query
+	}
 
 	// **Retrieval Step**
 	// The number of documents to retrieve (topK) could be configurable.
 	const topK = 5
-	retrievedDocs, err := s.retriever.Retrieve(ctx, processedQuery, topK)
+	retrievedDocs, err := s.retriever.Retrieve(ctx, expandedQuery, topK)
 	if err != nil {
 		return nil, err
 	}
 
 	// **Post-retrieval Step (Placeholder): Re-ranking & Filtering**
-	// After retrieving an initial set of documents, you could re-rank them for better relevance.
-	// 1. Re-ranking: Use a more powerful but slower model (like a cross-encoder) to re-score the top K documents.
-	//    `rerankedDocs := s.rerank(ctx, query, retrievedDocs)`
-	// 2. Filtering: Remove irrelevant documents based on metadata or other criteria.
-	// 3. Summarization: If needed, summarize the content of the top documents before returning.
-	finalDocs := retrievedDocs
+	rerankedDocs, err := s.rerank(ctx, query, retrievedDocs)
+	if err != nil {
+		s.log.Warnf("Failed to re-rank documents, falling back to original ranking: %v", err)
+		rerankedDocs = retrievedDocs
+	}
 
-	return finalDocs, nil
+	return rerankedDocs, nil
 }
 
-//Personal.AI order the ending
+func (s *semanticSearcher) rerank(ctx context.Context, query string, docs []rag.Document) ([]rag.Document, error) {
+	s.log.Debugf("Re-ranking %d documents for query: %s", len(docs), query)
+	docsJSON, err := json.Marshal(docs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal documents for re-ranking: %w", err)
+	}
+
+	data := map[string]string{
+		"Query":     query,
+		"Documents": string(docsJSON),
+	}
+
+	messages, err := s.promptBuilder.Build("rerank", data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build re-rank prompt: %w", err)
+	}
+
+	req := &interfaces.LLMRequest{
+		Messages:    messages,
+		Temperature: 0.1,
+	}
+
+	resp, err := s.llmClient.SendMessage(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call for re-ranking failed: %w", err)
+	}
+
+	var rerankedDocs []rag.Document
+	if err := json.Unmarshal([]byte(resp.Message.Content), &rerankedDocs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal re-ranked documents: %w", err)
+	}
+
+	s.log.Debugf("Successfully re-ranked %d documents.", len(rerankedDocs))
+	return rerankedDocs, nil
+}
+
+func (s *semanticSearcher) expandQuery(ctx context.Context, query string) (string, error) {
+	s.log.Debugf("Expanding query: %s", query)
+	data := map[string]string{"Query": query}
+	messages, err := s.promptBuilder.Build("query-expansion", data, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to build query expansion prompt: %w", err)
+	}
+
+	req := &interfaces.LLMRequest{
+		Messages:    messages,
+		Temperature: 0.4,
+	}
+
+	resp, err := s.llmClient.SendMessage(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("LLM call for query expansion failed: %w", err)
+	}
+
+	// The expanded queries are returned as a single string with newlines.
+	// We'll replace newlines with spaces to create a single, expanded query string.
+	expandedQuery := strings.ReplaceAll(resp.Message.Content, "\n", " ")
+	s.log.Debugf("Expanded query: %s", expandedQuery)
+	return expandedQuery, nil
+}

@@ -48,10 +48,15 @@ func (s *Server) handleDiagnose(c *gin.Context) {
 			}
 		}()
 
-		_, err := s.orchestrator.ExecuteDiagnosis(c, &req, progressChan)
-		if err != nil {
+		if _, err := s.orchestrator.ExecuteDiagnosis(c, &req, progressChan); err != nil {
 			s.log.Errorf("Diagnosis job %s failed: %v", jobID, err)
+			// In a real system, we'd update the job status in a database.
+			return
 		}
+		// In a real system, we'd update the job status and store the result.
+		s.log.Infof("Diagnosis job %s completed successfully.", jobID)
+		// For this implementation, we are relying on the fact that the diagnosis manager
+		// already persists the report to a file.
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
@@ -112,4 +117,13 @@ func (s *Server) handleAsk(c *gin.Context) {
 		fmt.Fprintf(c.Writer, "data: %s\n\n", chunk.Content)
 		c.Writer.Flush()
 	}
+}
+
+// handleListPlugins is the handler for the GET /api/v1/plugins endpoint.
+func (s *Server) handleListPlugins(c *gin.Context) {
+	// In a real application, we would get the plugin manager from the orchestrator.
+	// For now, we'll just return a placeholder.
+	c.JSON(http.StatusOK, gin.H{
+		"plugins": []string{"redis", "mysql", "kafka", "elasticsearch", "postgresql"},
+	})
 }
