@@ -41,8 +41,14 @@ type RequestContext struct {
 // OrchestratorConfig holds the configuration needed by the core orchestrator to
 // initialize its sub-components, such as the diagnosis and execution managers.
 type OrchestratorConfig struct {
-	// This struct can hold configurations for sub-managers like PluginManager,
-	// DiagnosisManager, etc., if they need specific settings not available globally.
+	// DiagnosisManager is the manager responsible for orchestrating diagnoses.
+	DiagnosisManager DiagnosisManager
+	// ExecutionManager is the manager responsible for executing action plans.
+	ExecutionManager ExecutionManager
+	// PluginManager is the manager responsible for loading and managing plugins.
+	PluginManager PluginManager
+	// LLMClient is the client for interacting with Large Language Models.
+	LLMClient llm_interfaces.LLMClient
 }
 
 // Orchestrator defines the contract for the central nervous system of KubeStack-AI.
@@ -76,9 +82,6 @@ type Orchestrator interface {
 
 	// ValidateExecution checks if an execution was successful and the original issue is resolved.
 	ValidateExecution(ctx context.Context, result *models.ExecutionResult) error
-
-	// GetDiagnosis retrieves a specific diagnosis result by its unique ID.
-	GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error)
 }
 
 //Personal.AI order the ending

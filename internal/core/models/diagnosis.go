@@ -18,8 +18,11 @@ package models
 
 import (
 	"time"
+
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 )
+
+// DiagnosisRequest contains all the parameters required to initiate a diagnosis run.
 // It specifies the target middleware and its location.
 type DiagnosisRequest struct {
 	// TargetMiddleware is the type of middleware to be diagnosed (e.g., Redis, MySQL).
@@ -62,6 +65,8 @@ type Issue struct {
 }
 
 // Recommendation provides a suggested action or set of actions to resolve a specific issue.
+// It is the high-level "what to do" that is presented to the user. A fixable
+// recommendation is later translated into a more concrete FixAction or ExecutionStep.
 type Recommendation struct {
 	// ID is the unique identifier for this recommendation.
 	ID string `json:"id" yaml:"id"`
@@ -155,8 +160,6 @@ type FixAction struct {
 	Command string `json:"command" yaml:"command"`
 	// Parameters provides any additional parameters needed to execute the fix.
 	Parameters map[string]string `json:"parameters" yaml:"parameters"`
-	// ActionType categorizes the action for dependency analysis.
-	ActionType enum.FixActionType `json:"actionType" yaml:"actionType"`
 }
 
 // FixResult represents the outcome of a single executed fix action.

@@ -18,18 +18,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/spf13/cobra"
 )
 
 // newAskCmd creates and configures the `ask` command.
 // This command allows users to ask questions in natural language to the KubeStack-AI assistant.
-// It sets up the command's usage, short and long descriptions, examples, and the execution logic (`RunE`).
-// The execution logic captures the user's question, sends it to the orchestrator,
-// and streams the response back to the console.
-//
-// Returns:
-//   *cobra.Command: A pointer to the configured cobra.Command object for the `ask` command.
-func newAskCmd() *cobra.Command {
+func newAskCmd(orchestrator interfaces.Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ask [question...]",
 		Short: "Ask KubeStack-AI a question in natural language",
@@ -44,11 +39,6 @@ The response will be streamed to the console in real-time.`,
 		Args: cobra.MinimumNArgs(1), // Requires at least one word for the question.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			question := strings.Join(args, " ")
-
-			// The orchestrator is now initialized in root.go's PersistentPreRunE.
-			if orchestrator == nil {
-				return fmt.Errorf("orchestrator not initialized")
-			}
 
 			fmt.Print("🤖 KubeStack-AI: ")
 

@@ -39,16 +39,26 @@ type Config struct {
 	LLM LLMConfig `mapstructure:"llm"`
 	// Plugins holds configurations related to the plugin management system.
 	Plugins PluginConfig `mapstructure:"plugins"`
-	// KnowledgeBase holds configurations for the knowledge base system.
-	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledgeBase"`
-	// Report holds configurations for storing diagnosis reports.
-	Report ReportConfig `mapstructure:"report"`
+	// Knowledge holds configurations for the knowledge base, including vector and document stores.
+	Knowledge KnowledgeStoreConfig `mapstructure:"knowledge"`
 }
 
-// ReportConfig holds configurations related to where diagnosis reports are stored.
-type ReportConfig struct {
-	// Directory is the path where diagnosis report files are saved.
-	Directory string `mapstructure:"directory"`
+// KnowledgeStoreConfig holds configurations for the knowledge base.
+type KnowledgeStoreConfig struct {
+	// Provider specifies the active vector store provider (e.g., "in-memory", "chroma").
+	Provider string `mapstructure:"provider"`
+	// Chroma contains the specific configuration for the ChromaDB provider.
+	Chroma ChromaConfig `mapstructure:"chroma"`
+}
+
+// ChromaConfig holds ChromaDB-specific configurations.
+type ChromaConfig struct {
+	// URL is the base URL for the ChromaDB instance.
+	URL string `mapstructure:"url"`
+	// CollectionName is the name of the collection to use for storing vectors.
+	CollectionName string `mapstructure:"collectionName"`
+	// Namespace is the ChromaDB namespace to use.
+	Namespace string `mapstructure:"namespace"`
 }
 
 // ServerConfig holds HTTP server-related configurations, such as the listening
@@ -91,47 +101,6 @@ type GeminiConfig struct {
 type PluginConfig struct {
 	// Directory is the path where plugins are stored.
 	Directory string `mapstructure:"directory"`
-}
-
-// KnowledgeBaseConfig holds configurations for the knowledge base, including the
-// vector store and document store backends.
-type KnowledgeBaseConfig struct {
-	// VectorStore defines the configuration for the vector database.
-	VectorStore VectorStoreConfig `mapstructure:"vectorStore"`
-	// DocumentStore defines the configuration for the document store.
-	DocumentStore DocumentStoreConfig `mapstructure:"documentStore"`
-}
-
-// DocumentStoreConfig specifies which document store provider to use and its settings.
-type DocumentStoreConfig struct {
-	// Provider is the active document store provider (e.g., "in-memory", "elasticsearch").
-	Provider string `mapstructure:"provider"`
-	// Elasticsearch contains the specific configuration for the Elasticsearch provider.
-	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
-}
-
-// ElasticsearchConfig holds Elasticsearch-specific connection configurations.
-type ElasticsearchConfig struct {
-	// Addresses is a list of Elasticsearch server URLs.
-	Addresses []string `mapstructure:"addresses"`
-	// IndexName is the name of the index to use within Elasticsearch.
-	IndexName string `mapstructure:"indexName"`
-}
-
-// VectorStoreConfig specifies which vector store provider to use and its settings.
-type VectorStoreConfig struct {
-	// Provider is the active vector store provider (e.g., "in-memory", "chroma").
-	Provider string `mapstructure:"provider"`
-	// Chroma contains the specific configuration for the ChromaDB provider.
-	Chroma ChromaDBConfig `mapstructure:"chroma"`
-}
-
-// ChromaDBConfig holds ChromaDB-specific connection configurations.
-type ChromaDBConfig struct {
-	// URL is the endpoint of the ChromaDB server.
-	URL string `mapstructure:"url"`
-	// CollectionName is the name of the collection to use within ChromaDB.
-	CollectionName string `mapstructure:"collectionName"`
 }
 
 var appConfig *Config
@@ -190,18 +159,12 @@ func LoadConfig(configPath string) (*Config, error) {
 // GetConfig returns the singleton instance of the loaded application configuration.
 // It is crucial to call LoadConfig before calling this function, otherwise it may
 // return nil.
-//
-// Returns:
-//   *Config: A pointer to the currently active application configuration.
 func GetConfig() *Config {
 	return appConfig
 }
 
 // Validate checks if the loaded configuration is valid by enforcing certain rules,
 // such as ensuring that API keys are present if a specific provider is selected.
-//
-// Returns:
-//   error: An error of type *errors.ConfigError if validation fails, otherwise nil.
 func (c *Config) Validate() error {
 	if c.LLM.Provider == "openai" && c.LLM.OpenAI.APIKey == "" {
 		return errors.NewConfigError(errors.ConfigValidationFailedCode, "OpenAI API key is missing", "Set the KSA_LLM_OPENAI_APIKEY environment variable or llm.openai.apiKey in the config file.")
@@ -213,7 +176,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// setDefaults defines the default values for configuration keys.
+// setDefaults defines the default values for all configuration keys. This ensures
+// the application can run with a minimal or empty configuration file.
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("logger.level", "info")
 	v.SetDefault("logger.format", "text")
@@ -233,15 +197,10 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("plugins.directory", constants.DefaultPluginDir)
 
-	v.SetDefault("knowledgeBase.vectorStore.provider", "in-memory")
-	v.SetDefault("knowledgeBase.vectorStore.chroma.url", "http://localhost:8000")
-	v.SetDefault("knowledgeBase.vectorStore.chroma.collectionName", "kubestack-ai")
-
-	v.SetDefault("knowledgeBase.documentStore.provider", "in-memory")
-	v.SetDefault("knowledgeBase.documentStore.elasticsearch.addresses", []string{"http://localhost:9200"})
-	v.SetDefault("knowledgeBase.documentStore.elasticsearch.indexName", "kubestack-ai-documents")
-
-	v.SetDefault("report.directory", constants.DefaultReportDir)
+	v.SetDefault("knowledge.provider", "in-memory")
+	v.SetDefault("knowledge.chroma.url", "http://localhost:8000")
+	v.SetDefault("knowledge.chroma.collectionName", "kubestack-ai-kb")
+	v.SetDefault("knowledge.chroma.namespace", "default")
 }
 
 //Personal.AI order the ending

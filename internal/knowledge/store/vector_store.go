@@ -22,6 +22,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 )
 
@@ -63,7 +64,21 @@ type inMemoryVectorStore struct {
 	mu        sync.RWMutex
 }
 
-// NewInMemoryVectorStore creates a new, empty in-memory vector store.
+// NewVectorStore is a factory function that creates and returns a VectorStore
+// implementation based on the provided configuration. This allows the application
+// to easily switch between different vector database backends.
+func NewVectorStore(cfg *config.KnowledgeStoreConfig) (VectorStore, error) {
+	switch cfg.Provider {
+	case "chroma":
+		return NewChromaVectorStore(&cfg.Chroma)
+	case "in-memory":
+		return newInMemoryVectorStore()
+	default:
+		return nil, fmt.Errorf("unsupported vector store provider: %s", cfg.Provider)
+	}
+}
+
+// newInMemoryVectorStore creates a new, empty in-memory vector store.
 // This implementation is simple and useful for testing or small-scale deployments,
 // but it is not durable and performs a brute-force search, making it inefficient
 // for large datasets.
@@ -71,7 +86,7 @@ type inMemoryVectorStore struct {
 // Returns:
 //   VectorStore: A new instance of an in-memory vector store.
 //   error: An error if initialization fails (nil in this implementation).
-func NewInMemoryVectorStore() (VectorStore, error) {
+func newInMemoryVectorStore() (VectorStore, error) {
 	return &inMemoryVectorStore{
 		log:       logger.NewLogger("in-memory-vector-store"),
 		documents: make([]StoreDocument, 0),

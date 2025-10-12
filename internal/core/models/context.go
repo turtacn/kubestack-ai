@@ -82,13 +82,14 @@ type KubernetesContext struct {
 }
 
 // K8sResource represents a single discovered Kubernetes resource, providing
-// enough information to uniquely identify it.
+// enough information to uniquely identify it within its namespace.
 type K8sResource struct {
 	// Kind is the type of the resource (e.g., "Pod", "Service", "Deployment").
 	Kind string `json:"kind" yaml:"kind"`
 	// Name is the name of the resource instance.
 	Name string `json:"name" yaml:"name"`
-	// UID is the unique identifier for the resource provided by Kubernetes.
+	// UID is the unique identifier for the resource provided by Kubernetes, which is
+	// guaranteed to be unique across time and namespaces.
 	UID string `json:"uid" yaml:"uid"`
 }
 

@@ -17,19 +17,14 @@ package commands
 import (
 	"fmt"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/spf13/cobra"
 )
 
 // newFixCmd creates and configures the `fix` command.
 // This command is designed to apply automated fixes based on the results of a previous diagnosis.
-// It sets up the command's usage, descriptions, examples, and the core execution logic (`RunE`).
-// The execution flow includes fetching recommendations, generating a safe execution plan,
-// requiring user confirmation, executing the plan, and validating the outcome.
-//
-// Returns:
-//   *cobra.Command: A pointer to the configured cobra.Command object for the `fix` command.
-func newFixCmd() *cobra.Command {
+func newFixCmd(orchestrator interfaces.Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fix [diagnosis-id]",
 		Short: "Apply automated fixes for a given diagnosis",
@@ -44,36 +39,23 @@ This command follows a safe, multi-step process:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			diagnosisID := args[0]
 
-			// The orchestrator is now initialized in root.go's PersistentPreRunE.
-			if orchestrator == nil {
-				return fmt.Errorf("orchestrator not initialized")
+			// 1. Fetch recommendations from the diagnosis report.
+			// This requires a persistence layer for diagnosis results, which is not yet implemented.
+			// We will use placeholder recommendations to demonstrate the flow.
+			fmt.Printf("Fetching recommendations for diagnosis ID: %s (using placeholder data)\n", diagnosisID)
+			recommendations := []*models.Recommendation{
+				{ID: "rec-001", Description: "Increase the max_connections parameter.", Command: "mysql -e 'SET GLOBAL max_connections = 500;'", CanAutoFix: true},
+				{ID: "rec-002", Description: "Restart the database server to apply changes.", Command: "systemctl restart mysqld", CanAutoFix: true},
 			}
 
-			// 1. Fetch the diagnosis report using the orchestrator.
-			fmt.Printf("Fetching diagnosis report for ID: %s\n", diagnosisID)
-			result, err := orchestrator.GetDiagnosis(cmd.Context(), diagnosisID)
-			if err != nil {
-				return fmt.Errorf("failed to get diagnosis report: %w", err)
-			}
-			if len(result.Issues) == 0 {
-				fmt.Println("No issues found in the report. Nothing to fix.")
-				return nil
-			}
-
-			// 2. Extract recommendations from the report.
-			var recommendations []*models.Recommendation
-			for _, issue := range result.Issues {
-				recommendations = append(recommendations, issue.Recommendations...)
-			}
-
-			// 3. Generate the execution plan.
+			// 2. Generate the execution plan.
 			fmt.Println("Generating execution plan...")
 			plan, err := orchestrator.PlanExecution(cmd.Context(), recommendations)
 			if err != nil {
 				return fmt.Errorf("failed to generate execution plan: %w", err)
 			}
 
-			// 4. Display the plan and ask for user confirmation. This is a critical safety step.
+			// 3. Display the plan and ask for user confirmation. This is a critical safety step.
 			// TODO: Use a proper UI component from `internal/cli/ui` to render the plan nicely.
 			fmt.Println("\n--- [Execution Plan Review] ---")
 			fmt.Printf(" Risk Level: %s\n", plan.Risk.Level)
@@ -92,7 +74,7 @@ This command follows a safe, multi-step process:
 				return nil
 			}
 
-			// 5. Execute the plan.
+			// 4. Execute the plan.
 			fmt.Println("\nExecuting plan...")
 			// The confirmation function for individual steps is created here and passed down to the executor.
 			stepConfirmFunc := func(prompt string) bool {
@@ -114,12 +96,12 @@ This command follows a safe, multi-step process:
 				return err
 			}
 
-			// 6. Display final result.
+			// 5. Display final result.
 			fmt.Println("\n--- [Execution Result] ---")
 			fmt.Printf("Final Status: %s\n", execResult.Status)
 			// TODO: Print detailed step results and logs from execResult.
 
-			// 7. Validate the fix.
+			// 6. Validate the fix.
 			if execResult.Status == "Success" {
 				fmt.Println("\nValidating that the fix was successful...")
 				if err := orchestrator.ValidateExecution(cmd.Context(), execResult); err != nil {

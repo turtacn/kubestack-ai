@@ -55,13 +55,12 @@ type DiagnosisManager interface {
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the analysis operation.
-	//   req (*models.DiagnosisRequest): The original request, providing context.
 	//   collectedData (*models.CollectedData): The aggregated data collected from the plugin.
 	//
 	// Returns:
 	//   []*models.Issue: A slice containing all issues identified by the analyzers.
 	//   error: An error if the analysis process itself fails.
-	AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, collectedData *models.CollectedData) ([]*models.Issue, error)
+	AnalyzeData(ctx context.Context, collectedData *models.CollectedData) ([]*models.Issue, error)
 
 	// GenerateReport takes a final diagnosis result and formats it into a human-readable report.
 	//
@@ -72,17 +71,6 @@ type DiagnosisManager interface {
 	//   string: The formatted report.
 	//   error: An error if report generation fails.
 	GenerateReport(result *models.DiagnosisResult) (string, error)
-
-	// GetDiagnosis retrieves a specific diagnosis result by its unique ID.
-	//
-	// Parameters:
-	//   ctx (context.Context): The context for the retrieval operation.
-	//   id (string): The unique ID of the diagnosis report to retrieve.
-	//
-	// Returns:
-	//   *models.DiagnosisResult: The requested diagnosis result.
-	//   error: An error if the report is not found or cannot be loaded.
-	GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error)
 }
 
 // DiagnosisAnalyzer defines the contract for a pluggable analysis component. It is

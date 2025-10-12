@@ -26,13 +26,7 @@ import (
 
 // newDiagnoseCmd creates and configures the `diagnose` command.
 // This command is responsible for running a comprehensive diagnosis on a specified middleware instance.
-// It defines the command's usage, descriptions, examples, arguments, and the main execution logic (`RunE`).
-// The RunE function parses arguments, builds a diagnosis request, executes the diagnosis via the
-// orchestrator, and prints a formatted report of the findings.
-//
-// Returns:
-//   *cobra.Command: A pointer to the configured cobra.Command object for the `diagnose` command.
-func newDiagnoseCmd() *cobra.Command {
+func newDiagnoseCmd(orchestrator interfaces.Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diagnose [middleware-type] [instance-name]",
 		Short: "Run a diagnosis on a middleware instance",
@@ -40,19 +34,14 @@ func newDiagnoseCmd() *cobra.Command {
 It collects data, analyzes it for common issues, and provides a report with actionable recommendations.`,
 		Example: `  # Diagnose a Redis instance named 'my-redis' in the 'default' namespace
   ksa diagnose redis my-redis -n default`,
-		Args: cobra.ExactArgs(2), // Enforces that exactly two arguments are provided.
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 1. Parse arguments and flags.
 			middlewareTypeStr := strings.ToLower(args[0])
 			instanceName := args[1]
 			namespace, _ := cmd.Flags().GetString("namespace")
 
-			// 2. The orchestrator is now initialized in root.go's PersistentPreRunE.
-			if orchestrator == nil {
-				return fmt.Errorf("orchestrator not initialized")
-			}
-
-			// 3. Validate and build the diagnosis request.
+			// 2. Validate and build the diagnosis request.
 			var middlewareType enum.MiddlewareType
 			// This is a simplified validation. A real implementation might use a map or a more robust parser.
 			switch middlewareTypeStr {

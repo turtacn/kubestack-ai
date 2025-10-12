@@ -60,7 +60,9 @@ type KubeStackError interface {
 	Unwrap() error
 }
 
-// baseError is the concrete implementation of the KubeStackError interface.
+// baseError is the concrete implementation of the KubeStackError interface. It holds
+// all the structured error information and is not exported to encourage the use of
+// the factory functions.
 type baseError struct {
 	code       int
 	errorType  ErrorType
@@ -69,7 +71,8 @@ type baseError struct {
 	cause      error
 }
 
-// New creates a new KubeStackError.
+// newError is a private factory function to create a new KubeStackError without a cause.
+// It is the foundation for all specific error constructors like NewPluginError.
 func newError(code int, errorType ErrorType, message, suggestion string) KubeStackError {
 	return &baseError{
 		code:       code,
@@ -79,7 +82,8 @@ func newError(code int, errorType ErrorType, message, suggestion string) KubeSta
 	}
 }
 
-// Wrap creates a new KubeStackError that wraps an existing error.
+// wrapError is a private factory function to create a new KubeStackError that wraps
+// an existing error. This is essential for preserving the error chain.
 func wrapError(err error, code int, errorType ErrorType, message, suggestion string) KubeStackError {
 	return &baseError{
 		code:       code,

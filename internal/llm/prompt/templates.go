@@ -14,136 +14,44 @@
 
 package prompt
 
-// diagnosisTemplate is a generic template for diagnosing any middleware. It instructs the LLM
-// on the process to follow (analyze, identify root cause, suggest solutions) and the desired output format.
-const diagnosisTemplate = `You are KubeStack-AI, an expert system designed to diagnose issues in middleware and infrastructure.
-Your task is to analyze the provided data, identify the root cause of any problems, and suggest actionable solutions.
+// TemplateDiagnosisID is the identifier for the standard diagnosis prompt.
+const TemplateDiagnosisID = "diagnosis_v1"
 
-**Analysis Context:**
-- Middleware Type: {{.MiddlewareName}}
-- Instance: {{.InstanceName}}
-- Timestamp: {{.Timestamp}}
+// AllTemplates is a slice containing all the default prompt templates for the application.
+// This list is used to initialize the prompt builder.
+var AllTemplates = []*Template{
+	{
+		ID:      TemplateDiagnosisID,
+		Version: "1.0",
+		Text: `You are an expert SRE assistant. Your goal is to analyze the provided context data from a middleware system and identify potential issues.
+The context data is provided in JSON format below.
 
-**Collected Data:**
-'''
-{{.CollectedData}}
-'''
+Context Data:
+{{.context_data}}
 
-**Instructions:**
-1.  **Analyze Data:** Carefully review all sections of the collected data. Look for explicit error messages, metric values that violate common thresholds, and configurations that deviate from best practices.
-2.  **Identify Root Cause:** Synthesize your findings to determine the most likely root cause for each potential problem.
-3.  **Suggest Solutions:** Provide clear, step-by-step solutions to fix each identified issue. If possible, provide the exact commands to run or configuration changes to make.
-4.  **Format Output:** Your final output must be a single, valid JSON object. This object should contain a single key, "issues", which is a list of issue objects. Each issue object must have the following keys: "title" (a short, descriptive title), "severity" (one of "Low", "Medium", "High", "Critical"), "description" (a detailed explanation of the problem), and "recommendations" (a list of recommendation objects, each with a "description" and an optional "command").
-`
-
-// redisDiagnosisTemplate is a more specific template for Redis. It includes a few-shot example
-// to guide the LLM in generating the correct output format and reasoning process.
-const queryExpansionTemplate = `You are an expert in query expansion. Your task is to expand the given user query with synonyms and related terms to improve the recall of a semantic search system.
-Provide a list of 3 to 5 alternative queries. The original query should be included in the list.
-Return the list as a single line of text, with each query separated by a newline character (\n).
-
-Original Query: {{.Query}}`
-
-const rerankTemplate = `You are an expert in information retrieval. Your task is to re-rank the following documents based on their relevance to the user's query.
-The documents are provided as a JSON array. Your response should be a JSON array of the same documents, re-ordered from most relevant to least relevant.
-Do not add, remove, or modify any documents.
-
-**User Query:**
-{{.Query}}
-
-**Documents to Re-rank:**
-{{.Documents}}
-`
-
-const redisDiagnosisTemplate = `You are KubeStack-AI, a Redis performance and reliability expert.
-Your task is to analyze the provided Redis INFO and CONFIG data to identify issues and provide solutions.
-
-**Analysis Context:**
-- Middleware Type: Redis
-- Instance: {{.InstanceName}}
-
-**Collected Data:**
-- INFO:
-'''
-{{.Info}}
-'''
-- CONFIG:
-'''
-{{.Config}}
-'''
-
-**Instructions:**
-Analyze the data and respond with a single, valid JSON object containing a list of "issues", as shown in the example.
-Pay close attention to memory usage (especially fragmentation), persistence settings (RDB/AOF), and security configurations (requirepass, bind address).
-
-**Example:**
-
-*Input Data Analysis:*
-- The provided INFO shows 'mem_fragmentation_ratio:1.8'. This is greater than the recommended maximum of 1.5.
-- The provided CONFIG shows 'requirepass ""'. This means the instance is not password protected.
-
-*Your JSON Output:*
+Analyze the data and respond with a JSON object that follows this exact structure:
 {
+  "summary": "A brief, one-sentence summary of the main finding.",
+  "reasoning": "A step-by-step explanation of how you reached your conclusion based on the provided data.",
   "issues": [
     {
-      "title": "High Memory Fragmentation",
-      "severity": "Warning",
-      "description": "The memory fragmentation ratio is 1.8, which is high. This can lead to the operating system allocating more memory than requested, resulting in wasted resources.",
+      "id": "issue-uuid-here",
+      "title": "A concise title for the issue.",
+      "severity": "One of: Low, Medium, High, Critical.",
+      "description": "A detailed explanation of the issue, its impact, and why it's a problem.",
+      "evidence": "A snippet of data or a summary of the evidence that points to this issue.",
       "recommendations": [
         {
-          "description": "A high fragmentation ratio can often be resolved by restarting the Redis server, which allows the OS to reclaim the fragmented memory. Ensure persistence is enabled to avoid data loss during the restart."
-        }
-      ]
-    },
-    {
-      "title": "Password Protection Disabled",
-      "severity": "Critical",
-      "description": "The 'requirepass' configuration is empty, leaving the Redis instance unprotected and open to unauthorized access.",
-      "recommendations": [
-        {
-          "description": "Set a strong password via the 'requirepass' configuration option to secure the instance.",
-          "command": "CONFIG SET requirepass \"your-strong-password-here\""
+          "id": "rec-uuid-here",
+          "description": "A clear, actionable recommendation to fix the issue.",
+          "command": "The exact shell command to run for an automated fix, if applicable. Otherwise, an empty string.",
+          "canAutoFix": true
         }
       ]
     }
   ]
 }
 
-**Begin Analysis.**
-`
-
-// GetDefaultTemplates returns a slice containing all the default, built-in prompt
-// templates for the application. In a production system, these templates might be
-// loaded from an external configuration file or a dedicated template registry,
-// but providing them as code ensures that the application has a working set of
-// prompts out of the box.
-//
-// Returns:
-//   []*Template: A slice of the default prompt templates.
-func GetDefaultTemplates() []*Template {
-	return []*Template{
-		{
-			ID:      "generic-diagnosis",
-			Version: "1.0",
-			Text:    diagnosisTemplate,
-		},
-		{
-			ID:      "redis-diagnosis",
-			Version: "1.0",
-			Text:    redisDiagnosisTemplate,
-		},
-		{
-			ID:      "query-expansion",
-			Version: "1.0",
-			Text:    queryExpansionTemplate,
-		},
-		{
-			ID:      "rerank",
-			Version: "1.0",
-			Text:    rerankTemplate,
-		},
-		// TODO: Add other templates here, e.g., for MySQL, Kafka, etc.
-	}
+Only return the JSON object. Do not include any other text, greetings, or explanations.`,
+	},
 }
-
-//Personal.AI order the ending

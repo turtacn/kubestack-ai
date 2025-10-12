@@ -51,9 +51,6 @@ const DefaultLogDir = "/var/log/kubestack-ai/"
 // DefaultDataDir is the default directory for application data, including knowledge base indexes.
 const DefaultDataDir = "/var/lib/kubestack-ai/data/"
 
-// DefaultReportDir is the default directory for storing diagnosis reports.
-const DefaultReportDir = "/var/lib/kubestack-ai/reports/"
-
 // --- Networking ---
 
 // DefaultConnectTimeout is the default timeout for establishing network connections.

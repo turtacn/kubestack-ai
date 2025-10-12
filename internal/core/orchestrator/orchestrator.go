@@ -36,7 +36,7 @@ type orchestrator struct {
 	pluginManager    interfaces.PluginManager
 	diagnosisManager interfaces.DiagnosisManager
 	executionManager interfaces.ExecutionManager
-	knowledgeManager interfaces.KnowledgeManager
+	// llmClient, knowledgeManager, etc. will be added here
 }
 
 // NewOrchestrator creates a new instance of the core orchestrator. It acts as a
@@ -48,7 +48,6 @@ type orchestrator struct {
 //   pm (interfaces.PluginManager): The manager responsible for the plugin lifecycle.
 //   dm (interfaces.DiagnosisManager): The manager for running diagnoses.
 //   em (interfaces.ExecutionManager): The manager for executing fix plans.
-//   km (interfaces.KnowledgeManager): The manager for accessing the knowledge base.
 //
 // Returns:
 //   interfaces.Orchestrator: A new, fully initialized orchestrator.
@@ -57,7 +56,6 @@ func NewOrchestrator(
 	pm interfaces.PluginManager,
 	dm interfaces.DiagnosisManager,
 	em interfaces.ExecutionManager,
-	km interfaces.KnowledgeManager,
 ) interfaces.Orchestrator {
 	return &orchestrator{
 		cfg:              cfg,
@@ -65,7 +63,6 @@ func NewOrchestrator(
 		pluginManager:    pm,
 		diagnosisManager: dm,
 		executionManager: em,
-		knowledgeManager: km,
 	}
 }
 
@@ -166,12 +163,6 @@ func (o *orchestrator) PlanExecution(ctx context.Context, recommendations []*mod
 func (o *orchestrator) ValidateExecution(ctx context.Context, result *models.ExecutionResult) error {
 	o.log.Info("Orchestrating execution validation.")
 	return o.executionManager.ValidateExecution(ctx, result)
-}
-
-// GetDiagnosis delegates the retrieval of a diagnosis report to the diagnosis manager.
-func (o *orchestrator) GetDiagnosis(ctx context.Context, id string) (*models.DiagnosisResult, error) {
-	o.log.Infof("Retrieving diagnosis report with ID: %s", id)
-	return o.diagnosisManager.GetDiagnosis(ctx, id)
 }
 
 //Personal.AI order the ending
