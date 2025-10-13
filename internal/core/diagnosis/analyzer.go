@@ -189,12 +189,6 @@ type AIAnalyzer struct {
 }
 
 // NewAIAnalyzer creates a new, configured instance of the AIAnalyzer.
-//
-// Parameters:
-//   llmClient (llm_interfaces.LLMClient): A client for interacting with an LLM provider.
-//
-// Returns:
-//   interfaces.DiagnosisAnalyzer: A new analyzer ready to process data.
 func NewAIAnalyzer(llmClient llm_interfaces.LLMClient) interfaces.DiagnosisAnalyzer {
 	pb, err := prompt.NewBuilder(prompt.AllTemplates)
 	if err != nil {
@@ -212,8 +206,7 @@ func NewAIAnalyzer(llmClient llm_interfaces.LLMClient) interfaces.DiagnosisAnaly
 // Name returns the unique identifier for this analyzer.
 func (a *AIAnalyzer) Name() string { return "AIAnalyzer" }
 
-// AnalyzeMetrics defers to the more powerful CorrelateSystems method. The primary
-// strength of the AIAnalyzer is in correlation, not isolated data analysis.
+// AnalyzeMetrics defers to the more powerful CorrelateSystems method.
 func (a *AIAnalyzer) AnalyzeMetrics(ctx context.Context, data *models.MetricsData) ([]*models.Issue, error) {
 	correlationData := &models.SystemCorrelationData{
 		DataSources: map[string]interface{}{"metrics": data},
@@ -221,8 +214,7 @@ func (a *AIAnalyzer) AnalyzeMetrics(ctx context.Context, data *models.MetricsDat
 	return a.CorrelateSystems(ctx, correlationData)
 }
 
-// AnalyzeLogs defers to the more powerful CorrelateSystems method. The primary
-// strength of the AIAnalyzer is in correlation, not isolated data analysis.
+// AnalyzeLogs defers to the more powerful CorrelateSystems method.
 func (a *AIAnalyzer) AnalyzeLogs(ctx context.Context, data *models.LogData) ([]*models.Issue, error) {
 	correlationData := &models.SystemCorrelationData{
 		DataSources: map[string]interface{}{"logs": data},
@@ -239,35 +231,26 @@ func (a *AIAnalyzer) CorrelateSystems(ctx context.Context, data *models.SystemCo
 		return nil, nil
 	}
 
-	// 1. Serialize the collected data to JSON.
 	jsonData, err := json.MarshalIndent(data.DataSources, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize data for LLM prompt: %w", err)
 	}
 
-	// 2. Build the prompt using the prompt builder.
 	messages, err := a.promptBuilder.Build(prompt.TemplateDiagnosisID, map[string]string{"context_data": string(jsonData)}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build diagnosis prompt: %w", err)
 	}
 
 	a.log.Infof("Sending diagnosis request to LLM...")
-
-	// 3. Call the LLM client.
 	llmRequest := &llm_interfaces.LLMRequest{Messages: messages}
 	llmResponse, err := a.llmClient.SendMessage(ctx, llmRequest)
 	if err != nil {
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
-
 	a.log.Infof("Received diagnosis response from LLM.")
-	a.log.Debugf("LLM Response: %s", llmResponse.Message.Content)
 
-	// 4. Parse the structured response from the LLM.
 	var analysisResult models.AIAnalysisResult
 	if err := json.Unmarshal([]byte(llmResponse.Message.Content), &analysisResult); err != nil {
-		// This can happen if the LLM response is not valid JSON.
-		// We can add more robust parsing/fallback logic here in the future.
 		return nil, fmt.Errorf("failed to parse structured response from LLM: %w. Response: %s", err, llmResponse.Message.Content)
 	}
 

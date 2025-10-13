@@ -77,11 +77,6 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Go 1.18+
-- Git
-- `make` (for development)
-
 ### Installation
 
 #### Option 1: Go Install
@@ -100,34 +95,12 @@ brew install kubestack-ai
 
 Visit our [releases page](https://github.com/turtacn/kubestack-ai/releases) to download pre-built binaries.
 
-### Configuration
-
-KubeStack-AI is configured via a `config.yaml` file and environment variables.
-
-1.  **Initialize Configuration**: Run `ksa init` to create a default configuration file at `~/.kubestack-ai/config.yaml`.
-
-2.  **Set LLM API Key**: For AI-powered features, you must provide an API key. This is best done via an environment variable.
-
-    ```bash
-    # For OpenAI
-    export KSA_LLM_OPENAI_APIKEY="your-openai-api-key"
-
-    # For Google Gemini
-    export KSA_LLM_GEMINI_APIKEY="your-gemini-api-key"
-    ```
-
-    You can also set this in your `~/.kubestack-ai/config.yaml`:
-
-    ```yaml
-    llm:
-      provider: openai
-      openai:
-        apiKey: "your-openai-api-key"
-    ```
-
 ### Quick Start
 
 ```bash
+# Initialize KubeStack-AI
+ksa init
+
 # Diagnose all middleware in current namespace
 ksa diagnose --all
 
@@ -139,6 +112,70 @@ ksa status redis --namespace production
 
 # List available plugins
 ksa plugin list
+
+# Install a new plugin
+ksa plugin install mongodb
+```
+
+### Basic Usage Examples
+
+#### Example 1: Comprehensive System Health Check
+
+```bash
+$ ksa diagnose --middleware redis,mysql,kafka
+🔍 Analyzing Redis cluster...
+✅ Redis: Healthy (3/3 nodes up, memory usage: 45%)
+
+🔍 Analyzing MySQL primary-replica...
+⚠️  MySQL: Warning detected
+   • Replica lag: 2.3s (threshold: 1s)
+   • Slow queries: 23 in last hour
+
+🔍 Analyzing Kafka cluster...
+❌ Kafka: Critical issues found
+   • Topic 'orders': 50K messages backed up
+   • Consumer group 'payment-service': 5min lag
+
+💡 AI Recommendations:
+   1. MySQL: Consider tuning innodb_buffer_pool_size
+   2. Kafka: Scale consumer group or check processing logic
+```
+
+#### Example 2: Natural Language Troubleshooting
+
+```bash
+$ ksa ask "My application can't connect to the database"
+🤔 Analyzing connection issues...
+
+🔍 Discovered Issues:
+   • PostgreSQL max_connections (100) reached
+   • Connection pool exhaustion in app pods
+   • Network policy blocking traffic on port 5432
+
+🛠️  Suggested Actions:
+   1. Increase max_connections: `ksa exec postgres --set max_connections=200`
+   2. Scale app replicas: `ksa scale app --replicas 5`
+   3. Review network policies: `ksa network analyze postgres`
+
+Execute fixes? [y/N]:
+```
+
+#### Example 3: Plugin Management
+
+```bash
+$ ksa plugin install clickhouse
+📦 Installing ClickHouse plugin v1.2.0...
+✅ Plugin installed successfully
+
+$ ksa diagnose clickhouse --cluster analytics
+🔍 ClickHouse Cluster Analysis:
+   • Merge queue: 145 items (high)
+   • Query latency P95: 2.3s
+   • Disk usage: 78% on shard-2
+
+💡 Recommendations:
+   • Consider adding more background merge threads
+   • Archive old partitions in 'events' table
 ```
 
 ## 📖 Documentation
@@ -149,70 +186,44 @@ ksa plugin list
 * [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
 * [**API Reference**](docs/api.md) - REST API and SDK documentation
 
-## 🏗️ Architecture & Codebase
+## 🏗️ Codebase Structure
 
-KubeStack-AI is built on a modular, layered architecture designed for extensibility and maintainability. Understanding this structure is key to contributing effectively.
+A brief overview of the key directories in the KubeStack-AI repository:
 
-- **`/cmd/ksa`**: The main application entry point. This is where the Cobra CLI is initialized and the core `Orchestrator` is created and injected with its dependencies.
-
-- **`/internal`**: Contains all core application logic, following standard Go project layout. This code is not meant for external import.
-    - **`/internal/cli`**: Defines the command-line interface using Cobra. It handles command parsing, flags, and user interaction, but delegates all real work to the Orchestrator.
-    - **`/internal/core`**: The heart of the application.
-        - **`/interfaces`**: Defines the key Go interfaces (`Orchestrator`, `DiagnosisManager`, `MiddlewarePlugin`, etc.) that form the application's backbone.
-        - **`/models`**: Contains the data structures (structs) passed between components (e.g., `DiagnosisResult`, `ExecutionPlan`).
-        - **`/orchestrator`**: The central coordinator. It receives requests from the CLI and uses its managers to fulfill them.
-        - **`/diagnosis`**: The diagnosis engine. It uses analyzers (rule-based, AI-based) to inspect data and find issues.
-        - **`/execution`**: The execution engine. It takes a plan and safely executes actions to fix issues.
-    - **`/internal/plugins`**: The plugin system.
-        - **`/manager`**: Responsible for loading, registering, and managing plugin lifecycles.
-        - **`/builtin`**: Contains the source code for all standard, built-in middleware plugins (e.g., `redis`, `kafka`).
-    - **`/internal/llm`**: Abstractions for interacting with Large Language Models.
-        - **`/client`**: Contains specific clients for different providers (OpenAI, Gemini).
-        - **`/rag`**: The Retrieval-Augmented Generation (RAG) pipeline, which enriches prompts with knowledge base context.
-    - **`/internal/knowledge`**: The knowledge base system. It includes components for crawling data sources, storing them (in vector and document stores), and searching.
-    - **`/internal/common`**: Shared utilities used across the application, such as structured logging, configuration management, and custom error types.
-
-- **`/pkg`**: Shared utility packages that are safe for external use (though none are intended for it currently).
-- **`/docs`**: All project documentation, including this README and the detailed architecture diagrams.
-- **`/scripts`**: Helper scripts for development (build, test, lint).
+- **`/cmd`**: Main application entry points. The `ksa` CLI application lives here.
+- **`/internal`**: All of the core application logic. As this is an `internal` package, it is not meant to be imported by external applications.
+  - **`/cli`**: Defines the command-line interface using Cobra, including command definitions, flag parsing, and UI formatters.
+  - **`/core`**: The heart of the application. It contains the central orchestrator and the primary interfaces for diagnosis, execution, and plugins.
+  - **`/llm`**: Abstractions and clients for interacting with Large Language Models (LLMs) and the Retrieval-Augmented Generation (RAG) pipeline.
+  - **`/knowledge`**: Components for the knowledge base, including storage, crawling, and search functionalities.
+  - **`/plugins`**: The plugin management system and all built-in middleware plugins (e.g., Redis, Kafka).
+- **`/pkg`**: Shared utility packages that could theoretically be used by external applications.
+- **`/deployments`**: Kubernetes manifests, Dockerfiles, and other deployment-related artifacts.
+- **`/docs`**: Project documentation, including architecture and contribution guides.
+- **`/scripts`**: Helper scripts for development tasks like building, testing, and linting.
+- **`/web`**: Contains frontend assets for a potential web-based UI.
 
 ## 🤝 Contributing
 
 We welcome contributions from the community! KubeStack-AI is built by middleware experts for middleware experts.
 
+### How to Contribute
+
+1. **🐛 Report Issues**: Found a bug? [Open an issue](https://github.com/turtacn/kubestack-ai/issues)
+2. **💡 Feature Requests**: Have ideas? [Start a discussion](https://github.com/turtacn/kubestack-ai/discussions)
+3. **🔧 Code Contributions**: [Fork, develop, and submit PRs](docs/contributing.md)
+4. **📝 Documentation**: Help improve our docs
+5. **🧩 Plugin Development**: Build plugins for new middleware
+
 ### Development Setup
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/turtacn/kubestack-ai.git
-    cd kubestack-ai
-    ```
-
-2.  **Install dependencies:**
-    This command will download the necessary Go modules and development tools.
-    ```bash
-    make dev-setup
-    ```
-
-3.  **Build the binary:**
-    ```bash
-    make build
-    ```
-    The `ksa` executable will be placed in the `/bin` directory.
-
-4.  **Run tests and linters:**
-    Before submitting a change, ensure all tests and quality checks pass.
-    ```bash
-    make test
-    make lint
-    ```
-
-5.  **Run your local build:**
-    To test your changes, run the binary from the `/bin` directory.
-    ```bash
-    # Make sure you have configured your API keys as mentioned in the Configuration section
-    ./bin/ksa --config /path/to/your/config.yaml ask "Why is my redis slow?"
-    ```
+```bash
+git clone https://github.com/turtacn/kubestack-ai.git
+cd kubestack-ai
+make dev-setup
+make test
+make build
+```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 

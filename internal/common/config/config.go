@@ -159,12 +159,18 @@ func LoadConfig(configPath string) (*Config, error) {
 // GetConfig returns the singleton instance of the loaded application configuration.
 // It is crucial to call LoadConfig before calling this function, otherwise it may
 // return nil.
+//
+// Returns:
+//   *Config: A pointer to the currently active application configuration.
 func GetConfig() *Config {
 	return appConfig
 }
 
 // Validate checks if the loaded configuration is valid by enforcing certain rules,
 // such as ensuring that API keys are present if a specific provider is selected.
+//
+// Returns:
+//   error: An error of type *errors.ConfigError if validation fails, otherwise nil.
 func (c *Config) Validate() error {
 	if c.LLM.Provider == "openai" && c.LLM.OpenAI.APIKey == "" {
 		return errors.NewConfigError(errors.ConfigValidationFailedCode, "OpenAI API key is missing", "Set the KSA_LLM_OPENAI_APIKEY environment variable or llm.openai.apiKey in the config file.")
@@ -176,8 +182,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// setDefaults defines the default values for all configuration keys. This ensures
-// the application can run with a minimal or empty configuration file.
+// setDefaults defines the default values for configuration keys.
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("logger.level", "info")
 	v.SetDefault("logger.format", "text")

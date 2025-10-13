@@ -65,8 +65,6 @@ type Issue struct {
 }
 
 // Recommendation provides a suggested action or set of actions to resolve a specific issue.
-// It is the high-level "what to do" that is presented to the user. A fixable
-// recommendation is later translated into a more concrete FixAction or ExecutionStep.
 type Recommendation struct {
 	// ID is the unique identifier for this recommendation.
 	ID string `json:"id" yaml:"id"`

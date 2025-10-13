@@ -29,8 +29,7 @@ import (
 )
 
 // chromaVectorStore is a production-grade implementation of VectorStore that uses
-// ChromaDB as its backend. It interacts directly with the ChromaDB REST API,
-// avoiding the unstable client library.
+// ChromaDB as its backend. It interacts directly with the ChromaDB REST API.
 type chromaVectorStore struct {
 	log            logger.Logger
 	httpClient     *http.Client

@@ -166,34 +166,16 @@ func (l *logrusLogger) WithFields(fields map[string]interface{}) Logger {
 	return &logrusLogger{entry: l.entry.WithFields(fields)}
 }
 
-// Debug logs a message at the debug level.
 func (l *logrusLogger) Debug(args ...interface{}) { l.entry.Debug(args...) }
-
-// Info logs a message at the info level.
-func (l *logrusLogger) Info(args ...interface{}) { l.entry.Info(args...) }
-
-// Warn logs a message at the warning level.
-func (l *logrusLogger) Warn(args ...interface{}) { l.entry.Warn(args...) }
-
-// Error logs a message at the error level.
+func (l *logrusLogger) Info(args ...interface{})  { l.entry.Info(args...) }
+func (l *logrusLogger) Warn(args ...interface{})  { l.entry.Warn(args...) }
 func (l *logrusLogger) Error(args ...interface{}) { l.entry.Error(args...) }
-
-// Fatal logs a message at the fatal level and then calls os.Exit(1).
 func (l *logrusLogger) Fatal(args ...interface{}) { l.entry.Fatal(args...) }
 
-// Debugf logs a formatted message at the debug level.
 func (l *logrusLogger) Debugf(format string, args ...interface{}) { l.entry.Debugf(format, args...) }
-
-// Infof logs a formatted message at the info level.
-func (l *logrusLogger) Infof(format string, args ...interface{}) { l.entry.Infof(format, args...) }
-
-// Warnf logs a formatted message at the warning level.
-func (l *logrusLogger) Warnf(format string, args ...interface{}) { l.entry.Warnf(format, args...) }
-
-// Errorf logs a formatted message at the error level.
+func (l *logrusLogger) Infof(format string, args ...interface{})  { l.entry.Infof(format, args...) }
+func (l *logrusLogger) Warnf(format string, args ...interface{})  { l.entry.Warnf(format, args...) }
 func (l *logrusLogger) Errorf(format string, args ...interface{}) { l.entry.Errorf(format, args...) }
-
-// Fatalf logs a formatted message at the fatal level and then calls os.Exit(1).
 func (l *logrusLogger) Fatalf(format string, args ...interface{}) { l.entry.Fatalf(format, args...) }
 
 //Personal.AI order the ending

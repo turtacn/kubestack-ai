@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package commands contains all the CLI commands for the application.
 package commands
 
 import (
@@ -32,157 +31,111 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	// cfgFile holds the path to the configuration file provided via a command-line flag.
-	cfgFile string
+var cfgFile string
 
-	// rootCmd represents the base command when called without any subcommands.
-	// It is the root of the command tree and is responsible for global setup,
-	// such as initializing configuration and logging.
-	rootCmd = &cobra.Command{
+// rootCmd encapsulates the main command and its dependencies.
+type rootCmd struct {
+	cmd           *cobra.Command
+	cfg           *config.Config
+	log           logger.Logger
+	orchestrator  interfaces.Orchestrator
+}
+
+// NewRootCmd creates a new instance of the application's root command.
+func NewRootCmd() *rootCmd {
+	root := &rootCmd{}
+	root.cmd = &cobra.Command{
 		Use:   "ksa",
 		Short: "KubeStack-AI is an intelligent SRE assistant for middleware.",
 		Long: `KubeStack-AI is a command-line tool that uses AI to help you diagnose,
 analyze, and fix issues with your middleware infrastructure, whether it is
 running on Kubernetes or bare metal servers.`,
-		// PersistentPreRunE is a Cobra hook that runs before any subcommand's Run function.
-		// It's the perfect place for global initialization.
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// 1. Load configuration from file and environment variables.
-			cfg, err := config.LoadConfig(cfgFile)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// 2. Initialize the global logger with settings from the config file,
-			//    which may have been overridden by command-line flags bound by Viper.
-			logCfg := cfg.Logger
-			logCfg.Level = viper.GetString("logger.level") // Get the final value after flag parsing.
-			logger.InitGlobalLogger(&logCfg)
-
-			log := logger.GetLogger()
-			log.Debugf("Logger initialized with level: %s", logCfg.Level)
-
-			// 3. Validate the final configuration.
-			if err := cfg.Validate(); err != nil {
-				return fmt.Errorf("configuration validation failed: %w", err)
-			}
-
-			return nil
+			return root.initConfigAndOrchestrator()
 		},
 	}
-)
 
-// Execute is the main entry point for the command-line interface.
-// It executes the root command, which in turn handles all subcommand logic.
-// This function is called directly by `main.main()` and is the starting point
-// for the entire application's command-line functionality. If the root command
-// returns an error, it prints the error and exits with a non-zero status code.
+	root.cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kubestack-ai.yaml)")
+	root.cmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error, fatal)")
+	root.cmd.PersistentFlags().StringP("output", "o", "text", "Output format (text, json, yaml)")
+	viper.BindPFlag("logger.level", root.cmd.PersistentFlags().Lookup("log-level"))
+	viper.BindPFlag("output.format", root.cmd.PersistentFlags().Lookup("output"))
+
+	return root
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		// Cobra prints the error, so we just need to exit with a non-zero code.
+	root := NewRootCmd()
+	if err := root.cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-// init is a special Go function that is executed when the package is initialized.
-// It sets up global flags and ensures that the dependency injection for the
-// orchestrator is configured *after* Cobra has parsed the flags and loaded the config.
-func init() {
-	// The `cobra.OnInitialize` function allows us to defer the complex setup
-	// until after the config file path and other flags have been parsed.
-	cobra.OnInitialize(initConfigAndOrchestrator)
-
-	// Add global flags that will apply to all subcommands.
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is /etc/kubestack-ai/config.yaml or $HOME/.ksa.yaml)")
-	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error, fatal)")
-	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format (text, json, yaml)")
-
-	// Bind flags to Viper to allow them to override config file settings.
-	viper.BindPFlag("logger.level", rootCmd.PersistentFlags().Lookup("log-level"))
-	viper.BindPFlag("output.format", rootCmd.PersistentFlags().Lookup("output"))
-
-	// Add a built-in 'version' command.
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print the version number of KubeStack-AI",
-		Run: func(cmd *cobra.Command, args []string) {
-			// In a real application, version info would come from the version package and be set at build time.
-			fmt.Println("KubeStack-AI v0.1.0")
-		},
-	})
-}
-
-// initConfigAndOrchestrator is the main dependency injection container for the application.
-// It is responsible for loading the configuration, initializing all core services
-// (logger, LLM client, stores, managers), wiring them together, and attaching the
-// fully configured commands to the root command.
-func initConfigAndOrchestrator() {
-	// 1. Load configuration. This is called first to ensure all components get the correct config.
+func (r *rootCmd) initConfigAndOrchestrator() error {
+	// 1. Load configuration
 	cfg, err := config.LoadConfig(cfgFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
+	r.cfg = cfg
 
-	// 2. Initialize logger.
-	logCfg := cfg.Logger
+	// 2. Initialize logger
+	logCfg := r.cfg.Logger
 	logCfg.Level = viper.GetString("logger.level")
 	logger.InitGlobalLogger(&logCfg)
-	log := logger.GetLogger()
+	r.log = logger.GetLogger()
 
-	// 3. Validate configuration.
-	if err := cfg.Validate(); err != nil {
-		log.Fatalf("Configuration validation failed: %v", err)
+	// 3. Validate configuration
+	if err := r.cfg.Validate(); err != nil {
+		return fmt.Errorf("configuration validation failed: %w", err)
 	}
-	log.Debug("Configuration loaded and validated successfully.")
+	r.log.Debug("Configuration loaded and validated successfully.")
 
-	// 4. Initialize Core Components (Dependency Injection).
-	// This is where we build the object graph.
-
-	// LLM Client
-	llmClient, err := client.NewClient(&cfg.LLM)
+	// 4. Initialize Core Components
+	llmClient, err := client.NewClient(&r.cfg.LLM)
 	if err != nil {
-		log.Fatalf("Failed to initialize LLM client: %v", err)
+		return fmt.Errorf("failed to initialize LLM client: %w", err)
 	}
-	log.Debugf("Initialized LLM client with provider: %s", cfg.LLM.Provider)
 
-	// Knowledge Base
-	vectorStore, err := store.NewVectorStore(&cfg.Knowledge)
+	vectorStore, err := store.NewVectorStore(&r.cfg.Knowledge)
 	if err != nil {
-		log.Fatalf("Failed to initialize vector store: %v", err)
+		return fmt.Errorf("failed to initialize vector store: %w", err)
 	}
-	log.Debugf("Initialized vector store with provider: %s", cfg.Knowledge.Provider)
-	// TODO: Initialize and use the DocumentStore and KnowledgeManager here.
-	_ = vectorStore // Temporarily use vectorStore to avoid "declared and not used"
+	_ = vectorStore // This will be used later
 
-	// Analyzers
-	ruleAnalyzer := diagnosis.NewRuleBasedAnalyzer(nil, nil) // No rules for now
+	ruleAnalyzer := diagnosis.NewRuleBasedAnalyzer(nil, nil)
 	aiAnalyzer := diagnosis.NewAIAnalyzer(llmClient)
 	analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
-	log.Debug("Initialized diagnosis analyzers.")
 
-	// Managers
-	pluginRegistry, err := manager.NewRegistry([]string{cfg.Plugins.Directory})
+	pluginRegistry, err := manager.NewRegistry([]string{r.cfg.Plugins.Directory})
 	if err != nil {
-		log.Fatalf("Failed to initialize plugin registry: %v", err)
+		return fmt.Errorf("failed to initialize plugin registry: %w", err)
 	}
+
 	pluginLoader := manager.NewLoader()
 	pluginManager := manager.NewManager(pluginRegistry, pluginLoader)
 	diagnosisManager := diagnosis.NewManager(pluginManager, analyzers)
-	executionManager := execution.NewManager(nil) // No planner for now
-	log.Debug("Initialized core managers.")
+	executionManager := execution.NewManager(nil)
 
-	// Orchestrator
-	orchestrator := orchestrator.NewOrchestrator(cfg, pluginManager, diagnosisManager, executionManager)
-	log.Debug("Orchestrator initialized.")
+	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager)
+	r.log.Debug("Orchestrator initialized successfully.")
 
-	// 5. Add Subcommands with the fully initialized orchestrator.
-	// By passing the orchestrator to the command constructors, we are injecting the
-	// application's core logic into the UI layer.
-	rootCmd.AddCommand(newDiagnoseCmd(orchestrator))
-	rootCmd.AddCommand(newAskCmd(orchestrator))
-	rootCmd.AddCommand(newFixCmd(orchestrator))
+	// 5. Add Subcommands
+	r.cmd.AddCommand(newDiagnoseCmd(r.orchestrator))
+	r.cmd.AddCommand(newAskCmd(r.orchestrator))
+	r.cmd.AddCommand(newFixCmd(r.orchestrator))
+	r.cmd.AddCommand(newVersionCmd())
+
+	return nil
 }
 
-//Personal.AI order the ending
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number of KubeStack-AI",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("KubeStack-AI v0.1.0")
+		},
+	}
+}
