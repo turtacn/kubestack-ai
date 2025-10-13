@@ -25,7 +25,10 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/orchestrator"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/client"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugins/manager"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -102,7 +105,32 @@ func (r *rootCmd) initConfigAndOrchestrator() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize vector store: %w", err)
 	}
-	_ = vectorStore // This will be used later
+
+	documentStore, err := store.NewDocumentStore(&r.cfg.Knowledge)
+	if err != nil {
+		return fmt.Errorf("failed to initialize document store: %w", err)
+	}
+
+	embedder, err := rag.NewEmbedder(llmClient, "")
+	if err != nil {
+		return fmt.Errorf("failed to initialize embedder: %w", err)
+	}
+
+	retriever, err := rag.NewRetriever(embedder, vectorStore)
+	if err != nil {
+		return fmt.Errorf("failed to initialize retriever: %w", err)
+	}
+
+	hybridSearcher, err := search.NewHybridSearcher(documentStore, retriever)
+	if err != nil {
+		return fmt.Errorf("failed to initialize hybrid searcher: %w", err)
+	}
+
+	knowledgeManager, err := knowledge.NewManager(hybridSearcher)
+	if err != nil {
+		return fmt.Errorf("failed to initialize knowledge manager: %w", err)
+	}
+	r.log.Debug("Knowledge base initialized successfully.")
 
 	ruleAnalyzer := diagnosis.NewRuleBasedAnalyzer(nil, nil)
 	aiAnalyzer := diagnosis.NewAIAnalyzer(llmClient)
@@ -118,7 +146,7 @@ func (r *rootCmd) initConfigAndOrchestrator() error {
 	diagnosisManager := diagnosis.NewManager(pluginManager, analyzers)
 	executionManager := execution.NewManager(nil)
 
-	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager)
+	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager, knowledgeManager, llmClient)
 	r.log.Debug("Orchestrator initialized successfully.")
 
 	// 5. Add Subcommands

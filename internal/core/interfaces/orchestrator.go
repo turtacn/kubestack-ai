@@ -41,8 +41,11 @@ type RequestContext struct {
 // OrchestratorConfig holds the configuration needed by the core orchestrator to
 // initialize its sub-components, such as the diagnosis and execution managers.
 type OrchestratorConfig struct {
-	// This struct can hold configurations for sub-managers like PluginManager,
-	// DiagnosisManager, etc., if they need specific settings not available globally.
+	DiagnosisManager DiagnosisManager
+	ExecutionManager ExecutionManager
+	PluginManager    PluginManager
+	LLMClient        llm_interfaces.LLMClient
+	KnowledgeManager KnowledgeManager
 }
 
 // Orchestrator defines the contract for the central nervous system of KubeStack-AI.

@@ -45,10 +45,22 @@ type Config struct {
 
 // KnowledgeStoreConfig holds configurations for the knowledge base.
 type KnowledgeStoreConfig struct {
-	// Provider specifies the active vector store provider (e.g., "in-memory", "chroma").
-	Provider string `mapstructure:"provider"`
+	// VectorProvider specifies the active vector store provider (e.g., "in-memory", "chroma").
+	VectorProvider string `mapstructure:"vectorProvider"`
+	// DocumentProvider specifies the active document store provider (e.g., "in-memory", "elasticsearch").
+	DocumentProvider string `mapstructure:"documentProvider"`
 	// Chroma contains the specific configuration for the ChromaDB provider.
 	Chroma ChromaConfig `mapstructure:"chroma"`
+	// Elasticsearch contains the specific configuration for the Elasticsearch provider.
+	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
+}
+
+// ElasticsearchConfig holds Elasticsearch-specific configurations.
+type ElasticsearchConfig struct {
+	// Addresses is a list of Elasticsearch node URLs.
+	Addresses []string `mapstructure:"addresses"`
+	// IndexName is the name of the index to use for storing documents.
+	IndexName string `mapstructure:"indexName"`
 }
 
 // ChromaConfig holds ChromaDB-specific configurations.
@@ -202,10 +214,13 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("plugins.directory", constants.DefaultPluginDir)
 
-	v.SetDefault("knowledge.provider", "in-memory")
+	v.SetDefault("knowledge.vectorProvider", "in-memory")
+	v.SetDefault("knowledge.documentProvider", "in-memory")
 	v.SetDefault("knowledge.chroma.url", "http://localhost:8000")
 	v.SetDefault("knowledge.chroma.collectionName", "kubestack-ai-kb")
 	v.SetDefault("knowledge.chroma.namespace", "default")
+	v.SetDefault("knowledge.elasticsearch.addresses", []string{"http://localhost:9200"})
+	v.SetDefault("knowledge.elasticsearch.indexName", "kubestack-ai-kb")
 }
 
 //Personal.AI order the ending

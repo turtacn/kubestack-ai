@@ -68,13 +68,13 @@ type inMemoryVectorStore struct {
 // implementation based on the provided configuration. This allows the application
 // to easily switch between different vector database backends.
 func NewVectorStore(cfg *config.KnowledgeStoreConfig) (VectorStore, error) {
-	switch cfg.Provider {
+	switch cfg.VectorProvider {
 	case "chroma":
 		return NewChromaVectorStore(&cfg.Chroma)
 	case "in-memory":
 		return newInMemoryVectorStore()
 	default:
-		return nil, fmt.Errorf("unsupported vector store provider: %s", cfg.Provider)
+		return nil, fmt.Errorf("unsupported vector store provider: %s", cfg.VectorProvider)
 	}
 }
 
