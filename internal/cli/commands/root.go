@@ -146,13 +146,14 @@ func (r *rootCmd) initConfigAndOrchestrator() error {
 	diagnosisManager := diagnosis.NewManager(pluginManager, analyzers, r.cfg.Report.Directory)
 	executionManager := execution.NewManager(nil)
 
-	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager, knowledgeManager, llmClient)
+	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager, knowledgeManager, llmClient, embedder, documentStore, vectorStore)
 	r.log.Debug("Orchestrator initialized successfully.")
 
 	// 5. Add Subcommands
 	r.cmd.AddCommand(newDiagnoseCmd(r.orchestrator))
 	r.cmd.AddCommand(newAskCmd(r.orchestrator))
 	r.cmd.AddCommand(newFixCmd(r.orchestrator, r.cfg.Report.Directory))
+	r.cmd.AddCommand(newKbCmd(r.orchestrator))
 	r.cmd.AddCommand(newVersionCmd())
 
 	return nil

@@ -20,7 +20,9 @@ import (
 	"context"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 	llm_interfaces "github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
 // RequestContext encapsulates all relevant information for a single user request,
@@ -79,6 +81,12 @@ type Orchestrator interface {
 
 	// ValidateExecution checks if an execution was successful and the original issue is resolved.
 	ValidateExecution(ctx context.Context, result *models.ExecutionResult) error
+	// GetEmbedder returns the application's configured embedder instance.
+	GetEmbedder() (rag.Embedder, error)
+	// GetDocumentStore returns the application's configured document store instance.
+	GetDocumentStore() (store.DocumentStore, error)
+	// GetVectorStore returns the application's configured vector store instance.
+	GetVectorStore() (store.VectorStore, error)
 }
 
 //Personal.AI order the ending

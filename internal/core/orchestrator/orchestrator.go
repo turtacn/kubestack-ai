@@ -25,7 +25,9 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/constants"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 	llm_interfaces "github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
 // orchestrator is the concrete implementation of the interfaces.Orchestrator interface.
@@ -38,6 +40,9 @@ type orchestrator struct {
 	executionManager interfaces.ExecutionManager
 	knowledgeManager interfaces.KnowledgeManager
 	llmClient        llm_interfaces.LLMClient
+	embedder         rag.Embedder
+	documentStore    store.DocumentStore
+	vectorStore      store.VectorStore
 }
 
 // NewOrchestrator creates a new instance of the core orchestrator. It acts as a
@@ -50,6 +55,9 @@ func NewOrchestrator(
 	em interfaces.ExecutionManager,
 	km interfaces.KnowledgeManager,
 	llmClient llm_interfaces.LLMClient,
+	embedder rag.Embedder,
+	docStore store.DocumentStore,
+	vecStore store.VectorStore,
 ) interfaces.Orchestrator {
 	return &orchestrator{
 		cfg:              cfg,
@@ -59,7 +67,34 @@ func NewOrchestrator(
 		executionManager: em,
 		knowledgeManager: km,
 		llmClient:        llmClient,
+		embedder:         embedder,
+		documentStore:    docStore,
+		vectorStore:      vecStore,
 	}
+}
+
+// GetDocumentStore returns the application's configured document store instance.
+func (o *orchestrator) GetDocumentStore() (store.DocumentStore, error) {
+	if o.documentStore == nil {
+		return nil, fmt.Errorf("document store not initialized")
+	}
+	return o.documentStore, nil
+}
+
+// GetVectorStore returns the application's configured vector store instance.
+func (o *orchestrator) GetVectorStore() (store.VectorStore, error) {
+	if o.vectorStore == nil {
+		return nil, fmt.Errorf("vector store not initialized")
+	}
+	return o.vectorStore, nil
+}
+
+// GetEmbedder returns the application's configured embedder instance.
+func (o *orchestrator) GetEmbedder() (rag.Embedder, error) {
+	if o.embedder == nil {
+		return nil, fmt.Errorf("embedder not initialized")
+	}
+	return o.embedder, nil
 }
 
 // ProcessRequest serves as the main entry point for requests originating from a UI
