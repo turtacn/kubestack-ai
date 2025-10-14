@@ -41,6 +41,8 @@ type Config struct {
 	Plugins PluginConfig `mapstructure:"plugins"`
 	// Knowledge holds configurations for the knowledge base, including vector and document stores.
 	Knowledge KnowledgeStoreConfig `mapstructure:"knowledge"`
+	// Report holds configurations for storing diagnosis reports.
+	Report ReportConfig `mapstructure:"report"`
 }
 
 // KnowledgeStoreConfig holds configurations for the knowledge base.
@@ -53,6 +55,12 @@ type KnowledgeStoreConfig struct {
 	Chroma ChromaConfig `mapstructure:"chroma"`
 	// Elasticsearch contains the specific configuration for the Elasticsearch provider.
 	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
+}
+
+// ReportConfig holds configurations for storing diagnosis reports.
+type ReportConfig struct {
+	// Directory is the path where diagnosis reports are stored.
+	Directory string `mapstructure:"directory"`
 }
 
 // ElasticsearchConfig holds Elasticsearch-specific configurations.
@@ -221,6 +229,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("knowledge.chroma.namespace", "default")
 	v.SetDefault("knowledge.elasticsearch.addresses", []string{"http://localhost:9200"})
 	v.SetDefault("knowledge.elasticsearch.indexName", "kubestack-ai-kb")
+
+	v.SetDefault("report.directory", constants.DefaultDataDir+"/reports")
 }
 
 //Personal.AI order the ending

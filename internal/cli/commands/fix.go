@@ -15,7 +15,10 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
@@ -24,7 +27,7 @@ import (
 
 // newFixCmd creates and configures the `fix` command.
 // This command is designed to apply automated fixes based on the results of a previous diagnosis.
-func newFixCmd(orchestrator interfaces.Orchestrator) *cobra.Command {
+func newFixCmd(orchestrator interfaces.Orchestrator, reportDir string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fix [diagnosis-id]",
 		Short: "Apply automated fixes for a given diagnosis",
@@ -40,12 +43,32 @@ This command follows a safe, multi-step process:
 			diagnosisID := args[0]
 
 			// 1. Fetch recommendations from the diagnosis report.
-			// This requires a persistence layer for diagnosis results, which is not yet implemented.
-			// We will use placeholder recommendations to demonstrate the flow.
-			fmt.Printf("Fetching recommendations for diagnosis ID: %s (using placeholder data)\n", diagnosisID)
-			recommendations := []*models.Recommendation{
-				{ID: "rec-001", Description: "Increase the max_connections parameter.", Command: "mysql -e 'SET GLOBAL max_connections = 500;'", CanAutoFix: true},
-				{ID: "rec-002", Description: "Restart the database server to apply changes.", Command: "systemctl restart mysqld", CanAutoFix: true},
+			reportPath := filepath.Join(reportDir, fmt.Sprintf("%s.json", diagnosisID))
+			fmt.Printf("Loading diagnosis report from: %s\n", reportPath)
+
+			data, err := ioutil.ReadFile(reportPath)
+			if err != nil {
+				return fmt.Errorf("failed to read diagnosis report: %w", err)
+			}
+
+			var report models.DiagnosisResult
+			if err := json.Unmarshal(data, &report); err != nil {
+				return fmt.Errorf("failed to parse diagnosis report: %w", err)
+			}
+
+			if len(report.Issues) == 0 {
+				fmt.Println("No issues found in the report. Nothing to fix.")
+				return nil
+			}
+
+			var recommendations []*models.Recommendation
+			for _, issue := range report.Issues {
+				recommendations = append(recommendations, issue.Recommendations...)
+			}
+
+			if len(recommendations) == 0 {
+				fmt.Println("No recommendations found in the report. Nothing to fix.")
+				return nil
 			}
 
 			// 2. Generate the execution plan.

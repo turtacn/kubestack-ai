@@ -143,7 +143,7 @@ func (r *rootCmd) initConfigAndOrchestrator() error {
 
 	pluginLoader := manager.NewLoader()
 	pluginManager := manager.NewManager(pluginRegistry, pluginLoader)
-	diagnosisManager := diagnosis.NewManager(pluginManager, analyzers)
+	diagnosisManager := diagnosis.NewManager(pluginManager, analyzers, r.cfg.Report.Directory)
 	executionManager := execution.NewManager(nil)
 
 	r.orchestrator = orchestrator.NewOrchestrator(r.cfg, pluginManager, diagnosisManager, executionManager, knowledgeManager, llmClient)
@@ -152,7 +152,7 @@ func (r *rootCmd) initConfigAndOrchestrator() error {
 	// 5. Add Subcommands
 	r.cmd.AddCommand(newDiagnoseCmd(r.orchestrator))
 	r.cmd.AddCommand(newAskCmd(r.orchestrator))
-	r.cmd.AddCommand(newFixCmd(r.orchestrator))
+	r.cmd.AddCommand(newFixCmd(r.orchestrator, r.cfg.Report.Directory))
 	r.cmd.AddCommand(newVersionCmd())
 
 	return nil
