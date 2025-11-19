@@ -74,6 +74,8 @@ type Recommendation struct {
 	Command string `json:"command,omitempty" yaml:"command,omitempty"`
 	// CanAutoFix indicates whether this recommendation can be safely and automatically applied by the execution engine.
 	CanAutoFix bool `json:"canAutoFix" yaml:"canAutoFix"`
+	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
+	Category string `json:"category,omitempty" yaml:"category,omitempty"`
 }
 
 // MetricsData is a generic container for collected performance metrics. It uses a
@@ -158,6 +160,8 @@ type FixAction struct {
 	Command string `json:"command" yaml:"command"`
 	// Parameters provides any additional parameters needed to execute the fix.
 	Parameters map[string]string `json:"parameters" yaml:"parameters"`
+	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
+	Category string `json:"category,omitempty" yaml:"category,omitempty"`
 }
 
 // FixResult represents the outcome of a single executed fix action.

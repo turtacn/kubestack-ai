@@ -17,7 +17,11 @@ package diagnosis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -34,25 +38,23 @@ type manager struct {
 	pluginManager interfaces.PluginManager
 	analyzers     []interfaces.DiagnosisAnalyzer
 	cache         *diagnosisCache
-	// dbClient would be here for persistence.
+	reportDir     string
 }
 
 // NewManager creates a new instance of the diagnosis manager, which orchestrates
 // the entire diagnosis process. It takes a plugin manager to load the appropriate
 // middleware-specific logic and a slice of analyzers to process the collected data.
-//
-// Parameters:
-//   pm (interfaces.PluginManager): The plugin manager used to load diagnosis plugins.
-//   analyzers ([]interfaces.DiagnosisAnalyzer): A slice of analyzers to be run on the collected data.
-//
-// Returns:
-//   interfaces.DiagnosisManager: A new, configured diagnosis manager.
-func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer) interfaces.DiagnosisManager {
+func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer, reportDir string) interfaces.DiagnosisManager {
+	// Ensure the report directory exists
+	if _, err := os.Stat(reportDir); os.IsNotExist(err) {
+		os.MkdirAll(reportDir, 0755)
+	}
 	return &manager{
 		log:           logger.NewLogger("diagnosis-manager"),
 		pluginManager: pm,
 		analyzers:     analyzers,
 		cache:         newDiagnosisCache(10 * time.Minute), // Default 10 min cache TTL
+		reportDir:     reportDir,
 	}
 }
 
@@ -109,9 +111,30 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	}
 
 	m.cache.Set(req, result)
-	// m.persistResult(ctx, result) // Placeholder for DB persistence and history
-	m.log.Infof("Diagnosis completed for %s. Found %d issues.", req.TargetMiddleware, len(issues))
+	if err := m.persistResult(ctx, result); err != nil {
+		m.log.Warnf("Failed to persist diagnosis result: %v", err)
+		// We don't return the error here, as failing to save the report
+		// should not fail the entire diagnosis operation.
+	}
+	m.log.Infof("Diagnosis completed for %s. Found %d issues. Report ID: %s", req.TargetMiddleware, len(issues), result.ID)
 	return result, nil
+}
+
+// persistResult saves a diagnosis result to a JSON file in the configured report directory.
+func (m *manager) persistResult(ctx context.Context, result *models.DiagnosisResult) error {
+	filePath := filepath.Join(m.reportDir, fmt.Sprintf("%s.json", result.ID))
+	m.log.Debugf("Persisting diagnosis report to %s", filePath)
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal diagnosis result: %w", err)
+	}
+
+	if err := ioutil.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write diagnosis report to file: %w", err)
+	}
+
+	return nil
 }
 
 func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewarePlugin) (*models.CollectedData, error) {

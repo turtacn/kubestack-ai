@@ -157,7 +157,7 @@ $ ksa ask "My application can't connect to the database"
    2. Scale app replicas: `ksa scale app --replicas 5`
    3. Review network policies: `ksa network analyze postgres`
 
-Execute fixes? [y/N]: 
+Execute fixes? [y/N]:
 ```
 
 #### Example 3: Plugin Management

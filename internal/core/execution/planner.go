@@ -73,20 +73,23 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 				ID:          rec.ID,
 				Description: rec.Description,
 				Command:     rec.Command,
+				Category:    rec.Category,
 			},
 			Status: "Pending",
 		}
 		steps = append(steps, step)
 	}
 
-	// Placeholder for dependency analysis. A real implementation would analyze the steps
-	// to build a dependency graph and populate the `DependsOn` field of each step.
-	// For example, a step that restarts a service should depend on a step that applies a config change.
+	// Build a dependency graph and sort the steps topologically.
+	sortedSteps, err := p.buildDependencyGraphAndSort(steps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sort execution steps by dependency: %w", err)
+	}
 
 	plan := &models.ExecutionPlan{
 		ID:       uuid.New().String(),
-		Strategy: models.SerialExecution, // Default to the safest strategy.
-		Steps:    steps,
+		Strategy: models.SerialExecution, // Serial execution is safest for dependent steps.
+		Steps:    sortedSteps,
 	}
 
 	// After generating the basic plan, analyze its risk.
@@ -99,51 +102,54 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 	return plan, nil
 }
 
+// RiskRule defines a pattern and associated risk level for classifying commands.
+type RiskRule struct {
+	Pattern     string
+	Level       string
+	Description string
+}
+
+var riskRules = []RiskRule{
+	{Pattern: "rm -rf", Level: "Critical", Description: "Potential for irreversible, widespread data loss."},
+	{Pattern: "dd ", Level: "Critical", Description: "Potential for raw disk writes, which can cause catastrophic data loss."},
+	{Pattern: "mkfs", Level: "Critical", Description: "Formats a filesystem, which will destroy all data on the target partition."},
+	{Pattern: "format", Level: "Critical", Description: "Formats a disk, destroying all data."},
+	{Pattern: "reboot", Level: "High", Description: "Will cause a service outage by rebooting the machine."},
+	{Pattern: "shutdown", Level: "High", Description: "Will cause a service outage by shutting down the machine."},
+	{Pattern: "kill -9", Level: "High", Description: "Forcibly terminates a process, which can lead to data corruption."},
+	{Pattern: "drop database", Level: "High", Description: "Deletes an entire database, leading to major data loss."},
+	{Pattern: "delete from", Level: "Medium", Description: "Deletes data from a table. If no WHERE clause is present, this could be high risk."},
+	{Pattern: "systemctl restart", Level: "Medium", Description: "Restarts a service, which will cause a brief service interruption."},
+	{Pattern: "kubectl delete", Level: "Medium", Description: "Deletes a Kubernetes resource, which could impact service availability."},
+	{Pattern: "kill", Level: "Medium", Description: "Terminates a process, which could cause a service interruption."},
+}
+
 // AnalyzeRisk assesses the potential risks of an execution plan by inspecting the
-// commands in each step. It uses a simple, keyword-based approach to classify
-// commands as low, medium, or high risk. This is a critical safety feature to
-// inform the user before they approve a plan.
-//
-// Parameters:
-//   _ (context.Context): The context for the operation (currently unused).
-//   plan (*models.ExecutionPlan): The plan to be analyzed.
-//
-// Returns:
-//   *models.RiskAssessment: A struct containing the assessed risk level and a description.
-//   error: An error if the analysis fails (nil in this implementation).
+// commands in each step against a predefined set of risk rules.
 func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
 	p.log.Info("Analyzing risk for generated execution plan.")
 
-	// This is a very basic risk analysis. A real-world system would have a more sophisticated engine,
-	// possibly checking against a database of risky operations or using policies.
-	var highRiskCommands = []string{"rm -rf", "kill -9", "reboot", "format", "mkfs"}
-	var mediumRiskCommands = []string{"rm ", "kill ", "systemctl restart", "kubectl delete"}
-
-	assessment := &models.RiskAssessment{
+	highestRisk := &models.RiskAssessment{
 		Level:       "Low",
 		Description: "No significant risks detected.",
 	}
 
+	riskLevels := map[string]int{"Low": 0, "Medium": 1, "High": 2, "Critical": 3}
+
 	for _, step := range plan.Steps {
 		cmd := strings.ToLower(step.Action.Command)
-		for _, riskyCmd := range highRiskCommands {
-			if strings.Contains(cmd, riskyCmd) {
-				assessment.Level = "High"
-				assessment.Description = "Plan contains high-risk operations (e.g., data deletion, system reboot)."
-				p.log.Warnf("High-risk command '%s' detected in step '%s'", riskyCmd, step.Name)
-				return assessment, nil // Return on first high-risk finding
-			}
-		}
-		for _, riskyCmd := range mediumRiskCommands {
-			if strings.Contains(cmd, riskyCmd) && assessment.Level == "Low" {
-				assessment.Level = "Medium"
-				assessment.Description = "Plan contains medium-risk operations (e.g., service restarts, resource deletion)."
-				p.log.Warnf("Medium-risk command '%s' detected in step '%s'", riskyCmd, step.Name)
+		for _, rule := range riskRules {
+			if strings.Contains(cmd, rule.Pattern) {
+				if riskLevels[rule.Level] > riskLevels[highestRisk.Level] {
+					highestRisk.Level = rule.Level
+					highestRisk.Description = rule.Description
+					p.log.Warnf("Risk rule triggered. Level: %s, Pattern: '%s', Step: '%s'", rule.Level, rule.Pattern, step.Name)
+				}
 			}
 		}
 	}
 
-	return assessment, nil
+	return highestRisk, nil
 }
 
 // OptimizeSequence is responsible for reordering the steps in a plan to ensure
@@ -151,22 +157,86 @@ func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*m
 // NOTE: This is a placeholder implementation. A complete implementation would
 // perform a topological sort on the dependency graph of the steps to guarantee
 // correct execution order (e.g., apply a config change before restarting a service).
-//
-// Parameters:
-//   _ (context.Context): The context for the operation (currently unused).
-//   plan (*models.ExecutionPlan): The plan to be optimized.
-//
-// Returns:
-//   *models.ExecutionPlan: The optimized plan (or the original plan in this placeholder).
-//   error: An error if optimization fails (nil in this implementation).
 func (p *planner) OptimizeSequence(_ context.Context, plan *models.ExecutionPlan) (*models.ExecutionPlan, error) {
 	p.log.Info("Optimizing execution sequence.")
-	// This is a placeholder. A real implementation would perform a topological sort
-	// on the dependency graph of the steps to ensure correct execution order.
-	// It could also reorder independent steps to, for example, perform read-only
-	// operations first, followed by config changes, and finally service restarts.
-	p.log.Info("Sequence optimization is not yet implemented; returning original plan.")
+	sortedSteps, err := p.buildDependencyGraphAndSort(plan.Steps)
+	if err != nil {
+		return nil, err
+	}
+	plan.Steps = sortedSteps
 	return plan, nil
+}
+
+// buildDependencyGraphAndSort analyzes the steps, builds a dependency graph based on categories,
+// and returns a new list of steps sorted topologically.
+func (p *planner) buildDependencyGraphAndSort(steps []*models.ExecutionStep) ([]*models.ExecutionStep, error) {
+	// Simple dependency rule: "Restart" actions depend on "ConfigChange" actions.
+	// This can be expanded with more sophisticated rules.
+	categoryMap := make(map[string][]*models.ExecutionStep)
+	for _, step := range steps {
+		category := step.Action.Category
+		categoryMap[category] = append(categoryMap[category], step)
+	}
+
+	configChangeSteps, hasConfigChanges := categoryMap["ConfigChange"]
+	restartSteps, hasRestarts := categoryMap["Restart"]
+
+	if hasConfigChanges && hasRestarts {
+		p.log.Debugf("Found %d config change steps and %d restart steps. Adding dependencies.", len(configChangeSteps), len(restartSteps))
+		for _, restartStep := range restartSteps {
+			for _, configStep := range configChangeSteps {
+				restartStep.DependsOn = append(restartStep.DependsOn, configStep.ID)
+			}
+		}
+	}
+
+	// Now perform a topological sort (Kahn's algorithm)
+	graph := make(map[string][]string)
+	inDegree := make(map[string]int)
+	for _, step := range steps {
+		graph[step.ID] = []string{}
+		inDegree[step.ID] = 0
+	}
+
+	for _, step := range steps {
+		for _, depID := range step.DependsOn {
+			graph[depID] = append(graph[depID], step.ID)
+			inDegree[step.ID]++
+		}
+	}
+
+	queue := make([]string, 0)
+	for id, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, id)
+		}
+	}
+
+	var sortedOrder []*models.ExecutionStep
+	stepMap := make(map[string]*models.ExecutionStep)
+	for _, step := range steps {
+		stepMap[step.ID] = step
+	}
+
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		sortedOrder = append(sortedOrder, stepMap[id])
+
+		for _, neighborID := range graph[id] {
+			inDegree[neighborID]--
+			if inDegree[neighborID] == 0 {
+				queue = append(queue, neighborID)
+			}
+		}
+	}
+
+	if len(sortedOrder) != len(steps) {
+		return nil, fmt.Errorf("cycle detected in execution plan dependencies, cannot sort")
+	}
+
+	p.log.Info("Successfully sorted execution steps based on dependencies.")
+	return sortedOrder, nil
 }
 
 //Personal.AI order the ending
