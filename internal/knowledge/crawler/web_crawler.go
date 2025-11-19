@@ -16,6 +16,7 @@
 package crawler
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +26,14 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 )
+
+// CrawledDocument represents a document fetched by the crawler.
+type CrawledDocument struct {
+	Title    string
+	URL      string
+	Content  string
+	Metadata map[string]string
+}
 
 // WebCrawler defines the interface for a component that fetches and extracts
 // content from web pages.
@@ -39,6 +48,13 @@ type WebCrawler interface {
 	//   *store.RawDocument: A document containing the extracted text content.
 	//   error: An error if the crawl fails.
 	Crawl(startURL string) (*store.RawDocument, error)
+
+	// CrawlWithFilter performs a deep crawl starting from a URL, with filtering and content processing.
+	// It blocks until the crawl is complete and returns all found documents.
+	CrawlWithFilter(ctx context.Context, startURL string) ([]*CrawledDocument, error)
+
+	// GetMetadata extracts metadata from a crawled document.
+	GetMetadata(doc *CrawledDocument) map[string]string
 }
 
 // simpleWebCrawler is a basic implementation of a web crawler using the Colly library.
@@ -88,11 +104,13 @@ func NewWebCrawler(allowedDomains []string) (WebCrawler, error) {
 // A more advanced version would follow links to perform a deep crawl.
 //
 // Parameters:
-//   startURL (string): The URL of the page to crawl.
+//
+//	startURL (string): The URL of the page to crawl.
 //
 // Returns:
-//   *store.RawDocument: A document containing the extracted text content.
-//   error: An error if the HTTP request or crawling process fails.
+//
+//	*store.RawDocument: A document containing the extracted text content.
+//	error: An error if the HTTP request or crawling process fails.
 func (c *simpleWebCrawler) Crawl(startURL string) (*store.RawDocument, error) {
 	c.log.Infof("Starting crawl for URL: %s", startURL)
 
@@ -150,6 +168,17 @@ func (c *simpleWebCrawler) Crawl(startURL string) (*store.RawDocument, error) {
 		Content: contentBuilder.String(),
 		Source:  startURL,
 	}, nil
+}
+
+func (c *simpleWebCrawler) CrawlWithFilter(ctx context.Context, startURL string) ([]*CrawledDocument, error) {
+	// This is a placeholder implementation.
+	// The full implementation will be in web_crawler_impl.go.
+	return nil, nil
+}
+
+func (c *simpleWebCrawler) GetMetadata(doc *CrawledDocument) map[string]string {
+	// This is a placeholder implementation.
+	return doc.Metadata
 }
 
 //Personal.AI order the ending

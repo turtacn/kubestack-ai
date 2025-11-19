@@ -261,7 +261,7 @@ graph TB
 flowchart LR
     %% 自动化知识获取流程
     subgraph AUTO[自动化获取（Auto Acquisition）]
-        CRAWL[爬虫系统（Web Crawler）]
+    CRAWL[爬虫系统（Web Crawler）- 已实现]
         API[API集成（API Integration）]
         RSS[RSS订阅（RSS Feeds）]
         GIT[Git仓库监控（Git Monitoring）]

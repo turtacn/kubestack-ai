@@ -1,0 +1,24 @@
+# TODO: 定义爬取规则
+targets:
+  - name: redis-docs
+    start_url: https://redis.io/docs/
+    allowed_domains:
+      - redis.io
+    url_patterns:
+      include:
+        - /docs/commands/.*
+        - /docs/topics/.*
+      exclude:
+        - /download
+        - /community
+    max_depth: 3
+    max_pages: 500
+
+crawler:
+  max_concurrency: 5
+  request_timeout: 30s
+  user_agent: "KubeStack-AI Crawler/1.0"
+
+quality:
+  min_score: 60
+  min_word_count: 200
