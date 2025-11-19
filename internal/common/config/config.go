@@ -86,10 +86,43 @@ type PluginConfig struct {
 }
 
 // KnowledgeBaseConfig holds configurations for the knowledge base, including the
-// vector store backend.
+// vector store backend and crawler settings.
 type KnowledgeBaseConfig struct {
 	// VectorStore defines the configuration for the vector database.
 	VectorStore VectorStoreConfig `mapstructure:"vectorStore"`
+	// Crawler holds default configurations for the web crawler.
+	Crawler CrawlerConfig `mapstructure:"crawler"`
+}
+
+// CrawlerConfig holds all crawler-related configurations.
+type CrawlerConfig struct {
+	Targets        []Target `mapstructure:"targets"`
+	MaxConcurrency int      `mapstructure:"max_concurrency"`
+	RequestTimeout string   `mapstructure:"request_timeout"`
+	UserAgent      string   `mapstructure:"user_agent"`
+	Quality        Quality  `mapstructure:"quality"`
+}
+
+// Target defines a website to be crawled.
+type Target struct {
+	Name           string      `mapstructure:"name"`
+	StartURL       string      `mapstructure:"start_url"`
+	AllowedDomains []string    `mapstructure:"allowed_domains"`
+	URLPatterns    URLPatterns `mapstructure:"url_patterns"`
+	MaxDepth       int         `mapstructure:"max_depth"`
+	MaxPages       int         `mapstructure:"max_pages"`
+}
+
+// URLPatterns defines the include and exclude patterns for URLs.
+type URLPatterns struct {
+	Include []string `mapstructure:"include"`
+	Exclude []string `mapstructure:"exclude"`
+}
+
+// Quality defines the quality filter settings.
+type Quality struct {
+	MinScore     int `mapstructure:"min_score"`
+	MinWordCount int `mapstructure:"min_word_count"`
 }
 
 // VectorStoreConfig specifies which vector store provider to use and its settings.
@@ -210,6 +243,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("knowledgeBase.vectorStore.provider", "in-memory")
 	v.SetDefault("knowledgeBase.vectorStore.chroma.url", "http://localhost:8000")
 	v.SetDefault("knowledgeBase.vectorStore.chroma.collectionName", "kubestack-ai")
-}
 
-//Personal.AI order the ending
+	v.SetDefault("knowledgeBase.crawler.max_concurrency", 5)
+	v.SetDefault("knowledgeBase.crawler.request_timeout", "30s")
+	v.SetDefault("knowledgeBase.crawler.user_agent", "KubeStack-AI Crawler/1.0")
+	v.SetDefault("knowledgeBase.crawler.quality.min_score", 60)
+	v.SetDefault("knowledgeBase.crawler.quality.min_word_count", 200)
+}
