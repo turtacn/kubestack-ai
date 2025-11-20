@@ -16,26 +16,28 @@ package store
 
 import (
 	"fmt"
+
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 )
 
-// NewVectorStoreFromConfig is a factory function that creates a VectorStore instance
-// based on the provided configuration. It acts as a selector to switch between
-// different vector store implementations like in-memory, ChromaDB, etc.
-//
-// Parameters:
-//   - cfg: The vector store configuration containing the provider and its settings.
-//
-// Returns:
-//   - VectorStore: An initialized vector store implementation.
-//   - error: An error if the provider is unknown or if initialization fails.
-func NewVectorStoreFromConfig(cfg *config.VectorStoreConfig) (VectorStore, error) {
-	switch cfg.Provider {
+// NewVectorStoreFromConfig creates a new vector store based on the provided configuration.
+func NewVectorStoreFromConfig(cfg *config.KnowledgeConfig) (VectorStore, error) {
+	switch cfg.Retrieval.Semantic.Provider {
 	case "in-memory":
 		return NewInMemoryVectorStore()
 	case "chroma":
-		return NewChromaVectorStore(cfg.Chroma.URL, cfg.Chroma.CollectionName)
+		return NewChromaVectorStore(cfg.Retrieval.Semantic.Model, "default")
 	default:
-		return nil, fmt.Errorf("unknown vector store provider: %s", cfg.Provider)
+		return nil, fmt.Errorf("unsupported vector store provider: %s", cfg.Retrieval.Semantic.Provider)
+	}
+}
+
+// NewDocumentStoreFromConfig creates a new document store based on the provided configuration.
+func NewDocumentStoreFromConfig(cfg *config.KnowledgeConfig) (DocumentStore, error) {
+	switch cfg.Retrieval.Keyword.Engine {
+	case "in-memory":
+		return newInMemoryDocumentStore()
+	default:
+		return nil, fmt.Errorf("unsupported document store provider: %s", cfg.Retrieval.Keyword.Engine)
 	}
 }

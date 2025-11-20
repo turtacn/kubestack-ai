@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 )
 
@@ -69,20 +68,6 @@ type inMemoryDocumentStore struct {
 	log       logger.Logger
 	documents map[string]*RawDocument
 	mu        sync.RWMutex
-}
-
-// NewDocumentStore is a factory function that creates and returns a DocumentStore
-// implementation based on the provided configuration. This allows the application
-// to easily switch between different document store backends.
-func NewDocumentStore(cfg *config.KnowledgeStoreConfig) (DocumentStore, error) {
-	switch cfg.DocumentProvider {
-	case "elasticsearch":
-		return NewElasticsearchDocumentStore(&cfg.Elasticsearch)
-	case "in-memory":
-		return newInMemoryDocumentStore()
-	default:
-		return nil, fmt.Errorf("unsupported document store provider: %s", cfg.DocumentProvider)
-	}
 }
 
 // newInMemoryDocumentStore creates a new, empty in-memory document store.
@@ -199,5 +184,3 @@ func (s *inMemoryDocumentStore) Search(_ context.Context, query string, tags []s
 	}
 	return results, nil
 }
-
-//Personal.AI order the ending

@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
-	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
 // Searcher defines a high-level interface for performing searches over the knowledge
@@ -36,16 +35,16 @@ type Searcher interface {
 	//   query (string): The user's search query.
 	//
 	// Returns:
-	//   []rag.Document: A slice of documents, ordered by relevance.
+	//   []Document: A slice of documents, ordered by relevance.
 	//   error: An error if the search operation fails.
-	Search(ctx context.Context, query string) ([]rag.Document, error)
+	Search(ctx context.Context, query string) ([]Document, error)
 }
 
 // semanticSearcher implements the Searcher interface. It orchestrates the process
 // of retrieving relevant documents using semantic understanding, powered by a RAG retriever.
 type semanticSearcher struct {
 	log       logger.Logger
-	retriever rag.Retriever
+	retriever Retriever
 }
 
 // NewSemanticSearcher creates a new searcher that performs semantic searches.
@@ -53,12 +52,12 @@ type semanticSearcher struct {
 // find documents based on vector similarity.
 //
 // Parameters:
-//   retriever (rag.Retriever): The retriever component that performs the vector search.
+//   retriever (Retriever): The retriever component that performs the vector search.
 //
 // Returns:
 //   Searcher: A new instance of a semantic searcher.
 //   error: An error if the provided retriever is nil.
-func NewSemanticSearcher(retriever rag.Retriever) (Searcher, error) {
+func NewSemanticSearcher(retriever Retriever) (Searcher, error) {
 	if retriever == nil {
 		return nil, fmt.Errorf("retriever cannot be nil")
 	}
@@ -78,9 +77,9 @@ func NewSemanticSearcher(retriever rag.Retriever) (Searcher, error) {
 //   query (string): The user's search query.
 //
 // Returns:
-//   []rag.Document: A slice of documents retrieved based on semantic similarity.
+//   []Document: A slice of documents retrieved based on semantic similarity.
 //   error: An error if the retrieval process fails.
-func (s *semanticSearcher) Search(ctx context.Context, query string) ([]rag.Document, error) {
+func (s *semanticSearcher) Search(ctx context.Context, query string) ([]Document, error) {
 	s.log.Infof("Performing semantic search for query: %.50s...", query)
 
 	// **Pre-retrieval Step (Placeholder): Query Transformation**
@@ -109,5 +108,3 @@ func (s *semanticSearcher) Search(ctx context.Context, query string) ([]rag.Docu
 
 	return finalDocs, nil
 }
-
-//Personal.AI order the ending

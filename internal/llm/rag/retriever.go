@@ -20,27 +20,9 @@ import (
 	"fmt"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store" // Will be created later
 )
-
-// Document represents a single chunk of retrieved information that is considered
-// relevant to a query. It is ready to be injected into an LLM prompt to provide context.
-type Document struct {
-	// Content is the text of the document chunk.
-	Content string `json:"content"`
-	// Metadata contains additional information about the document, such as its source URL.
-	Metadata map[string]interface{} `json:"metadata"`
-	// Score indicates the relevance of the document to the query, as determined by the search mechanism.
-	Score float32 `json:"score"`
-}
-
-// Retriever defines the interface for components that retrieve relevant documents
-// from a knowledge base in response to a user query. This is a core part of the
-// Retrieval-Augmented Generation (RAG) pattern.
-type Retriever interface {
-	// Retrieve finds the top K most relevant documents for a given query.
-	Retrieve(ctx context.Context, query string, topK int) ([]Document, error)
-}
 
 // vectorRetriever implements the Retriever interface using an embedder and a vector store.
 // This is the core of semantic search.
@@ -59,9 +41,9 @@ type vectorRetriever struct {
 //   vectorStore (store.VectorStore): The vector database to search against.
 //
 // Returns:
-//   Retriever: A new instance of a vector-based retriever.
+//   search.Retriever: A new instance of a vector-based retriever.
 //   error: An error if either the embedder or vector store is nil.
-func NewRetriever(embedder Embedder, vectorStore store.VectorStore) (Retriever, error) {
+func NewRetriever(embedder Embedder, vectorStore store.VectorStore) (search.Retriever, error) {
 	if embedder == nil {
 		return nil, fmt.Errorf("embedder cannot be nil")
 	}
@@ -85,9 +67,9 @@ func NewRetriever(embedder Embedder, vectorStore store.VectorStore) (Retriever, 
 //   topK (int): The number of top matching documents to retrieve.
 //
 // Returns:
-//   []Document: A ranked list of the most relevant documents.
+//   []search.Document: A ranked list of the most relevant documents.
 //   error: An error if embedding the query or searching the vector store fails.
-func (r *vectorRetriever) Retrieve(ctx context.Context, query string, topK int) ([]Document, error) {
+func (r *vectorRetriever) Retrieve(ctx context.Context, query string, topK int) ([]search.Document, error) {
 	r.log.Infof("Retrieving top %d documents for query: %s", topK, query)
 
 	// 1. Convert the natural language query into a vector embedding.
@@ -104,20 +86,21 @@ func (r *vectorRetriever) Retrieve(ctx context.Context, query string, topK int) 
 	}
 
 	// 3. Convert the store's document format to our RAG document format.
-	docs := make([]Document, len(similarDocs))
+	docs := make([]search.Document, len(similarDocs))
 	for i, sDoc := range similarDocs {
-		docs[i] = Document{
+		docs[i] = search.Document{
 			Content:  sDoc.Content,
 			Metadata: sDoc.Metadata,
 			Score:    sDoc.Score,
 		}
 	}
 
-	// TODO: Implement hybrid search by merging these results with a traditional keyword search (e.g., from Elasticsearch).
-	// TODO: Implement re-ranking of results based on more complex relevance criteria (e.g., using a cross-encoder).
-
 	r.log.Infof("Successfully retrieved %d documents.", len(docs))
 	return docs, nil
 }
 
-//Personal.AI order the ending
+// HybridRetrieve implements the Retriever interface for hybrid search.
+// For the vectorRetriever, this will just call the regular Retrieve method.
+func (r *vectorRetriever) HybridRetrieve(ctx context.Context, query string, opts *search.RetrieveOptions) ([]search.Document, error) {
+	return r.Retrieve(ctx, query, opts.TopK)
+}

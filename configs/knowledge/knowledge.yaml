@@ -1,0 +1,40 @@
+knowledge:
+  default_index: "default"
+  language: "zh"
+
+  retrieval:
+    mode: "hybrid"
+
+    semantic:
+      enabled: true
+      provider: "openai"
+      model: "text-embedding-3-large"
+      top_k: 50
+      score_threshold: 0.3
+
+    keyword:
+      enabled: true
+      engine: "bm25"
+      analyzer: "zh"
+      top_k: 50
+
+    fusion:
+      strategy: "rrf"
+      rrf:
+        k: 60
+      weighted:
+        semantic_weight: 0.7
+        keyword_weight: 0.3
+
+    reranker:
+      enabled: true
+      provider: "openai"
+      model: "gpt-4.1-mini"
+      top_k: 10
+      score_threshold: 0.4
+      timeout: "8s"
+
+  rag:
+    engine:
+      max_context_tokens: 4096
+      max_chunks: 10

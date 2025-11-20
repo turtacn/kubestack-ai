@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package prompt
+package llm
 
-// Template defines a prompt template.
-type Template struct {
-	Name     string
-	Content  string
-	IsChat   bool
-	Messages []MessageTemplate
-}
+import (
+	"context"
+)
 
-// MessageTemplate defines a message template for chat models.
-type MessageTemplate struct {
-	Role    string
-	Content string
+// LLMClient defines the interface for a language model client.
+type LLMClient interface {
+	// Generate generates a response from the language model.
+	Generate(ctx context.Context, prompt string) (string, error)
 }

@@ -16,148 +16,91 @@ package search
 
 import (
 	"context"
-	"sort"
-	"sync"
+	"fmt"
 
-	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
-	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
-	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
+	"golang.org/x/sync/errgroup"
 )
 
-// hybridSearcher implements the Searcher interface by combining results from
-// a keyword-based search (lexical) and a vector-based search (semantic).
-type hybridSearcher struct {
-	log               logger.Logger
-	keywordStore      store.DocumentStore
-	semanticRetriever rag.Retriever
+// HybridSearcher orchestrates a hybrid search by combining results from a
+// semantic retriever and a keyword-based searcher (like BM25).
+type HybridSearcher struct {
+	vectorRetriever Retriever
+	bm25Searcher    *BM25Searcher
+	fusionStrategy  FusionStrategy
+	reranker        Reranker
+	cfg             config.RetrievalConfig
 }
 
-// NewHybridSearcher creates a new hybrid searcher that combines lexical search
-// (from a document store) and semantic search (from a retriever). This approach
-// leverages the strengths of both methods to provide more relevant results.
-//
-// Parameters:
-//   keywordStore (store.DocumentStore): The document store to use for keyword-based search.
-//   semanticRetriever (rag.Retriever): The retriever to use for vector-based semantic search.
-//
-// Returns:
-//   Searcher: A new instance of a hybrid searcher.
-//   error: An error if initialization fails (nil in this implementation).
-func NewHybridSearcher(keywordStore store.DocumentStore, semanticRetriever rag.Retriever) (Searcher, error) {
-	return &hybridSearcher{
-		log:               logger.NewLogger("hybrid-searcher"),
-		keywordStore:      keywordStore,
-		semanticRetriever: semanticRetriever,
+// NewHybridSearcher creates a new HybridSearcher.
+func NewHybridSearcher(
+	vectorRetriever Retriever,
+	bm25Searcher *BM25Searcher,
+	reranker Reranker,
+	cfg config.RetrievalConfig,
+) (Searcher, error) {
+	var fusionStrategy FusionStrategy
+	switch cfg.Fusion.Strategy {
+	case "rrf":
+		fusionStrategy = NewRRFFusion(cfg.Fusion.RRF.K)
+	case "weighted":
+		fusionStrategy = NewWeightedFusion([]float64{
+			cfg.Fusion.Weighted.SemanticWeight,
+			cfg.Fusion.Weighted.KeywordWeight,
+		})
+	default:
+		return nil, fmt.Errorf("unknown fusion strategy: %s", cfg.Fusion.Strategy)
+	}
+
+	return &HybridSearcher{
+		vectorRetriever: vectorRetriever,
+		bm25Searcher:    bm25Searcher,
+		fusionStrategy:  fusionStrategy,
+		reranker:        reranker,
+		cfg:             cfg,
 	}, nil
 }
 
-// Search implements the Searcher interface. It executes a keyword search and a
-// semantic search in parallel for a given query. It then fuses the results from
-// both searches using the Reciprocal Rank Fusion (RRF) algorithm to produce a
-// single, re-ranked list of relevant documents.
-//
-// Parameters:
-//   ctx (context.Context): The context for the search operations.
-//   query (string): The user's search query.
-//
-// Returns:
-//   []rag.Document: A slice of documents, sorted by their fused relevance score.
-//   error: An error if both the keyword and semantic searches fail.
-func (s *hybridSearcher) Search(ctx context.Context, query string) ([]rag.Document, error) {
-	s.log.Infof("Performing hybrid search for query: %.50s...", query)
+// Search performs a hybrid search.
+func (h *HybridSearcher) Search(ctx context.Context, query string) ([]Document, error) {
+	g, gCtx := errgroup.WithContext(ctx)
 
-	var keywordResults []*store.RawDocument
-	var semanticResults []rag.Document
-	var wg sync.WaitGroup
-	var errKeyword, errSemantic error
+	var semanticResults []*Document
+	var bm25Results []*Document
 
-	wg.Add(2)
-
-	// Run keyword search in a goroutine.
-	go func() {
-		defer wg.Done()
-		keywordResults, errKeyword = s.keywordStore.Search(ctx, query, nil)
-	}()
-
-	// Run semantic search in a goroutine.
-	go func() {
-		defer wg.Done()
-		const topK = 10 // Retrieve more results for better fusion potential.
-		semanticResults, errSemantic = s.semanticRetriever.Retrieve(ctx, query, topK)
-	}()
-
-	wg.Wait()
-
-	if errKeyword != nil {
-		s.log.Warnf("Keyword search failed during hybrid search: %v", errKeyword)
-	}
-	if errSemantic != nil {
-		s.log.Warnf("Semantic search failed during hybrid search: %v", errSemantic)
-	}
-
-	// Fuse the results from both searches.
-	fusedDocs := s.reciprocalRankFusion(keywordResults, semanticResults)
-
-	return fusedDocs, nil
-}
-
-// reciprocalRankFusion combines two lists of ranked results using the RRF algorithm.
-// RRF is effective because it doesn't require tuning weights and focuses on rank order.
-func (s *hybridSearcher) reciprocalRankFusion(keywordDocs []*store.RawDocument, semanticDocs []rag.Document) []rag.Document {
-	// RRF Score = sum over result lists ( 1 / (k + rank) )
-	// 'k' is a constant to mitigate the impact of high ranks; 60 is a common value.
-	const rrfK = 60
-
-	scores := make(map[string]float32)
-	docsMap := make(map[string]rag.Document)
-
-	// Process semantic results.
-	for i, doc := range semanticDocs {
-		sourceID, ok := doc.Metadata["SourceID"].(string)
-		if !ok {
-			continue // Skip chunks without a source document ID.
+	g.Go(func() error {
+		var err error
+		docs, err := h.vectorRetriever.Retrieve(gCtx, query, h.cfg.Semantic.TopK)
+		for _, doc := range docs {
+			semanticResults = append(semanticResults, &doc)
 		}
-		rank := i + 1
-		score := 1.0 / float32(rrfK+rank)
-		scores[sourceID] += score
-		// Keep the first chunk we see from a source document.
-		if _, exists := docsMap[sourceID]; !exists {
-			docsMap[sourceID] = doc
-		}
-	}
-
-	// Process keyword results.
-	for i, doc := range keywordDocs {
-		rank := i + 1
-		score := 1.0 / float32(rrfK+rank)
-		scores[doc.ID] += score
-		// If we haven't seen this document from the semantic search, add it.
-		// Note: The content here is the full document, not a chunk.
-		if _, exists := docsMap[doc.ID]; !exists {
-			docsMap[doc.ID] = rag.Document{
-				Content: doc.Content,
-				Metadata: map[string]interface{}{
-					"SourceID":  doc.ID,
-					"SourceURL": doc.Source,
-				},
-			}
-		}
-	}
-
-	// Create a single list of documents with their new RRF scores.
-	var fusedDocs []rag.Document
-	for id, score := range scores {
-		doc := docsMap[id]
-		doc.Score = score
-		fusedDocs = append(fusedDocs, doc)
-	}
-
-	// Sort the final list by the new RRF score in descending order.
-	sort.Slice(fusedDocs, func(i, j int) bool {
-		return fusedDocs[i].Score > fusedDocs[j].Score
+		return err
 	})
 
-	return fusedDocs
-}
+	g.Go(func() error {
+		var err error
+		bm25Results, err = h.bm25Searcher.Search(query, h.cfg.Keyword.TopK)
+		return err
+	})
 
-//Personal.AI order the ending
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	fusedResults := h.fusionStrategy.Fuse(semanticResults, bm25Results)
+
+	if h.cfg.Reranker.Enabled {
+		rerankedDocs, err := h.reranker.Rerank(ctx, query, fusedResults, h.cfg.Reranker.TopK)
+		if err != nil {
+			return nil, err
+		}
+		fusedResults = rerankedDocs
+	}
+
+	finalDocs := make([]Document, 0, len(fusedResults))
+	for _, doc := range fusedResults {
+		finalDocs = append(finalDocs, *doc)
+	}
+
+	return finalDocs, nil
+}

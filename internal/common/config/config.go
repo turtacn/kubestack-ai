@@ -12,241 +12,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package config provides a centralized configuration management system for KubeStack-AI.
-// It uses Viper to support loading from YAML files, environment variables, and command-line flags,
-// and also supports features like hot-reloading.
 package config
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
-	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
-	"github.com/kubestack-ai/kubestack-ai/internal/common/types/constants"
-	"github.com/kubestack-ai/kubestack-ai/internal/common/types/errors"
 	"github.com/spf13/viper"
 )
 
-// Config is the root configuration structure for the application.
-// It is composed of smaller, domain-specific configuration structs and is used
-// to unmarshal the configuration data from Viper.
+// Config is the top-level configuration for the application.
 type Config struct {
-	// Logger holds all logging-related configurations.
-	Logger logger.Config `mapstructure:"logger"`
-	// Server holds configurations for the optional HTTP server component.
-	Server ServerConfig `mapstructure:"server"`
-	// LLM holds configurations for connecting to Large Language Model providers.
-	LLM LLMConfig `mapstructure:"llm"`
-	// Plugins holds configurations related to the plugin management system.
-	Plugins PluginConfig `mapstructure:"plugins"`
-	// KnowledgeBase holds configurations for the knowledge base system.
-	KnowledgeBase KnowledgeBaseConfig `mapstructure:"knowledgeBase"`
+	KnowledgeConfigPath string          `mapstructure:"knowledge_config_path"`
+	Knowledge           KnowledgeConfig `mapstructure:"knowledge"`
 }
 
-// ServerConfig holds HTTP server-related configurations, such as the listening
-// port and request timeouts.
-type ServerConfig struct {
-	// Port is the TCP port on which the HTTP server will listen.
-	Port int `mapstructure:"port"`
-	// Timeout is the request timeout for the HTTP server in seconds.
-	Timeout int `mapstructure:"timeout"`
-}
-
-// LLMConfig holds configurations for Large Language Model providers, including which
-// provider to use and the credentials for each.
-type LLMConfig struct {
-	// Provider specifies the active LLM provider (e.g., "openai", "gemini").
-	Provider string `mapstructure:"provider"`
-	// OpenAI contains the specific configuration for the OpenAI provider.
-	OpenAI OpenAIConfig `mapstructure:"openai"`
-	// Gemini contains the specific configuration for the Google Gemini provider.
-	Gemini GeminiConfig `mapstructure:"gemini"`
-}
-
-// OpenAIConfig holds OpenAI-specific API configurations.
-type OpenAIConfig struct {
-	// APIKey is the secret key for authenticating with the OpenAI API.
-	APIKey string `mapstructure:"apiKey"` // Sensitive: Handle with care.
-	// Model is the specific model to use (e.g., "gpt-4", "gpt-3.5-turbo").
-	Model string `mapstructure:"model"`
-}
-
-// GeminiConfig holds Google Gemini-specific API configurations.
-type GeminiConfig struct {
-	// APIKey is the secret key for authenticating with the Google Gemini API.
-	APIKey string `mapstructure:"apiKey"` // Sensitive: Handle with care.
-	// Model is the specific model to use (e.g., "gemini-pro").
-	Model string `mapstructure:"model"`
-}
-
-// PluginConfig holds configurations for the plugin system.
-type PluginConfig struct {
-	// Directory is the path where plugins are stored.
-	Directory string `mapstructure:"directory"`
-}
-
-// KnowledgeBaseConfig holds configurations for the knowledge base, including the
-// vector store backend and crawler settings.
-type KnowledgeBaseConfig struct {
-	// VectorStore defines the configuration for the vector database.
-	VectorStore VectorStoreConfig `mapstructure:"vectorStore"`
-	// Crawler holds default configurations for the web crawler.
-	Crawler CrawlerConfig `mapstructure:"crawler"`
-}
-
-// CrawlerConfig holds all crawler-related configurations.
-type CrawlerConfig struct {
-	Targets        []Target `mapstructure:"targets"`
-	MaxConcurrency int      `mapstructure:"max_concurrency"`
-	RequestTimeout string   `mapstructure:"request_timeout"`
-	UserAgent      string   `mapstructure:"user_agent"`
-	Quality        Quality  `mapstructure:"quality"`
-}
-
-// Target defines a website to be crawled.
-type Target struct {
-	Name           string      `mapstructure:"name"`
-	StartURL       string      `mapstructure:"start_url"`
-	AllowedDomains []string    `mapstructure:"allowed_domains"`
-	URLPatterns    URLPatterns `mapstructure:"url_patterns"`
-	MaxDepth       int         `mapstructure:"max_depth"`
-	MaxPages       int         `mapstructure:"max_pages"`
-}
-
-// URLPatterns defines the include and exclude patterns for URLs.
-type URLPatterns struct {
-	Include []string `mapstructure:"include"`
-	Exclude []string `mapstructure:"exclude"`
-}
-
-// Quality defines the quality filter settings.
-type Quality struct {
-	MinScore     int `mapstructure:"min_score"`
-	MinWordCount int `mapstructure:"min_word_count"`
-}
-
-// VectorStoreConfig specifies which vector store provider to use and its settings.
-type VectorStoreConfig struct {
-	// Provider is the active vector store provider (e.g., "in-memory", "chroma").
-	Provider string `mapstructure:"provider"`
-	// Chroma contains the specific configuration for the ChromaDB provider.
-	Chroma ChromaDBConfig `mapstructure:"chroma"`
-}
-
-// ChromaDBConfig holds ChromaDB-specific connection configurations.
-type ChromaDBConfig struct {
-	// URL is the endpoint of the ChromaDB server.
-	URL string `mapstructure:"url"`
-	// CollectionName is the name of the collection to use within ChromaDB.
-	CollectionName string `mapstructure:"collectionName"`
-}
-
-var appConfig *Config
-
-// LoadConfig initializes Viper, loads configuration from multiple sources (file,
-// environment variables), sets up defaults, and enables hot-reloading.
-// It follows a layered approach: defaults < file < environment variables.
-//
-// Parameters:
-//   configPath (string): The path to the configuration file. If empty, only defaults
-//     and environment variables will be used.
-//
-// Returns:
-//   *Config: A pointer to the loaded and unmarshaled configuration struct.
-//   error: An error if loading or unmarshaling fails.
-func LoadConfig(configPath string) (*Config, error) {
-	v := viper.New()
-	setDefaults(v)
-
-	if configPath != "" {
-		v.SetConfigFile(configPath)
-		v.SetConfigType("yaml")
-		if err := v.ReadInConfig(); err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-				return nil, errors.WrapConfigError(err, errors.ConfigLoadFailedCode, "failed to read config file", "Ensure the file exists and is readable.")
-			}
+// LoadConfig loads the configuration from the specified file.
+func LoadConfig(cfgFile string) (*Config, error) {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
 		}
+		viper.AddConfigPath(home)
+		viper.SetConfigName(".kubestack-ai")
 	}
 
-	v.SetEnvPrefix("KSA")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
+	viper.SetEnvPrefix("KSA")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, errors.WrapConfigError(err, errors.ConfigLoadFailedCode, "failed to unmarshal config", "Check the configuration structure.")
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	v.WatchConfig()
-	v.OnConfigChange(func(e fsnotify.Event) {
-		log := logger.GetLogger()
-		log.Infof("Configuration file changed: %s", e.Name)
-		if err := v.Unmarshal(&cfg); err != nil {
-			log.Errorf("Failed to reload config: %v", err)
-		} else {
-			appConfig = &cfg
-			logger.InitGlobalLogger(&cfg.Logger) // Re-initialize logger with new settings
-			log.Info("Configuration reloaded successfully.")
+	if cfg.KnowledgeConfigPath != "" {
+		viper.SetConfigFile(cfg.KnowledgeConfigPath)
+		if err := viper.MergeInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to merge knowledge config: %w", err)
 		}
-	})
+		if err := viper.Unmarshal(&cfg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal merged config: %w", err)
+		}
+	}
 
-	appConfig = &cfg
+	if err := cfg.Knowledge.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid knowledge config: %w", err)
+	}
+
 	return &cfg, nil
-}
-
-// GetConfig returns the singleton instance of the loaded application configuration.
-// It is crucial to call LoadConfig before calling this function, otherwise it may
-// return nil.
-//
-// Returns:
-//   *Config: A pointer to the currently active application configuration.
-func GetConfig() *Config {
-	return appConfig
-}
-
-// Validate checks if the loaded configuration is valid by enforcing certain rules,
-// such as ensuring that API keys are present if a specific provider is selected.
-//
-// Returns:
-//   error: An error of type *errors.ConfigError if validation fails, otherwise nil.
-func (c *Config) Validate() error {
-	if c.LLM.Provider == "openai" && c.LLM.OpenAI.APIKey == "" {
-		return errors.NewConfigError(errors.ConfigValidationFailedCode, "OpenAI API key is missing", "Set the KSA_LLM_OPENAI_APIKEY environment variable or llm.openai.apiKey in the config file.")
-	}
-	if c.LLM.Provider == "gemini" && c.LLM.Gemini.APIKey == "" {
-		return errors.NewConfigError(errors.ConfigValidationFailedCode, "Gemini API key is missing", "Set the KSA_LLM_GEMINI_APIKEY environment variable or llm.gemini.apiKey in the config file.")
-	}
-	// Add more validation rules here
-	return nil
-}
-
-// setDefaults defines the default values for configuration keys.
-func setDefaults(v *viper.Viper) {
-	v.SetDefault("logger.level", "info")
-	v.SetDefault("logger.format", "text")
-	v.SetDefault("logger.output", "console")
-	v.SetDefault("logger.file", "/var/log/kubestack-ai/ksa.log")
-	v.SetDefault("logger.maxSize", 100)
-	v.SetDefault("logger.maxBackups", 3)
-	v.SetDefault("logger.maxAge", 7)
-	v.SetDefault("logger.compress", true)
-
-	v.SetDefault("server.port", 8080)
-	v.SetDefault("server.timeout", 30)
-
-	v.SetDefault("llm.provider", "openai")
-	v.SetDefault("llm.openai.model", "gpt-4")
-	v.SetDefault("llm.gemini.model", "gemini-pro")
-
-	v.SetDefault("plugins.directory", constants.DefaultPluginDir)
-
-	v.SetDefault("knowledgeBase.vectorStore.provider", "in-memory")
-	v.SetDefault("knowledgeBase.vectorStore.chroma.url", "http://localhost:8000")
-	v.SetDefault("knowledgeBase.vectorStore.chroma.collectionName", "kubestack-ai")
-
-	v.SetDefault("knowledgeBase.crawler.max_concurrency", 5)
-	v.SetDefault("knowledgeBase.crawler.request_timeout", "30s")
-	v.SetDefault("knowledgeBase.crawler.user_agent", "KubeStack-AI Crawler/1.0")
-	v.SetDefault("knowledgeBase.crawler.quality.min_score", 60)
-	v.SetDefault("knowledgeBase.crawler.quality.min_word_count", 200)
 }

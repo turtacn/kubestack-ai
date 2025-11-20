@@ -24,184 +24,253 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 )
 
-// chromaVectorStore is a production-grade implementation of VectorStore that uses
-// ChromaDB as its backend. It interacts directly with the ChromaDB REST API.
-type chromaVectorStore struct {
-	log            logger.Logger
-	httpClient     *http.Client
-	url            string
-	collectionName string
+// --- Direct HTTP Client Implementation for ChromaDB V2 API ---
+
+// ChromaVectorStore is a production-ready implementation of VectorStore that uses
+// direct HTTP calls to the ChromaDB V2 REST API. This approach avoids issues with
+// the Go client library.
+type ChromaVectorStore struct {
+	log          logger.Logger
+	httpClient   *http.Client
+	apiBaseURL   string
+	collectionID string
 }
 
-// NewChromaVectorStore creates a new vector store that connects to a ChromaDB instance via its REST API.
-func NewChromaVectorStore(cfg *config.ChromaConfig) (VectorStore, error) {
+// Chroma API V2 Request/Response Structs
+type chromaAddRequest struct {
+	IDs        []string                 `json:"ids"`
+	Embeddings [][]float32              `json:"embeddings"`
+	Metadatas  []map[string]interface{} `json:"metadatas"`
+	Documents  []string                 `json:"documents"`
+}
+
+type chromaQueryRequest struct {
+	QueryEmbeddings [][]float32 `json:"query_embeddings"`
+	NResults        int         `json:"n_results"`
+	Include         []string    `json:"include"`
+}
+
+type chromaQueryResponse struct {
+	IDs        [][]string                 `json:"ids"`
+	Distances  [][]float32                `json:"distances"`
+	Metadatas  [][]map[string]interface{} `json:"metadatas"`
+	Embeddings [][][]float32              `json:"embeddings"`
+	Documents  [][]string                 `json:"documents"`
+}
+
+type chromaCollection struct {
+	ID       string                 `json:"id"`
+	Name     string                 `json:"name"`
+	Metadata map[string]interface{} `json:"metadata"`
+}
+
+// NewChromaVectorStore creates a new vector store that connects directly to the
+// ChromaDB V2 API.
+func NewChromaVectorStore(url string, collectionName string) (VectorStore, error) {
 	log := logger.NewLogger("chroma-http-store")
-	collectionName := fmt.Sprintf("%s-%s", cfg.Namespace, cfg.CollectionName)
+	client := &http.Client{Timeout: 30 * time.Second}
+	apiBaseURL := fmt.Sprintf("%s/api/v2", url)
 
-	store := &chromaVectorStore{
-		log:            log,
-		httpClient:     &http.Client{Timeout: 30 * time.Second},
-		url:            cfg.URL,
-		collectionName: collectionName,
+	// Get or create the collection
+	collection, err := getOrCreateCollection(client, apiBaseURL, collectionName)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := store.ensureCollection(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed to ensure chroma collection exists: %w", err)
-	}
+	log.Infof("Using ChromaDB collection '%s' with ID: %s", collection.Name, collection.ID)
 
-	log.Infof("Successfully connected to ChromaDB at %s and ensured collection '%s' exists", cfg.URL, collectionName)
-	return store, nil
+	return &ChromaVectorStore{
+		log:          log,
+		httpClient:   client,
+		apiBaseURL:   apiBaseURL,
+		collectionID: collection.ID,
+	}, nil
 }
 
 // AddDocuments adds a batch of documents to the ChromaDB collection via the REST API.
-func (s *chromaVectorStore) AddDocuments(ctx context.Context, docs []StoreDocument) error {
+func (c *ChromaVectorStore) AddDocuments(ctx context.Context, docs []StoreDocument) error {
 	if len(docs) == 0 {
 		return nil
 	}
-	s.log.Infof("Adding %d documents to Chroma collection '%s'", len(docs), s.collectionName)
+	c.log.Infof("Adding %d documents to collection ID '%s'", len(docs), c.collectionID)
 
-	ids := make([]string, len(docs))
-	embeddings := make([][]float32, len(docs))
-	metadatas := make([]map[string]interface{}, len(docs))
-	documents := make([]string, len(docs))
-
-	for i, doc := range docs {
-		if doc.ID == "" {
-			ids[i] = uuid.New().String()
-		} else {
-			ids[i] = doc.ID
-		}
-		embeddings[i] = doc.Vector
-		metadatas[i] = doc.Metadata
-		documents[i] = doc.Content
+	addReq := chromaAddRequest{
+		IDs:        getDocIDs(docs),
+		Embeddings: getDocVectors(docs),
+		Metadatas:  getDocMetadatas(docs),
+		Documents:  getDocContents(docs),
 	}
 
-	payload := map[string]interface{}{
-		"ids":         ids,
-		"embeddings":  embeddings,
-		"metadatas":   metadatas,
-		"documents":   documents,
-	}
-
-	endpoint := fmt.Sprintf("%s/api/v1/collections/%s/add", s.url, s.collectionName)
-	_, err := s.doRequest(ctx, http.MethodPost, endpoint, payload)
+	endpoint := fmt.Sprintf("/collections/%s/add", c.collectionID)
+	_, err := c.doRequest(ctx, http.MethodPost, endpoint, addReq)
 	if err != nil {
-		return fmt.Errorf("failed to add documents to chroma: %w", err)
+		return fmt.Errorf("failed to add documents via Chroma API: %w", err)
 	}
+
 	return nil
 }
 
-// SimilaritySearch performs a similarity search in the ChromaDB collection via the REST API.
-func (s *chromaVectorStore) SimilaritySearch(ctx context.Context, queryVector []float32, topK int) ([]StoreDocument, error) {
-	s.log.Debugf("Performing similarity search in Chroma for top %d results", topK)
+// SimilaritySearch performs a similarity search on the ChromaDB collection via the REST API.
+func (c *ChromaVectorStore) SimilaritySearch(ctx context.Context, queryVector []float32, topK int) ([]StoreDocument, error) {
+	c.log.Debugf("Performing similarity search for top %d results in collection ID '%s'", topK, c.collectionID)
 
-	payload := map[string]interface{}{
-		"query_embeddings": [][]float32{queryVector},
-		"n_results":        topK,
-		"include":          []string{"metadatas", "documents", "distances"},
+	queryReq := chromaQueryRequest{
+		QueryEmbeddings: [][]float32{queryVector},
+		NResults:        topK,
+		Include:         []string{"Metadatas", "Documents", "Distances", "Embeddings"},
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/collections/%s/query", s.url, s.collectionName)
-	body, err := s.doRequest(ctx, http.MethodPost, endpoint, payload)
+	endpoint := fmt.Sprintf("/collections/%s/query", c.collectionID)
+	respBody, err := c.doRequest(ctx, http.MethodPost, endpoint, queryReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query chroma: %w", err)
+		return nil, fmt.Errorf("failed to query Chroma API: %w", err)
 	}
 
-	var results struct {
-		IDs       [][]string                 `json:"ids"`
-		Distances [][]float32              `json:"distances"`
-		Metadatas [][]map[string]interface{} `json:"metadatas"`
-		Documents [][]string                 `json:"documents"`
+	var queryResp chromaQueryResponse
+	if err := json.Unmarshal(respBody, &queryResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Chroma query response: %w", err)
 	}
 
-	if err := json.Unmarshal(body, &results); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chroma query response: %w", err)
-	}
-
-	if len(results.IDs) == 0 {
-		return []StoreDocument{}, nil
-	}
-
-	var storeDocs []StoreDocument
-	for i := 0; i < len(results.IDs[0]); i++ {
-		storeDocs = append(storeDocs, StoreDocument{
-			ID:       results.IDs[0][i],
-			Content:  results.Documents[0][i],
-			Metadata: results.Metadatas[0][i],
-			Score:    results.Distances[0][i],
-		})
-	}
-
-	return storeDocs, nil
+	return convertChromaHTTPResultsToStoreDocuments(queryResp)
 }
 
-// ensureCollection checks if the target collection exists, and if not, creates it.
-func (s *chromaVectorStore) ensureCollection(ctx context.Context) error {
-	endpoint := fmt.Sprintf("%s/api/v1/collections/%s", s.url, s.collectionName)
+// --- Helper Functions ---
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+func (c *ChromaVectorStore) doRequest(ctx context.Context, method, endpoint string, payload interface{}) ([]byte, error) {
+	reqBody, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to marshal request payload: %w", err)
 	}
 
-	resp, err := s.httpClient.Do(req)
+	url := c.apiBaseURL + endpoint
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		s.log.Debugf("Collection '%s' already exists.", s.collectionName)
-		return nil
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		s.log.Infof("Collection '%s' not found, creating it.", s.collectionName)
-		createEndpoint := fmt.Sprintf("%s/api/v1/collections", s.url)
-		payload := map[string]interface{}{"name": s.collectionName}
-		_, err := s.doRequest(ctx, http.MethodPost, createEndpoint, payload)
-		return err
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("failed to check for collection '%s', status: %s, body: %s", s.collectionName, resp.Status, string(body))
-}
-
-// doRequest is a helper function to handle boilerplate for making HTTP requests.
-func (s *chromaVectorStore) doRequest(ctx context.Context, method, url string, payload interface{}) ([]byte, error) {
-	var body io.Reader
-	if payload != nil {
-		jsonBody, err := json.Marshal(payload)
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewBuffer(jsonBody)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("http request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("http request failed with status %s: %s", resp.Status, string(respBody))
+		return nil, fmt.Errorf("chroma api request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	return respBody, nil
+}
+
+func getOrCreateCollection(client *http.Client, baseURL, name string) (*chromaCollection, error) {
+	// Try to get the collection first
+	getEndpoint := fmt.Sprintf("%s/collections/%s", baseURL, name)
+	req, _ := http.NewRequest(http.MethodGet, getEndpoint, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send get collection request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var collection chromaCollection
+		if err := json.NewDecoder(resp.Body).Decode(&collection); err != nil {
+			return nil, fmt.Errorf("failed to decode existing collection: %w", err)
+		}
+		return &collection, nil
+	}
+
+	// If it doesn't exist (e.g., 404), create it
+	if resp.StatusCode == http.StatusNotFound {
+		createEndpoint := fmt.Sprintf("%s/collections", baseURL)
+		createPayload := map[string]string{"name": name}
+		payloadBytes, _ := json.Marshal(createPayload)
+		req, _ = http.NewRequest(http.MethodPost, createEndpoint, bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		createResp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to send create collection request: %w", err)
+		}
+		defer createResp.Body.Close()
+
+		if createResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(createResp.Body)
+			return nil, fmt.Errorf("failed to create collection, status %d: %s", createResp.StatusCode, string(body))
+		}
+		var collection chromaCollection
+		if err := json.NewDecoder(createResp.Body).Decode(&collection); err != nil {
+			return nil, fmt.Errorf("failed to decode created collection: %w", err)
+		}
+		return &collection, nil
+	}
+
+	// Handle other unexpected status codes
+	body, _ := io.ReadAll(resp.Body)
+	return nil, fmt.Errorf("unexpected status code when getting collection: %d, body: %s", resp.StatusCode, string(body))
+}
+
+func getDocIDs(docs []StoreDocument) []string {
+	ids := make([]string, len(docs))
+	for i, doc := range docs {
+		if doc.ID != "" {
+			ids[i] = doc.ID
+		} else {
+			ids[i] = uuid.New().String()
+		}
+	}
+	return ids
+}
+
+func getDocVectors(docs []StoreDocument) [][]float32 {
+	vectors := make([][]float32, len(docs))
+	for i, doc := range docs {
+		vectors[i] = doc.Vector
+	}
+	return vectors
+}
+
+func getDocMetadatas(docs []StoreDocument) []map[string]interface{} {
+	metadatas := make([]map[string]interface{}, len(docs))
+	for i, doc := range docs {
+		metadatas[i] = doc.Metadata
+	}
+	return metadatas
+}
+
+func getDocContents(docs []StoreDocument) []string {
+	contents := make([]string, len(docs))
+	for i, doc := range docs {
+		contents[i] = doc.Content
+	}
+	return contents
+}
+
+func convertChromaHTTPResultsToStoreDocuments(resp chromaQueryResponse) ([]StoreDocument, error) {
+	if len(resp.IDs) == 0 || len(resp.IDs[0]) == 0 {
+		return []StoreDocument{}, nil
+	}
+
+	numDocs := len(resp.IDs[0])
+	docs := make([]StoreDocument, numDocs)
+
+	for i := 0; i < numDocs; i++ {
+		docs[i] = StoreDocument{
+			ID:       resp.IDs[0][i],
+			Content:  resp.Documents[0][i],
+			Metadata: resp.Metadatas[0][i],
+			Score:    1.0 - resp.Distances[0][i],
+			Vector:   resp.Embeddings[0][i],
+		}
+	}
+
+	return docs, nil
 }

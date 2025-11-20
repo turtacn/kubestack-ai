@@ -75,6 +75,11 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 - **Automated Fixes**: One-click resolution for common issues
 - **Knowledge Integration**: Built-in best practices and troubleshooting guides
 
+###  advanced RAG Pipeline
+- **Hybrid Retrieval**: Combines semantic and keyword-based search to improve recall.
+- **Reranking**: Refines search results using a cross-encoder model to improve relevance.
+- **Configurable**: The entire RAG pipeline is configurable via the `configs/knowledge/knowledge.yaml` file.
+
 ## 🚀 Getting Started
 
 ### Installation
@@ -182,7 +187,7 @@ $ ksa diagnose clickhouse --cluster analytics
 
 * [**Architecture Overview**](docs/architecture.md) - Technical deep-dive into system design
 * [**Plugin Development Guide**](docs/plugins.md) - Build your own middleware plugins
-* [**Configuration Reference**](docs/configuration.md) - Complete config options
+* [**Configuration Reference**](docs/configuration.md) - Complete config options. See `configs/knowledge/knowledge.yaml` for RAG pipeline configuration.
 * [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
 * [**API Reference**](docs/api.md) - REST API and SDK documentation
 
