@@ -1,0 +1,33 @@
+# Prompt配置文件
+prompts:
+  diagnosis:
+    system_role: "You are an expert Kubernetes middleware diagnostician with deep knowledge of Redis, Kafka, MySQL, and Elasticsearch."
+    temperature: 0.3  # 低温度保证稳定输出
+    max_tokens: 2000
+    response_format: json
+
+  root_cause:
+    system_role: "You are a root cause analysis expert. Focus on identifying the PRIMARY cause, not symptoms."
+    temperature: 0.2
+    max_tokens: 1500
+
+  repair:
+    system_role: "You are an experienced SRE. Provide actionable, safe repair steps."
+    temperature: 0.4
+    max_tokens: 2500
+    include_rollback: true
+
+  clarify:
+    max_questions: 3  # 最多问3个问题
+    question_style: "numbered_list"
+
+knowledge_injection:
+  max_tokens: 4000
+  priority_strategy: relevance_score  # 可选: relevance_score, recency, combined
+  format: markdown
+
+multi_turn:
+  max_turns: 5
+  confidence_threshold: 0.7  # 低于此值触发追问
+  context_compression: true
+  compression_method: summary  # 可选: truncate, summary
