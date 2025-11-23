@@ -1,0 +1,13 @@
+thresholds:
+  redis:
+    cpu: 80.0
+    memory: 85.0
+    connections: 5000
+  mysql:
+    cpu: 90.0
+    memory: 90.0
+    connections: 1000
+  kafka:
+    cpu: 75.0
+    memory: 80.0
+    connections: 2000

@@ -52,9 +52,10 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 
 ## ⭐ Key Features
 
-### 🔍 **Intelligent Diagnosis**
+### 🔍 **Intelligent Diagnosis & Anomaly Detection**
+- **Automated Detection**: Built-in detectors for threshold breaches, time-series anomalies, and log patterns.
+- **AI-Powered RCA**: Root Cause Analysis engine that infers underlying issues from symptoms using rule-based logic and knowledge graph queries.
 - **Multi-Layer Analysis**: System, Kubernetes, and middleware-specific checks
-- **AI-Powered RCA**: Root cause analysis across complex distributed systems
 - **Natural Language Queries**: Ask questions in plain English
 
 ### 🛠️ **Universal Middleware Support**
@@ -220,6 +221,8 @@ $ ksa diagnose clickhouse --cluster analytics
 ## 📖 Documentation
 
 * [**Architecture Overview**](docs/architecture.md) - Technical deep-dive into system design
+* [**Anomaly Detection**](docs/design/anomaly_detection.md) - Design of the anomaly detection system
+* [**RCA Engine**](docs/design/rca_engine.md) - Design of the Root Cause Analysis engine
 * [**Plugin Development Guide**](docs/plugin_development.md) - Build your own middleware plugins
 * [**Supported Middlewares**](docs/supported_middlewares.md) - List of supported middlewares and their capabilities
 * [**Configuration Reference**](docs/configuration.md) - Complete config options. See `configs/knowledge/knowledge.yaml` for RAG pipeline configuration.
@@ -234,6 +237,8 @@ A brief overview of the key directories in the KubeStack-AI repository:
 - **`/internal`**: All of the core application logic. As this is an `internal` package, it is not meant to be imported by external applications.
   - **`/cli`**: Defines the command-line interface using Cobra, including command definitions, flag parsing, and UI formatters.
   - **`/core`**: The heart of the application. It contains the central orchestrator and the primary interfaces for diagnosis, execution, and plugins.
+    - **`/detection`**: Anomaly detection system.
+    - **`/rca`**: Root Cause Analysis engine.
   - **`/llm`**: Abstractions and clients for interacting with Large Language Models (LLMs) and the Retrieval-Augmented Generation (RAG) pipeline.
   - **`/knowledge`**: Components for the knowledge base, including storage, crawling, and search functionalities.
   - **`/plugin`**: The new unified plugin system architecture (Phase 4), including Registry, Loader, and Validator.

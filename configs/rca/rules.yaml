@@ -1,0 +1,18 @@
+rules:
+  - name: "Redis High Memory"
+    conditions:
+      - anomaly_type: "HighMemory"
+    root_cause: "Redis Memory Fragmentation or Large Keys"
+    priority: 80
+    actions:
+      - "Run 'MEMORY DOCTOR'"
+      - "Check for large keys with --bigkeys"
+
+  - name: "MySQL Connection Spike"
+    conditions:
+      - anomaly_type: "HighConnections"
+    root_cause: "Connection Leak or Traffic Surge"
+    priority: 90
+    actions:
+      - "Check 'SHOW PROCESSLIST' for sleeping connections"
+      - "Verify connection pool settings in application"

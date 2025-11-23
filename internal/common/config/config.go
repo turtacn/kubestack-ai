@@ -37,6 +37,29 @@ type Config struct {
 	Plugins             PluginConfig       `mapstructure:"plugins"`
 	TaskQueue           TaskQueueConfig    `mapstructure:"task_queue"`
 	Notification        NotificationConfig `mapstructure:"notification"`
+	Detection           DetectionConfig    `mapstructure:"detection"`
+	RCA                 RCAConfig          `mapstructure:"rca"`
+}
+
+type DetectionConfig struct {
+	Thresholds map[string]map[string]float64 `mapstructure:"thresholds"`
+}
+
+type RCAConfig struct {
+	Rules []RuleConfig `mapstructure:"rules"`
+}
+
+type RuleConfig struct {
+	Name       string            `mapstructure:"name"`
+	Conditions []ConditionConfig `mapstructure:"conditions"`
+	RootCause  string            `mapstructure:"root_cause"`
+	Priority   int               `mapstructure:"priority"`
+	Actions    []string          `mapstructure:"actions"`
+}
+
+type ConditionConfig struct {
+	AnomalyType string `mapstructure:"anomaly_type"`
+	Severity    string `mapstructure:"severity"`
 }
 
 type TaskQueueConfig struct {
@@ -160,7 +183,6 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	}
 
 	// Load server config if available in configs/server/api.yaml
-	// This is a bit of a hack for development, in production it should be part of the main config
 	viper.AddConfigPath("configs/server")
 	viper.SetConfigName("api")
 	if err := viper.MergeInConfig(); err == nil {
@@ -183,6 +205,24 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	viper.SetConfigName("notification_config")
 	if err := viper.MergeInConfig(); err == nil {
 		if err := viper.Unmarshal(&cfg.Notification); err != nil {
+			// Ignore error
+		}
+	}
+
+	// Load detection config
+	viper.AddConfigPath("configs/detection")
+	viper.SetConfigName("thresholds")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg.Detection); err != nil {
+			// Ignore error
+		}
+	}
+
+	// Load RCA config
+	viper.AddConfigPath("configs/rca")
+	viper.SetConfigName("rules")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg.RCA); err != nil {
 			// Ignore error
 		}
 	}

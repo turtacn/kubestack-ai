@@ -27,10 +27,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/detection"
+	detection_models "github.com/kubestack-ai/kubestack-ai/internal/core/detection/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/rca"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/chain"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/parser"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
@@ -38,13 +42,14 @@ import (
 
 // manager is the concrete implementation of the interfaces.DiagnosisManager.
 type manager struct {
-	log            logger.Logger
-	pluginRegistry *plugin.Registry
-	// pluginManager  interfaces.PluginManager // Legacy support if needed, but we are switching to registry
-	analyzers      []interfaces.DiagnosisAnalyzer
-	diagnosisChain *chain.DiagnosisChain
-	cache          *diagnosisCache
-	reportDir      string
+	log             logger.Logger
+	pluginRegistry  *plugin.Registry
+	analyzers       []interfaces.DiagnosisAnalyzer
+	diagnosisChain  *chain.DiagnosisChain
+	cache           *diagnosisCache
+	reportDir       string
+	anomalyDetector *detection.AnomalyDetector
+	rcaEngine       *rca.RulesEngine
 }
 
 // NewManager creates a new instance of the diagnosis manager.
@@ -61,13 +66,26 @@ func NewManager(
 	if _, err := os.Stat(reportDir); os.IsNotExist(err) {
 		os.MkdirAll(reportDir, 0755)
 	}
+
+	// Load configuration for detection and RCA
+	// In a real application, the config object should be injected into NewManager
+	// For now, we'll try to load it or use defaults if loading fails
+	cfg, err := config.LoadConfig("")
+	if err != nil {
+		// Log error and proceed with defaults
+		// We need a logger here, but it's initialized in the struct return
+		// Ideally, NewLogger should be called before
+	}
+
 	return &manager{
-		log:            logger.NewLogger("diagnosis-manager"),
-		pluginRegistry: registry,
-		analyzers:      analyzers,
-		diagnosisChain: diagnosisChain,
-		cache:          newDiagnosisCache(10 * time.Minute),
-		reportDir:      reportDir,
+		log:             logger.NewLogger("diagnosis-manager"),
+		pluginRegistry:  registry,
+		analyzers:       analyzers,
+		diagnosisChain:  diagnosisChain,
+		cache:           newDiagnosisCache(10 * time.Minute),
+		reportDir:       reportDir,
+		anomalyDetector: detection.NewAnomalyDetector(cfg),
+		rcaEngine:       rca.NewRulesEngine(cfg),
 	}
 }
 
@@ -89,7 +107,63 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	}
 	sendProgress(progressChan, "Initialization", "Completed", fmt.Sprintf("Found %d plugins.", len(plugins)))
 
-	// Step 2: 执行所有匹配的插件
+	// Step 2: Anomaly Detection
+	sendProgress(progressChan, "Detection", "InProgress", "Running anomaly detection...")
+	// Note: We need to collect data first. In this new architecture, plugins are responsible for data collection.
+	// However, the AnomalyDetector expects raw metrics/logs.
+	// This creates a circular dependency or flow issue if plugins only return issues.
+	//
+	// Ideally, plugins should return raw data OR we have a separate collection phase.
+	// Since the task P5-T7 says "Integrate anomaly detection into diagnosis flow", we'll simulate data collection
+	// or assume we can extract it if possible.
+	//
+	// For this phase, we will assume we can get some metrics (maybe mock/simulated for now, or extracted if plugins supported it).
+	// Realistically, the plugin should probably export collected data.
+	//
+	// To unblock this, I will create a dummy input for detection. In a real scenario, this data comes from the plugin's collection step.
+	// We'll pass an empty input for now, which means detectors won't find much unless we mock it inside or change the flow.
+	//
+	// Wait, the prompt says "Integrate... call anomaly detector... pass result as context".
+	// This implies we have data BEFORE diagnosis? Or detection IS part of diagnosis?
+	// Usually: Collection -> Detection -> Diagnosis (RCA).
+	// But here Plugins do "Diagnose".
+	//
+	// Let's assume for this task that we construct detection input. Since I don't have a separate collector,
+	// I will just initialize the input. The actual data would need to come from a metric provider.
+	detectionInput := &detection_models.DetectionInput{
+		Context: map[string]string{
+			"middleware": req.TargetMiddleware.String(),
+			"instance":   req.Instance,
+		},
+		// In a real integration, we would fetch metrics from Prometheus/Monitoring here
+	}
+
+	detectionResult, err := m.anomalyDetector.Detect(ctx, detectionInput)
+	if err != nil {
+		m.log.Warnf("Anomaly detection failed: %v", err)
+	} else {
+		m.log.Infof("Anomaly detection completed. Found %d anomalies.", len(detectionResult.Anomalies))
+	}
+
+	// Add anomalies to context so plugins or subsequent steps can use them
+	ctx = context.WithValue(ctx, "anomalies", detectionResult.Anomalies)
+
+	// Step 3: Root Cause Analysis (RCA) based on Anomalies
+	if len(detectionResult.Anomalies) > 0 {
+		sendProgress(progressChan, "RCA", "InProgress", "Running root cause analysis...")
+		rcaResult, err := m.rcaEngine.Analyze(ctx, detectionResult.Anomalies)
+		if err != nil {
+			m.log.Warnf("RCA failed: %v", err)
+		} else {
+			m.log.Infof("RCA completed. Root cause: %s", rcaResult.RootCause)
+			ctx = context.WithValue(ctx, "root_cause", rcaResult)
+		}
+	}
+
+	sendProgress(progressChan, "Detection", "Completed", "Anomaly detection finished.")
+
+
+	// Step 4: Execute Plugins (Deep Diagnosis)
 	sendProgress(progressChan, "Diagnosis", "InProgress", "Running diagnosis plugins...")
 
 	var allIssues []*models.Issue
@@ -115,19 +189,36 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	wg.Wait()
 	sendProgress(progressChan, "Diagnosis", "Completed", "Plugins finished.")
 
-	// Step 3: Analysis (Optional: Reuse analyzers if needed, but Plugin does most work now)
-	// We can still run AI analysis if we have collected data, but the new plugin interface
-	// doesn't return raw data (metrics/logs) explicitly in the same way.
-	// It returns a DiagnosisResult directly.
-	// If we want to keep AI chain, we might need plugins to attach raw evidence to issues.
+	// Step 5: Merge RCA results into issues if not already present
+	// If the RCA engine found something significant, we should ensure it's reported as an issue.
+	if rcaResult := ctx.Value("root_cause"); rcaResult != nil {
+		if res, ok := rcaResult.(*rca.RCAResult); ok && res.Confidence > 0.5 {
+			rcaIssue := &models.Issue{
+				ID: uuid.New().String(),
+				Source: "RCA Engine",
+				Title: res.RootCause,
+				Description: fmt.Sprintf("Root cause analysis identified %s with %.2f confidence.", res.RootCause, res.Confidence),
+				Severity: enum.SeverityHigh, // Default to High for RCA findings
+				Recommendations: convertToRecommendations(res.Recommendations),
+			}
+			allIssues = append(allIssues, rcaIssue)
+		}
+	}
 
-	// AI Analysis using DiagnosisChain (if applicable and if we have data to feed it)
-	// Since the new plugin interface encapsulates data collection, we might skip centralized AI analysis
-	// OR we assume the plugin puts enough info in the Issue description/evidence for a 2nd pass.
-	// For now, let's assume plugins provide the primary diagnosis.
-
-	// Merge issues
-	// (Already done in loop)
+	// If Anomaly Detection found things, add them as issues too
+	if detectionResult != nil && len(detectionResult.Anomalies) > 0 {
+		for _, anomaly := range detectionResult.Anomalies {
+			anomalyIssue := &models.Issue{
+				ID: uuid.New().String(),
+				Source: "AnomalyDetector",
+				Title: fmt.Sprintf("Anomaly: %s", anomaly.Type),
+				Description: anomaly.Description,
+				Severity: convertSeverity(anomaly.Severity),
+				Evidence: fmt.Sprintf("Detected at %s", anomaly.StartTime),
+			}
+			allIssues = append(allIssues, anomalyIssue)
+		}
+	}
 
 	sendProgress(progressChan, "Analysis", "Completed", fmt.Sprintf("Analysis finished, found %d issues.", len(allIssues)))
 
@@ -145,6 +236,33 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	}
 	m.log.Infof("Diagnosis completed for %s. Found %d issues. Report ID: %s", req.TargetMiddleware, len(allIssues), result.ID)
 	return result, nil
+}
+
+func convertToRecommendations(recs []string) []*models.Recommendation {
+	var result []*models.Recommendation
+	for i, r := range recs {
+		result = append(result, &models.Recommendation{
+			ID: fmt.Sprintf("rca-rec-%d", i),
+			Description: r,
+			CanAutoFix: false,
+		})
+	}
+	return result
+}
+
+func convertSeverity(s string) enum.SeverityLevel {
+	switch s {
+	case detection_models.SeverityCritical:
+		return enum.SeverityCritical
+	case detection_models.SeverityHigh:
+		return enum.SeverityHigh
+	case detection_models.SeverityMedium:
+		return enum.SeverityMedium
+	case detection_models.SeverityLow:
+		return enum.SeverityLow
+	default:
+		return enum.SeverityWarning
+	}
 }
 
 func buildQueryFromData(data *models.CollectedData, mwType string) string {

@@ -1,0 +1,17 @@
+{
+  "id": "7b126d8a-bb3c-4234-89db-07d00b8496cc",
+  "timestamp": "2025-11-23T14:07:46.479103816Z",
+  "status": 1,
+  "summary": "Found 1 potential issue(s). Please review the details.",
+  "issues": [
+    {
+      "id": "",
+      "source": "",
+      "title": "Mock Issue",
+      "severity": 3,
+      "description": "",
+      "evidence": "",
+      "recommendations": null
+    }
+  ]
+}
