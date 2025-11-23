@@ -17,11 +17,11 @@ package interfaces
 import (
 	"context"
 
-	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
 )
 
 // KnowledgeManager defines the interface for the knowledge base, providing a unified
 // entry point for searching and managing knowledge.
 type KnowledgeManager interface {
-	Search(ctx context.Context, query string) ([]rag.Document, error)
+	Search(ctx context.Context, query string) ([]search.Document, error)
 }

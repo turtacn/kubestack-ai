@@ -128,6 +128,19 @@ ksa plugin list
 ksa plugin install mongodb
 ```
 
+### Web Interface (New in P6)
+
+1.  Start the API server:
+    ```bash
+    ksa server start
+    ```
+2.  Start the Frontend (development mode):
+    ```bash
+    cd web/frontend
+    npm start
+    ```
+3.  Access the dashboard at `http://localhost:3000`.
+
 ### Basic Usage Examples
 
 #### Example 1: Comprehensive System Health Check

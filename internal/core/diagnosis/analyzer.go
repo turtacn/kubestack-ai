@@ -189,7 +189,13 @@ type AIAnalyzer struct {
 
 // NewAIAnalyzer creates a new, configured instance of the AIAnalyzer.
 func NewAIAnalyzer(llmClient llm_interfaces.LLMClient) (interfaces.DiagnosisAnalyzer, error) {
-	pb, err := prompt.NewBuilder(prompt.GetDefaultTemplates())
+	// Define the template locally since GetDefaultTemplates is not available.
+	// This template should align with what prompt.Builder expects.
+	tmpl := prompt.Template{
+		Name:    "generic-diagnosis",
+		Content: "Analyze the following system data and identify root causes for any issues. Return the result in JSON format.\n\nContext:\nMiddleware: {{.MiddlewareName}}\nInstance: {{.InstanceName}}\nTime: {{.Timestamp}}\n\nData:\n{{.CollectedData}}",
+	}
+	pb, err := prompt.NewBuilder(tmpl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prompt builder for AIAnalyzer: %w", err)
 	}
@@ -230,15 +236,23 @@ func (a *AIAnalyzer) CorrelateSystems(ctx context.Context, data *models.SystemCo
 		return nil, fmt.Errorf("failed to prepare data for prompt: %w", err)
 	}
 
-	// 2. Build the prompt messages
-	messages, err := a.promptBuilder.Build("generic-diagnosis", promptData, nil)
+	// 2. Build the prompt
+	promptStr, err := a.promptBuilder.
+		WithData("MiddlewareName", promptData.MiddlewareName).
+		WithData("InstanceName", promptData.InstanceName).
+		WithData("Timestamp", promptData.Timestamp).
+		WithData("CollectedData", promptData.CollectedData).
+		Build()
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to build diagnosis prompt: %w", err)
 	}
 
 	// 3. Send the request to the LLM
 	req := &llm_interfaces.LLMRequest{
-		Messages:    messages,
+		Messages: []llm_interfaces.Message{
+			{Role: "user", Content: promptStr},
+		},
 		Temperature: 0.2, // Lower temperature for more deterministic, factual analysis
 	}
 	a.log.Debug("Sending analysis request to LLM...")

@@ -46,6 +46,9 @@ type manager struct {
 // middleware-specific logic and a slice of analyzers to process the collected data.
 func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer, reportDir string) interfaces.DiagnosisManager {
 	// Ensure the report directory exists
+	if reportDir == "" {
+		reportDir = "reports"
+	}
 	if _, err := os.Stat(reportDir); os.IsNotExist(err) {
 		os.MkdirAll(reportDir, 0755)
 	}

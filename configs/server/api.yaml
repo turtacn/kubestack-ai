@@ -1,0 +1,39 @@
+server:
+  port: 8080
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+  cors:
+    allowed_origins:
+      - "http://localhost:3000"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+
+auth:
+  jwt_secret: "CHANGE_ME_IN_PRODUCTION"
+  token_ttl: 24h
+  refresh_enabled: true
+
+rbac:
+  roles:
+    admin:
+      permissions: ["*"]
+    operator:
+      permissions:
+        - "diagnosis:read"
+        - "diagnosis:write"
+        - "execution:read"
+        - "execution:write"
+    viewer:
+      permissions:
+        - "diagnosis:read"
+        - "execution:read"
+
+websocket:
+  ping_interval: 30s
+  max_connections: 1000

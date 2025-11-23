@@ -83,13 +83,16 @@ running on Kubernetes or bare metal servers.`,
 			return fmt.Errorf("failed to create AI analyzer: %w", err)
 		}
 		analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
-		diagManager := diagnosis.NewManager(pluginManager, analyzers)
+		diagManager := diagnosis.NewManager(pluginManager, analyzers, "reports")
 
 		// Execution components (using placeholder)
 		execManager := &execution.PlaceholderManager{}
 
 		// --- Orchestrator ---
-		orchestrator = orch.NewOrchestrator(cfg, pluginManager, diagManager, execManager)
+		// Warning: Missing KnowledgeManager and other components for RAG.
+		// Passing nil for now as Phase 6 focuses on API/Web.
+		// In a real integration, we'd initialize RAGEngine here.
+		orchestrator = orch.NewOrchestrator(cfg, pluginManager, diagManager, execManager, nil, llmClient, nil, nil, nil)
 		log.Info("Orchestrator and all dependencies initialized successfully.")
 
 		return nil
@@ -115,6 +118,7 @@ func init() {
 	rootCmd.AddCommand(newDiagnoseCmd())
 	rootCmd.AddCommand(newAskCmd())
 	rootCmd.AddCommand(newFixCmd())
+	rootCmd.AddCommand(newServerCmd())
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

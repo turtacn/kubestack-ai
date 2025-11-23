@@ -16,6 +16,11 @@
 // This provides a centralized and consistent way to manage predefined sets of values.
 package enum
 
+import (
+	"fmt"
+	"strings"
+)
+
 // MiddlewareType defines the supported types of middleware that KubeStack-AI can diagnose and manage.
 type MiddlewareType int
 
@@ -65,6 +70,16 @@ func (m MiddlewareType) String() string {
 //   bool: True if the middleware type is valid, false otherwise.
 func (m MiddlewareType) IsValid() bool {
 	return m >= MySQL && m <= ClickHouse
+}
+
+// ParseMiddlewareType converts a string to a MiddlewareType.
+func ParseMiddlewareType(s string) (MiddlewareType, error) {
+	for i, name := range middlewareTypeStrings {
+		if strings.EqualFold(name, s) {
+			return MiddlewareType(i), nil
+		}
+	}
+	return -1, fmt.Errorf("unknown middleware type: %s", s)
 }
 
 // DiagnosisStatus defines the overall outcome of a diagnostic run.

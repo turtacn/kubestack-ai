@@ -18,15 +18,27 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/spf13/viper"
 )
 
 // Config is the top-level configuration for the application.
 type Config struct {
-	KnowledgeConfigPath string          `mapstructure:"knowledge_config_path"`
-	Knowledge           KnowledgeConfig `mapstructure:"knowledge"`
-	LLM                 LLMConfig       `mapstructure:"llm"`
+	KnowledgeConfigPath string             `mapstructure:"knowledge_config_path"`
+	Knowledge           KnowledgeConfig    `mapstructure:"knowledge"`
+	LLM                 LLMConfig          `mapstructure:"llm"`
+	Server              ServerConfig       `mapstructure:"server"`
+	Auth                AuthConfig         `mapstructure:"auth"`
+	RBAC                RBACConfig         `mapstructure:"rbac"`
+	WebSocket           WebSocketConfig    `mapstructure:"websocket"`
+	Logger              logger.Config      `mapstructure:"logger"`
+	Plugins             PluginConfig       `mapstructure:"plugins"`
+}
+
+type PluginConfig struct {
+	Directory string `mapstructure:"directory"`
 }
 
 type LLMConfig struct {
@@ -41,6 +53,42 @@ type OpenAIConfig struct {
 
 type GeminiConfig struct {
 	APIKey string `mapstructure:"api_key"`
+}
+
+type ServerConfig struct {
+	Port int        `mapstructure:"port"`
+	TLS  TLSConfig  `mapstructure:"tls"`
+	CORS CORSConfig `mapstructure:"cors"`
+}
+
+type TLSConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	CertFile string `mapstructure:"cert_file"`
+	KeyFile  string `mapstructure:"key_file"`
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string `mapstructure:"allowed_origins"`
+	AllowedMethods []string `mapstructure:"allowed_methods"`
+}
+
+type AuthConfig struct {
+	JWTSecret      string        `mapstructure:"jwt_secret"`
+	TokenTTL       time.Duration `mapstructure:"token_ttl"`
+	RefreshEnabled bool          `mapstructure:"refresh_enabled"`
+}
+
+type RBACConfig struct {
+	Roles map[string]RoleConfig `mapstructure:"roles"`
+}
+
+type RoleConfig struct {
+	Permissions []string `mapstructure:"permissions"`
+}
+
+type WebSocketConfig struct {
+	PingInterval   time.Duration `mapstructure:"ping_interval"`
+	MaxConnections int           `mapstructure:"max_connections"`
 }
 
 // LoadConfig loads the configuration from the specified file.
@@ -79,9 +127,23 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
+	// Load server config if available in configs/server/api.yaml
+	// This is a bit of a hack for development, in production it should be part of the main config
+	viper.AddConfigPath("configs/server")
+	viper.SetConfigName("api")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg); err != nil {
+			// Ignore error if server config is missing
+		}
+	}
+
 	if err := cfg.Knowledge.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid knowledge config: %w", err)
 	}
 
 	return &cfg, nil
+}
+
+func (c *Config) Validate() error {
+    return c.Knowledge.Validate()
 }
