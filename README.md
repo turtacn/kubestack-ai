@@ -121,6 +121,9 @@ ksa ask "Why is my Redis cluster slow?"
 # Get specific middleware status
 ksa status redis --namespace production
 
+# Run diagnosis on a specific middleware
+ksa diagnose redis my-redis-instance -n default
+
 # List available plugins
 ksa plugin list
 
@@ -128,18 +131,14 @@ ksa plugin list
 ksa plugin install mongodb
 ```
 
-### Web Interface (New in P6)
+### Web Interface
 
 1.  Start the API server:
     ```bash
     ksa server start
     ```
-2.  Start the Frontend (development mode):
-    ```bash
-    cd web/frontend
-    npm start
-    ```
-3.  Access the dashboard at `http://localhost:3000`.
+2.  Access the Web Console at `http://localhost:8080/console`.
+    (Note: `http://localhost:3000` is for the full frontend if running, but the console integration is available on the API server port).
 
 ### Basic Usage Examples
 

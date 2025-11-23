@@ -72,6 +72,16 @@ type DiagnosisManager interface {
 	//   string: The formatted report.
 	//   error: An error if report generation fails.
 	GenerateReport(result *models.DiagnosisResult) (string, error)
+
+	// GetDiagnosisResult retrieves a previously completed diagnosis result by its ID.
+	//
+	// Parameters:
+	//   id (string): The unique identifier of the diagnosis result.
+	//
+	// Returns:
+	//   *models.DiagnosisResult: The diagnosis result if found.
+	//   error: An error if the result is not found or cannot be retrieved.
+	GetDiagnosisResult(id string) (*models.DiagnosisResult, error)
 }
 
 // DiagnosisAnalyzer defines the contract for a pluggable analysis component. It is

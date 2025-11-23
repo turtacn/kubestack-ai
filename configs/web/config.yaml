@@ -1,0 +1,15 @@
+server:
+  port: 8080
+  mode: debug
+  cors:
+    allowedOrigins: ["*"]
+    allowedMethods: ["GET", "POST", "PUT", "DELETE"]
+  tls:
+    enabled: false
+    certFile: ""
+    keyFile: ""
+
+# Web Console specific settings
+web:
+  title: "KubeStack-AI Console"
+  theme: "light"

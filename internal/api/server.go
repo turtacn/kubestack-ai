@@ -14,6 +14,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/web"
 )
 
 type Server struct {
@@ -60,6 +61,13 @@ func (s *Server) setupRoutes() {
 
 	// WebSocket
 	s.router.GET("/ws/diagnosis/:id", s.wsHandler.ServeHTTP)
+
+	// Load templates
+	s.router.LoadHTMLGlob("internal/web/templates/*")
+
+	// Web Console Routes
+	consoleHandler := web.NewConsoleHandler(s.diagnosisEngine)
+	consoleHandler.RegisterRoutes(s.router)
 
 	// API V1
 	v1 := s.router.Group("/api/v1")

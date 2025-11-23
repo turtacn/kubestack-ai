@@ -1,0 +1,23 @@
+{
+  "id": "db0f113e-a989-499e-b483-f927ea8e9889",
+  "timestamp": "2025-11-23T10:45:28.709831754Z",
+  "status": 1,
+  "summary": "Found 1 potential issue(s). Please review the details.",
+  "issues": [
+    {
+      "id": "856ca6c9-86ca-4540-ac6a-6a1566ba8fce",
+      "source": "AI",
+      "title": "OOM due to maxmemory",
+      "severity": 2,
+      "description": "High key eviction, No maxmemory-policy",
+      "evidence": "",
+      "recommendations": [
+        {
+          "id": "rec-0",
+          "description": "Set maxmemory-policy to allkeys-lru",
+          "canAutoFix": false
+        }
+      ]
+    }
+  ]
+}

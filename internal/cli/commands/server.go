@@ -48,7 +48,7 @@ func newServerCmd() *cobra.Command {
                 return fmt.Errorf("failed to create AI analyzer: %w", err)
             }
             analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
-            diagManager := diagnosis.NewManager(pluginManager, analyzers, "reports")
+            diagManager := diagnosis.NewManager(pluginManager, analyzers, nil, "reports")
 
             server := api.NewServer(cfg, diagManager)
             return server.Start(cmd.Context())

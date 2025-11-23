@@ -31,6 +31,9 @@ type DiagnosisRequest struct {
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	// Instance is the name of the specific middleware instance to diagnose.
 	Instance string `json:"instance" yaml:"instance"`
+	// OutputFormat specifies the desired format of the result (e.g., "json", "text").
+	// Defaults to "text" if not specified.
+	OutputFormat string `json:"outputFormat,omitempty" yaml:"outputFormat,omitempty"`
 }
 
 // DiagnosisResult is the comprehensive, structured output of a completed diagnosis run.

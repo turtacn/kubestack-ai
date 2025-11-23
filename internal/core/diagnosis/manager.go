@@ -341,6 +341,26 @@ func (m *manager) GenerateReport(result *models.DiagnosisResult) (string, error)
 		result.ID, result.Status, result.Summary, len(result.Issues)), nil
 }
 
+// GetDiagnosisResult retrieves a previously completed diagnosis result by its ID.
+func (m *manager) GetDiagnosisResult(id string) (*models.DiagnosisResult, error) {
+	filePath := filepath.Join(m.reportDir, fmt.Sprintf("%s.json", id))
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("diagnosis result not found for ID: %s", id)
+	}
+
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read diagnosis report: %w", err)
+	}
+
+	var result models.DiagnosisResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal diagnosis result: %w", err)
+	}
+
+	return &result, nil
+}
+
 // --- Helper Functions ---
 func sendProgress(ch chan<- interfaces.DiagnosisProgress, step, status, msg string) {
 	// If channel is nil, don't send

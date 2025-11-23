@@ -82,6 +82,11 @@ func ParseMiddlewareType(s string) (MiddlewareType, error) {
 	return -1, fmt.Errorf("unknown middleware type: %s", s)
 }
 
+// AllowedMiddlewareTypes returns a list of allowed middleware type strings.
+func AllowedMiddlewareTypes() []string {
+	return middlewareTypeStrings[:]
+}
+
 // DiagnosisStatus defines the overall outcome of a diagnostic run.
 type DiagnosisStatus int
 
