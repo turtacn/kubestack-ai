@@ -1,0 +1,20 @@
+prompts:
+  diagnosis_analysis:
+    template_path: ./internal/llm/prompt/templates/diagnosis_analysis.tmpl
+    max_tokens: 2000
+    temperature: 0.3
+
+  solution_generation:
+    template_path: ./internal/llm/prompt/templates/solution_generation.tmpl
+    max_tokens: 1500
+    temperature: 0.5
+
+  question_clarification:
+    template_path: ./internal/llm/prompt/templates/question_clarification.tmpl
+    max_tokens: 500
+    temperature: 0.7
+
+few_shot:
+  storage_path: ./docs/examples/few_shot_examples.yaml
+  auto_load: true
+  max_examples_per_category: 10

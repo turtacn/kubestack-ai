@@ -6,16 +6,18 @@ import (
 
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/parser"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/prompt"
 )
 
 type AIAnalyzer struct {
 	llmClient         interfaces.LLMClient
 	retriever         search.Retriever
-	promptRenderer    *PromptRenderer
-	parser            *StructuredParser
+	promptTemplate    prompt.PromptTemplate
+	parser            *parser.StructuredOutputParser
 	knowledgeInjector *KnowledgeInjector
 	multiTurnManager  *MultiTurnManager
-	validator         *OutputValidator
+	fewShotManager    *prompt.FewShotManager
 	config            *AIAnalyzerConfig
 }
 
@@ -34,7 +36,7 @@ type DiagnosisRequest struct {
 
 // This struct is the return type for the Analyze method
 type AnalyzeResult struct {
-	*DiagnosisResult
+	*parser.DiagnosisResult
 	NeedsClarification bool
 	ClarifyQuestion    string
 }
@@ -42,21 +44,21 @@ type AnalyzeResult struct {
 func NewAIAnalyzer(
 	llmClient interfaces.LLMClient,
 	retriever search.Retriever,
-	promptRenderer *PromptRenderer,
-	parser *StructuredParser,
+	template prompt.PromptTemplate,
+	parser *parser.StructuredOutputParser,
 	knowledgeInjector *KnowledgeInjector,
 	multiTurnManager *MultiTurnManager,
-	validator *OutputValidator,
+	fewShotManager *prompt.FewShotManager,
 	config *AIAnalyzerConfig,
 ) *AIAnalyzer {
 	return &AIAnalyzer{
 		llmClient:         llmClient,
 		retriever:         retriever,
-		promptRenderer:    promptRenderer,
+		promptTemplate:    template,
 		parser:            parser,
 		knowledgeInjector: knowledgeInjector,
 		multiTurnManager:  multiTurnManager,
-		validator:         validator,
+		fewShotManager:    fewShotManager,
 		config:            config,
 	}
 }
@@ -68,76 +70,49 @@ func (a *AIAnalyzer) Analyze(ctx context.Context, req *DiagnosisRequest) (*Analy
 		return nil, fmt.Errorf("failed to retrieve knowledge: %w", err)
 	}
 
-	// 2. Inject knowledge
-	knowledgeCtx := a.knowledgeInjector.InjectKnowledge(docs, req.Query)
+	// 2. Retrieve Few-Shot Examples
+	examples, err := a.fewShotManager.RetrieveSimilar(req.Query, req.PluginName, 3)
+	if err != nil {
+		// Log and continue without examples
+		examples = nil
+	}
 
 	// 3. Render prompt
 	promptData := map[string]interface{}{
-		"PluginName":       req.PluginName,
-		"Timestamp":        "now", // In a real scenario, you'd pass the actual timestamp
-		"UserQuery":        req.Query,
-		"SystemLogs":       req.Logs,
-		"MetricData":       req.Metrics,
-		"KnowledgeContext": knowledgeCtx,
+		"ServiceType":        req.PluginName,
+		"Question":           req.Query,
+		"Logs":               []map[string]interface{}{{"Timestamp": "now", "Level": "INFO", "Message": req.Logs}}, // Simplified for now
+		"Metrics":            []map[string]interface{}{{"Name": "Metrics", "Value": req.Metrics}},                   // Simplified
+		"RetrievedDocuments": docs,
+		"FewShotExamples":    examples,
 	}
-	prompt, err := a.promptRenderer.Render("diagnosis", promptData)
+
+	promptStr, err := a.promptTemplate.Render(promptData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
 
 	// 4. Call LLM
 	llmResp, err := a.llmClient.SendMessage(ctx, &interfaces.LLMRequest{
-		Messages:    []interfaces.Message{{Role: "user", Content: prompt}},
-		Temperature: a.config.Temperature,
-		MaxTokens:   a.config.MaxTokens,
+		Messages:       []interfaces.Message{{Role: "user", Content: promptStr}},
+		Temperature:    a.config.Temperature,
+		MaxTokens:      a.config.MaxTokens,
+		ResponseFormat: "json_object",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("llm client failed: %w", err)
 	}
 
 	// 5. Parse and validate
-	result, err := a.parser.ParseDiagnosisResult(llmResp.Message.Content)
+	result, err := a.parser.Parse(llmResp.Message.Content)
 	if err != nil {
-		// Retry logic
-		return a.retryWithStricterPrompt(ctx, prompt)
-	}
-	if err := a.validator.Validate(result); err != nil {
-		return nil, fmt.Errorf("invalid AI output: %w", err)
+		return nil, fmt.Errorf("parsing failed: %w", err)
 	}
 
-	// 6. Multi-turn management
-	turn, needsClarify, err := a.multiTurnManager.ProcessTurn(req.SessionID, req.Query, result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process turn: %w", err)
-	}
-
-	if needsClarify {
-		return &AnalyzeResult{NeedsClarification: true, ClarifyQuestion: turn.Content}, nil
-	}
-
-	return &AnalyzeResult{DiagnosisResult: result}, nil
-}
-
-func (a *AIAnalyzer) retryWithStricterPrompt(ctx context.Context, originalPrompt string) (*AnalyzeResult, error) {
-	stricterPrompt := originalPrompt + "\n\nCRITICAL: You MUST respond ONLY with valid JSON matching the schema above. Do not include any explanatory text."
-
-	llmResp, err := a.llmClient.SendMessage(ctx, &interfaces.LLMRequest{
-		Messages:    []interfaces.Message{{Role: "user", Content: stricterPrompt}},
-		Temperature: 0.1, // Lower temperature for stricter adherence
-		MaxTokens:   a.config.MaxTokens,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("llm client failed on retry: %w", err)
-	}
-
-	result, err := a.parser.ParseDiagnosisResult(llmResp.Message.Content)
-	if err != nil {
-		return nil, fmt.Errorf("parsing failed even on retry: %w", err)
-	}
-
-	if err := a.validator.Validate(result); err != nil {
-		return nil, fmt.Errorf("validation failed even on retry: %w", err)
-	}
+	// 6. Multi-turn management (Adaptation needed for new result type)
+	// For now, we assume simple return as the MultiTurnManager in memory seems specific to old types.
+	// TODO: Update MultiTurnManager to handle parser.DiagnosisResult if needed.
+	// turn, needsClarify, err := a.multiTurnManager.ProcessTurn(req.SessionID, req.Query, result)
 
 	return &AnalyzeResult{DiagnosisResult: result}, nil
 }

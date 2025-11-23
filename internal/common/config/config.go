@@ -26,6 +26,21 @@ import (
 type Config struct {
 	KnowledgeConfigPath string          `mapstructure:"knowledge_config_path"`
 	Knowledge           KnowledgeConfig `mapstructure:"knowledge"`
+	LLM                 LLMConfig       `mapstructure:"llm"`
+}
+
+type LLMConfig struct {
+	Provider string       `mapstructure:"provider"`
+	OpenAI   OpenAIConfig `mapstructure:"openai"`
+	Gemini   GeminiConfig `mapstructure:"gemini"`
+}
+
+type OpenAIConfig struct {
+	APIKey string `mapstructure:"api_key"`
+}
+
+type GeminiConfig struct {
+	APIKey string `mapstructure:"api_key"`
 }
 
 // LoadConfig loads the configuration from the specified file.

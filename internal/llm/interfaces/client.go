@@ -41,6 +41,8 @@ type LLMRequest struct {
 	MaxTokens int `json:"max_tokens,omitempty"`
 	// Stream indicates whether a streaming response is requested.
 	Stream bool `json:"stream,omitempty"`
+	// ResponseFormat specifies the format of the response (e.g., "json_object").
+	ResponseFormat string `json:"response_format,omitempty"`
 }
 
 // UsageStats contains information about token usage for an API request, which is

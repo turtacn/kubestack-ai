@@ -1,0 +1,52 @@
+You are an expert in diagnosing issues with {{.ServiceType}} systems.
+
+## Task
+Analyze the following problem and provide a structured diagnosis.
+
+## Input Context
+**User Question:** {{.Question}}
+
+{{if .RetrievedDocuments}}
+**Relevant Knowledge:**
+{{range .RetrievedDocuments}}
+- {{.Title}}: {{truncate .Content 200}}
+{{end}}
+{{end}}
+
+{{if .Metrics}}
+**Metrics Data:**
+{{range .Metrics}}
+- {{.Name}}: {{.Value}} (threshold: {{.Threshold}})
+{{end}}
+{{end}}
+
+{{if .Logs}}
+**Recent Logs:**
+{{range .Logs}}
+- [{{.Timestamp}}] {{.Level}}: {{truncate .Message 100}}
+{{end}}
+{{end}}
+
+{{if .FewShotExamples}}
+## Few-shot Examples
+{{range .FewShotExamples}}
+### Example {{.ID}}
+**Input:** {{.Input}}
+**Analysis:** {{.Analysis}}
+**Output:** {{.Output}}
+{{end}}
+{{end}}
+
+## Output Requirements
+Respond with a JSON object containing:
+{
+  "root_cause": "string (primary cause of the issue)",
+  "severity": "string (low/medium/high/critical)",
+  "confidence": float (0.0-1.0),
+  "contributing_factors": ["factor1", "factor2"],
+  "affected_components": ["component1"],
+  "evidence": ["evidence1", "evidence2"],
+  "next_steps": ["step1", "step2"]
+}
+
+Ensure all fields are present and valid.

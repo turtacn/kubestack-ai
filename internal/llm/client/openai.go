@@ -202,13 +202,21 @@ func toOpenAIChatRequest(req *interfaces.LLMRequest) openai.ChatCompletionReques
 		}
 	}
 
-	return openai.ChatCompletionRequest{
+	openaiReq := openai.ChatCompletionRequest{
 		Model:       req.Model,
 		Messages:    messages,
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 		Stream:      req.Stream,
 	}
+
+	if req.ResponseFormat == "json_object" {
+		openaiReq.ResponseFormat = &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		}
+	}
+
+	return openaiReq
 }
 
 //Personal.AI order the ending

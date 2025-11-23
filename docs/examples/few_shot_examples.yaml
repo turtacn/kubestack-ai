@@ -1,0 +1,35 @@
+# Few-shot examples for KubeStack-AI
+examples:
+  - id: redis-oom-001
+    category: Redis/OOM
+    input: "Redis instance memory usage suddenly spiked to 90%, with massive eviction events"
+    analysis: |
+      Metrics show 'evicted_keys' significantly increasing, indicating Redis is enforcing memory limits.
+      Possible causes: 1) Cache stampede causing high write volume 2) Improper maxmemory config 3) Memory leak or large keys
+    output: |
+      {
+        "root_cause": "maxmemory configuration too low for workload, coupled with keys without TTL",
+        "severity": "high",
+        "confidence": 0.85,
+        "contributing_factors": ["Improper Cache Strategy", "Missing TTL"],
+        "affected_components": ["Redis Master"],
+        "evidence": ["evicted_keys > 10000/min", "used_memory_rss > maxmemory"],
+        "next_steps": ["Run MEMORY DOCTOR", "Analyze big keys", "Set maxmemory-policy to allkeys-lru"]
+      }
+
+  - id: kafka-lag-001
+    category: Kafka/Latency
+    input: "Kafka consumer group lag is growing continuously, reached 1 million messages"
+    analysis: |
+      Consumption rate is lower than production rate. Check consumer threads, network bandwidth, and downstream processing time.
+      Likely insufficient consumer instances or slow per-message processing.
+    output: |
+      {
+        "root_cause": "Consumer processing capacity insufficient. Single instance TPS is 200, while production TPS is 5000",
+        "severity": "critical",
+        "confidence": 0.92,
+        "contributing_factors": ["Small Consumer Thread Pool", "Slow Database Query"],
+        "affected_components": ["consumer-group-A"],
+        "evidence": ["lag growth 1000/s", "consumer p99 duration = 500ms"],
+        "next_steps": ["Scale up consumers to 10 instances", "Optimize DB index", "Enable batch commit"]
+      }
