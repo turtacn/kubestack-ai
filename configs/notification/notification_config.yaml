@@ -1,0 +1,8 @@
+webhook:
+  url: ""
+email:
+  host: "smtp.example.com"
+  port: 587
+  username: "user"
+  password: "password"
+  from: "kubestack-ai@example.com"

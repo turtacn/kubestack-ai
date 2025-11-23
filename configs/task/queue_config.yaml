@@ -1,0 +1,6 @@
+type: redis
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  queue_name: "diagnosis_tasks"

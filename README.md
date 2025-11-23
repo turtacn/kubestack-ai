@@ -140,6 +140,22 @@ ksa plugin install mongodb
 2.  Access the Web Console at `http://localhost:8080/console`.
     (Note: `http://localhost:3000` is for the full frontend if running, but the console integration is available on the API server port).
 
+#### Asynchronous Tasks
+
+You can submit long-running diagnosis tasks asynchronously:
+
+```bash
+curl -X POST http://localhost:8080/console/diagnose?async=true \
+  -H "Content-Type: application/json" \
+  -d '{"targetMiddleware": "redis", "instance": "my-redis"}'
+```
+
+This returns a `task_id`. You can check the status:
+
+```bash
+curl http://localhost:8080/console/task/status/<task_id>
+```
+
 ### Basic Usage Examples
 
 #### Example 1: Comprehensive System Health Check

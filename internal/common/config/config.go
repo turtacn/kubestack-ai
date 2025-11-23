@@ -35,6 +35,38 @@ type Config struct {
 	WebSocket           WebSocketConfig    `mapstructure:"websocket"`
 	Logger              logger.Config      `mapstructure:"logger"`
 	Plugins             PluginConfig       `mapstructure:"plugins"`
+	TaskQueue           TaskQueueConfig    `mapstructure:"task_queue"`
+	Notification        NotificationConfig `mapstructure:"notification"`
+}
+
+type TaskQueueConfig struct {
+	Type  string      `mapstructure:"type"`
+	Redis RedisConfig `mapstructure:"redis"`
+}
+
+type RedisConfig struct {
+	Addr      string `mapstructure:"addr"`
+	Password  string `mapstructure:"password"`
+	DB        int    `mapstructure:"db"`
+	QueueName string `mapstructure:"queue_name"`
+}
+
+type NotificationConfig struct {
+	Webhook WebhookConfig `mapstructure:"webhook"`
+	Email   EmailConfig   `mapstructure:"email"`
+}
+
+type WebhookConfig struct {
+	URL string `mapstructure:"url"`
+}
+
+type EmailConfig struct {
+	Host      string `mapstructure:"host"`
+	Port      int    `mapstructure:"port"`
+	Username  string `mapstructure:"username"`
+	Password  string `mapstructure:"password"`
+	From      string `mapstructure:"from"`
+	DefaultTo string `mapstructure:"default_to"`
 }
 
 type PluginConfig struct {
@@ -134,6 +166,24 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	if err := viper.MergeInConfig(); err == nil {
 		if err := viper.Unmarshal(&cfg); err != nil {
 			// Ignore error if server config is missing
+		}
+	}
+
+	// Load task queue config
+	viper.AddConfigPath("configs/task")
+	viper.SetConfigName("queue_config")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg.TaskQueue); err != nil {
+			// Ignore error
+		}
+	}
+
+	// Load notification config
+	viper.AddConfigPath("configs/notification")
+	viper.SetConfigName("notification_config")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg.Notification); err != nil {
+			// Ignore error
 		}
 	}
 
