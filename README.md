@@ -67,8 +67,14 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 
 ### 🧩 **Plugin Architecture**
 - **Extensible Design**: Add support for any middleware through plugins
+- **Core Plugins**: Native support for Redis, Kafka, MySQL, and Elasticsearch
 - **Community Driven**: Open plugin ecosystem
 - **Hot-swappable**: Install, update, and remove plugins without downtime
+- **Middleware Support**:
+  - **Redis**: 5.x, 6.x, 7.x (Cluster/Sentinel/Standalone)
+  - **Kafka**: 2.x, 3.x (Lag monitoring, JMX)
+  - **MySQL**: 5.7, 8.x (Replication, Slow Queries)
+  - **Elasticsearch**: 7.x, 8.x (Cluster Health, Node Stats)
 
 ### 🤖 **AI-Enhanced Operations**
 - **Smart Recommendations**: Context-aware optimization suggestions  

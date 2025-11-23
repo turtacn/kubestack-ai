@@ -1,0 +1,11 @@
+plugin:
+  name: kafka
+  enabled: true
+  settings:
+    brokers:
+      - "localhost:9092"
+    sasl:
+      user: ""
+      password: ""
+    jmx_endpoints:
+      - "http://localhost:8778/jolokia"

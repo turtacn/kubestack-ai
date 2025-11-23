@@ -1,0 +1,6 @@
+diagnosis:
+  timeout: 30s
+  concurrency: 5
+  plugins:
+    enabled: true
+    autoload_path: "configs/plugins"

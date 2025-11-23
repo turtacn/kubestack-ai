@@ -1,0 +1,8 @@
+plugin:
+  name: elasticsearch
+  enabled: true
+  settings:
+    addresses:
+      - "http://localhost:9200"
+    username: ""
+    password: ""
