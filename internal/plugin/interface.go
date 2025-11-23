@@ -4,9 +4,41 @@ import (
 	"context"
 	"crypto/tls"
 	"time"
+
+	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 )
 
-// Plugin 插件核心接口
+// DiagnosticPlugin 诊断插件接口 (P4)
+type DiagnosticPlugin interface {
+	// 插件名称
+	Name() string
+
+	// 支持的中间件类型
+	SupportedTypes() []string
+
+	// 插件版本
+	Version() string
+
+	// 初始化插件
+	Init(config map[string]interface{}) error
+
+	// 执行诊断
+	Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)
+
+	// 关闭插件，释放资源
+	Shutdown() error
+}
+
+// 插件元数据
+type PluginMetadata struct {
+	Name           string   `json:"name"`
+	Version        string   `json:"version"`
+	SupportedTypes []string `json:"supported_types"`
+	Author         string   `json:"author"`
+	Description    string   `json:"description"`
+}
+
+// Plugin 插件核心接口 (Legacy, keeping for compatibility if needed, but DiagnosticPlugin is the main focus for P4)
 type Plugin interface {
 	// 元数据
 	Name() string

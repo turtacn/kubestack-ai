@@ -20,7 +20,7 @@
   <a href="README-zh.md">中文文档</a> •
   <a href="docs/architecture.md">Architecture</a> •
   <a href="docs/contributing.md">Contributing</a> •
-  <a href="docs/plugins.md">Plugin Development</a>
+  <a href="docs/plugin_development.md">Plugin Development</a>
 </p>
 
 ---
@@ -220,7 +220,8 @@ $ ksa diagnose clickhouse --cluster analytics
 ## 📖 Documentation
 
 * [**Architecture Overview**](docs/architecture.md) - Technical deep-dive into system design
-* [**Plugin Development Guide**](docs/plugins.md) - Build your own middleware plugins
+* [**Plugin Development Guide**](docs/plugin_development.md) - Build your own middleware plugins
+* [**Supported Middlewares**](docs/supported_middlewares.md) - List of supported middlewares and their capabilities
 * [**Configuration Reference**](docs/configuration.md) - Complete config options. See `configs/knowledge/knowledge.yaml` for RAG pipeline configuration.
 * [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
 * [**API Reference**](docs/api.md) - REST API and SDK documentation
@@ -235,7 +236,8 @@ A brief overview of the key directories in the KubeStack-AI repository:
   - **`/core`**: The heart of the application. It contains the central orchestrator and the primary interfaces for diagnosis, execution, and plugins.
   - **`/llm`**: Abstractions and clients for interacting with Large Language Models (LLMs) and the Retrieval-Augmented Generation (RAG) pipeline.
   - **`/knowledge`**: Components for the knowledge base, including storage, crawling, and search functionalities.
-  - **`/plugins`**: The plugin management system and all built-in middleware plugins (e.g., Redis, Kafka).
+  - **`/plugin`**: The new unified plugin system architecture (Phase 4), including Registry, Loader, and Validator.
+  - **`/plugins`**: Built-in middleware plugins (e.g., Redis, Kafka, MySQL).
 - **`/pkg`**: Shared utility packages that could theoretically be used by external applications.
 - **`/deployments`**: Kubernetes manifests, Dockerfiles, and other deployment-related artifacts.
 - **`/docs`**: Project documentation, including architecture and contribution guides.

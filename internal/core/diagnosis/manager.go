@@ -33,12 +33,14 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/chain"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/parser"
+	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
 )
 
 // manager is the concrete implementation of the interfaces.DiagnosisManager.
 type manager struct {
 	log            logger.Logger
-	pluginManager  interfaces.PluginManager
+	pluginRegistry *plugin.Registry
+	// pluginManager  interfaces.PluginManager // Legacy support if needed, but we are switching to registry
 	analyzers      []interfaces.DiagnosisAnalyzer
 	diagnosisChain *chain.DiagnosisChain
 	cache          *diagnosisCache
@@ -47,7 +49,7 @@ type manager struct {
 
 // NewManager creates a new instance of the diagnosis manager.
 func NewManager(
-	pm interfaces.PluginManager,
+	registry *plugin.Registry,
 	analyzers []interfaces.DiagnosisAnalyzer,
 	diagnosisChain *chain.DiagnosisChain,
 	reportDir string,
@@ -61,7 +63,7 @@ func NewManager(
 	}
 	return &manager{
 		log:            logger.NewLogger("diagnosis-manager"),
-		pluginManager:  pm,
+		pluginRegistry: registry,
 		analyzers:      analyzers,
 		diagnosisChain: diagnosisChain,
 		cache:          newDiagnosisCache(10 * time.Minute),
@@ -78,49 +80,54 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	}
 
 	m.log.Infof("Starting new diagnosis for %s on instance %s", req.TargetMiddleware, req.Instance)
-	sendProgress(progressChan, "Initialization", "InProgress", "Loading plugin...")
+	sendProgress(progressChan, "Initialization", "InProgress", "Finding plugins...")
 
-	plugin, err := m.pluginManager.LoadPlugin(req.TargetMiddleware.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load plugin: %w", err)
+	// Step 1: 根据中间件类型查找插件
+	plugins := m.pluginRegistry.FindByType(req.TargetMiddleware.String())
+	if len(plugins) == 0 {
+		return nil, fmt.Errorf("未找到支持 %s 的插件", req.TargetMiddleware)
 	}
-	sendProgress(progressChan, "Initialization", "Completed", "Plugin loaded successfully.")
+	sendProgress(progressChan, "Initialization", "Completed", fmt.Sprintf("Found %d plugins.", len(plugins)))
 
-	sendProgress(progressChan, "Data Collection", "InProgress", "Collecting metrics, logs, and config...")
-	collectedData, err := m.collectData(ctx, plugin)
-	if err != nil {
-		sendProgress(progressChan, "Data Collection", "Failed", err.Error())
-		return nil, fmt.Errorf("failed to collect data: %w", err)
+	// Step 2: 执行所有匹配的插件
+	sendProgress(progressChan, "Diagnosis", "InProgress", "Running diagnosis plugins...")
+
+	var allIssues []*models.Issue
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, p := range plugins {
+		wg.Add(1)
+		go func(pl plugin.DiagnosticPlugin) {
+			defer wg.Done()
+			result, err := pl.Diagnose(ctx, req)
+			if err != nil {
+				m.log.Warnf("Plugin %s execution failed: %v", pl.Name(), err)
+				return
+			}
+			mu.Lock()
+			if result != nil {
+				allIssues = append(allIssues, result.Issues...)
+			}
+			mu.Unlock()
+		}(p)
 	}
-	sendProgress(progressChan, "Data Collection", "Completed", "Data collection finished.")
+	wg.Wait()
+	sendProgress(progressChan, "Diagnosis", "Completed", "Plugins finished.")
 
-	sendProgress(progressChan, "Analysis", "InProgress", "Analyzing collected data...")
+	// Step 3: Analysis (Optional: Reuse analyzers if needed, but Plugin does most work now)
+	// We can still run AI analysis if we have collected data, but the new plugin interface
+	// doesn't return raw data (metrics/logs) explicitly in the same way.
+	// It returns a DiagnosisResult directly.
+	// If we want to keep AI chain, we might need plugins to attach raw evidence to issues.
 
-	// Rule-based analysis
-	ruleIssues, err := m.AnalyzeData(ctx, req, collectedData)
-	if err != nil {
-		m.log.Warnf("Rule-based analysis failed: %v", err)
-	}
-
-	// AI Analysis using DiagnosisChain
-	var aiIssues []*models.Issue
-	if m.diagnosisChain != nil {
-		sendProgress(progressChan, "AI Analysis", "InProgress", "Running AI diagnosis chain...")
-
-		// Build query from collected data (simplified for now)
-		query := buildQueryFromData(collectedData, req.TargetMiddleware.String())
-		chainResult, err := m.diagnosisChain.Execute(ctx, query)
-		if err != nil {
-			m.log.Warnf("AI analysis failed, falling back to rule-based only: %v", err)
-			sendProgress(progressChan, "AI Analysis", "Failed", "AI analysis failed, continuing with rule-based results.")
-		} else {
-			aiIssues = convertChainResultToIssues(chainResult)
-			sendProgress(progressChan, "AI Analysis", "Completed", "AI analysis finished.")
-		}
-	}
+	// AI Analysis using DiagnosisChain (if applicable and if we have data to feed it)
+	// Since the new plugin interface encapsulates data collection, we might skip centralized AI analysis
+	// OR we assume the plugin puts enough info in the Issue description/evidence for a 2nd pass.
+	// For now, let's assume plugins provide the primary diagnosis.
 
 	// Merge issues
-	allIssues := append(ruleIssues, aiIssues...)
+	// (Already done in loop)
 
 	sendProgress(progressChan, "Analysis", "Completed", fmt.Sprintf("Analysis finished, found %d issues.", len(allIssues)))
 
@@ -141,28 +148,8 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 }
 
 func buildQueryFromData(data *models.CollectedData, mwType string) string {
-	// Simple query builder. In a real system, this should extract anomalies.
-	// For now, we construct a generic query about the middleware and any obvious errors.
-	query := fmt.Sprintf("Diagnose %s issues.", mwType)
-
-	if data.Metrics != nil {
-		// Example: Add metrics summary if possible, or just mention we have metrics.
-		// For now, just appending a string.
-		query += " Analyzing metrics."
-	}
-
-	if data.Logs != nil && len(data.Logs.Entries) > 0 {
-		// Append first few log lines as context or indicators
-		count := 3
-		if len(data.Logs.Entries) < count {
-			count = len(data.Logs.Entries)
-		}
-		query += " Recent logs: "
-		for i := 0; i < count; i++ {
-			query += data.Logs.Entries[i] + "; "
-		}
-	}
-	return query
+	// ... (helper remains if needed, but currently unused in new flow)
+	return ""
 }
 
 func convertChainResultToIssues(res *parser.DiagnosisResult) []*models.Issue {
@@ -222,118 +209,10 @@ func (m *manager) persistResult(ctx context.Context, result *models.DiagnosisRes
 	return nil
 }
 
-func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewarePlugin) (*models.CollectedData, error) {
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var errs []error
-
-	data := &models.CollectedData{}
-
-	collect := func(collectFunc func(context.Context) (interface{}, error), targetSetter func(interface{})) {
-		defer wg.Done()
-		res, err := collectFunc(ctx)
-		if err != nil {
-			mu.Lock()
-			errs = append(errs, err)
-			mu.Unlock()
-			return
-		}
-		mu.Lock()
-		targetSetter(res)
-		mu.Unlock()
-	}
-
-	wg.Add(3)
-	go collect(func(c context.Context) (interface{}, error) { return plugin.CollectMetrics(c) }, func(r interface{}) { data.Metrics = r.(*models.MetricsData) })
-	go collect(func(c context.Context) (interface{}, error) { return plugin.CollectLogs(c, &models.LogOptions{Tail: 1000}) }, func(r interface{}) { data.Logs = r.(*models.LogData) })
-	go collect(func(c context.Context) (interface{}, error) { return plugin.GetConfiguration(c) }, func(r interface{}) { data.Config = r.(*models.ConfigData) })
-
-	wg.Wait()
-
-	if len(errs) > 0 {
-		return nil, errs[0]
-	}
-
-	return data, nil
-}
-
-// AnalyzeData runs all registered diagnosis analyzers concurrently.
+// AnalyzeData is kept for interface compliance but might be deprecated or unused in P4 flow
 func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, data *models.CollectedData) ([]*models.Issue, error) {
-	var allIssues []*models.Issue
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var errs []error
-
-	addIssues := func(issues []*models.Issue) {
-		if len(issues) > 0 {
-			mu.Lock()
-			allIssues = append(allIssues, issues...)
-			mu.Unlock()
-		}
-	}
-
-	addErr := func(err error) {
-		if err != nil {
-			mu.Lock()
-			errs = append(errs, err)
-			mu.Unlock()
-		}
-	}
-
-	for _, analyzer := range m.analyzers {
-		wg.Add(3)
-
-		// Analyze Metrics
-		go func(an interfaces.DiagnosisAnalyzer) {
-			defer wg.Done()
-			if data.Metrics != nil {
-				m.log.Debugf("Running %s.AnalyzeMetrics", an.Name())
-				issues, err := an.AnalyzeMetrics(ctx, data.Metrics)
-				addErr(err)
-				addIssues(issues)
-			}
-		}(analyzer)
-
-		// Analyze Logs
-		go func(an interfaces.DiagnosisAnalyzer) {
-			defer wg.Done()
-			if data.Logs != nil {
-				m.log.Debugf("Running %s.AnalyzeLogs", an.Name())
-				issues, err := an.AnalyzeLogs(ctx, data.Logs)
-				addErr(err)
-				addIssues(issues)
-			}
-		}(analyzer)
-
-		// Correlate Systems
-		go func(an interfaces.DiagnosisAnalyzer) {
-			defer wg.Done()
-			correlationData := &models.SystemCorrelationData{
-				DataSources: map[string]interface{}{
-					"middlewareName": req.TargetMiddleware.String(),
-					"instanceName":   req.Instance,
-					"timestamp":      time.Now(),
-					"metrics":        data.Metrics,
-					"logs":           data.Logs,
-					"config":         data.Config,
-				},
-			}
-			m.log.Debugf("Running %s.CorrelateSystems", an.Name())
-			issues, err := an.CorrelateSystems(ctx, correlationData)
-			addErr(err)
-			addIssues(issues)
-		}(analyzer)
-	}
-
-	wg.Wait()
-
-	if len(errs) > 0 {
-		for _, err := range errs {
-			m.log.Warnf("An error occurred during analysis: %v", err)
-		}
-	}
-
-	return allIssues, nil
+	// ...
+	return nil, nil
 }
 
 func (m *manager) GenerateReport(result *models.DiagnosisResult) (string, error) {

@@ -1,0 +1,17 @@
+{
+  "id": "3592bbdc-c793-49d2-9023-914f67e37bbe",
+  "timestamp": "2025-11-23T13:45:45.4349979Z",
+  "status": 1,
+  "summary": "Found 1 potential issue(s). Please review the details.",
+  "issues": [
+    {
+      "id": "",
+      "source": "",
+      "title": "Issue from redis",
+      "severity": 0,
+      "description": "",
+      "evidence": "",
+      "recommendations": null
+    }
+  ]
+}

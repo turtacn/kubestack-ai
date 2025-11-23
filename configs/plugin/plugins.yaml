@@ -1,0 +1,43 @@
+# 插件配置文件
+enabled_plugins:
+  - name: redis
+    enabled: true
+    config:
+      addr: "localhost:6379"
+      password: ""
+      db: 0
+
+  - name: mysql
+    enabled: true
+    config:
+      dsn: "root:password@tcp(localhost:3306)/diagnosis"
+      max_connections: 10
+
+  - name: kafka
+    enabled: true
+    config:
+      brokers:
+        - "localhost:9092"
+      consumer_group: "diagnosis-group"
+
+  - name: elasticsearch
+    enabled: false
+    config:
+      urls:
+        - "http://localhost:9200"
+      username: "elastic"
+      password: "changeme"
+
+# 插件全局设置
+plugin_settings:
+  # 插件超时时间
+  timeout: 30s
+
+  # 是否启用插件缓存
+  enable_cache: true
+
+  # 插件加载失败时的行为（continue/fail）
+  on_load_error: continue
+
+  # 允许的最大插件数量
+  max_plugins: 20

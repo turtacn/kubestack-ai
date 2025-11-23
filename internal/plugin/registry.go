@@ -1,98 +1,70 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
+	"log"
 	"sync"
 )
 
-var (
-	ErrPluginNameConflict     = errors.New("plugin name conflict")
-	ErrIncompatibleAPIVersion = errors.New("incompatible API version")
-	ErrPluginNotFound         = errors.New("plugin not found")
-)
-
-type ErrPluginConflict struct {
-	Conflicting string
-}
-
-func (e ErrPluginConflict) Error() string {
-	return fmt.Sprintf("plugin conflict with: %s", e.Conflicting)
-}
-
+// Registry 插件注册中心
 type Registry struct {
-	factories map[string]PluginFactory // key=插件名
-	mu        sync.RWMutex
-}
-
-type PluginFactory interface {
-	Create() Plugin
-	Metadata() *PluginMetadata
-}
-
-type PluginMetadata struct {
-	Name                 string
-	Version              string
-	APIVersion           string // KSA API版本要求，如"v1"
-	SupportedMiddlewares []string
-	Description          string
-	Author               string
-	Conflicts            []string // 与哪些插件冲突
+	mu      sync.RWMutex
+	plugins map[string]DiagnosticPlugin
 }
 
 func NewRegistry() *Registry {
-	return &Registry{factories: make(map[string]PluginFactory)}
+	return &Registry{
+		plugins: make(map[string]DiagnosticPlugin),
+	}
 }
 
-func (r *Registry) Register(factory PluginFactory) error {
+// Register 注册插件
+func (r *Registry) Register(plugin DiagnosticPlugin) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	metadata := factory.Metadata()
-
-	// 3. 检查名称冲突
-	if _, exists := r.factories[metadata.Name]; exists {
-		return ErrPluginNameConflict
+	name := plugin.Name()
+	if _, exists := r.plugins[name]; exists {
+		return fmt.Errorf("插件 %s 已注册", name)
 	}
 
-	// 4. 检查版本兼容性
-	if !r.isAPICompatible(metadata.APIVersion) {
-		return ErrIncompatibleAPIVersion
-	}
-
-	// 5. 检查与已注册插件的冲突
-	for _, conflict := range metadata.Conflicts {
-		if _, exists := r.factories[conflict]; exists {
-			return ErrPluginConflict{Conflicting: conflict}
-		}
-	}
-
-	r.factories[metadata.Name] = factory
+	r.plugins[name] = plugin
+	log.Printf("插件 %s (v%s) 注册成功", name, plugin.Version())
 	return nil
 }
 
-func (r *Registry) GetFactory(name string) (PluginFactory, error) {
+// Get 获取插件
+func (r *Registry) Get(name string) DiagnosticPlugin {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.plugins[name]
+}
+
+// FindByType 根据中间件类型查找插件
+func (r *Registry) FindByType(middlewareType string) []DiagnosticPlugin {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	factory := r.factories[name]
-	if factory == nil {
-		return nil, ErrPluginNotFound
+	var matched []DiagnosticPlugin
+	for _, plugin := range r.plugins {
+		for _, supportedType := range plugin.SupportedTypes() {
+			if supportedType == middlewareType {
+				matched = append(matched, plugin)
+				break
+			}
+		}
 	}
-	return factory, nil
+	return matched
 }
 
-// isAPICompatible checks if the plugin's required API version is compatible with the current system.
-// For now, we assume "v1" is the current version and we are compatible with "v1" and "v1.x".
-func (r *Registry) isAPICompatible(requiredVersion string) bool {
-	// Simple check for now. In a real system, we might use semver.
-	return requiredVersion == "v1" || requiredVersion == "v1.0"
-}
+// List 列出所有插件
+func (r *Registry) List() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-// Global registry instance
-var GlobalRegistry = NewRegistry()
-
-// RegisterPlugin is a helper to register to the global registry
-func RegisterPlugin(factory PluginFactory) error {
-	return GlobalRegistry.Register(factory)
+	names := make([]string, 0, len(r.plugins))
+	for name := range r.plugins {
+		names = append(names, name)
+	}
+	return names
 }

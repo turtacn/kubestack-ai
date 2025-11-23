@@ -17,6 +17,11 @@ package main
 
 import (
 	"github.com/kubestack-ai/kubestack-ai/internal/cli/commands"
+	// Register built-in plugins
+	_ "github.com/kubestack-ai/kubestack-ai/plugins/elasticsearch"
+	_ "github.com/kubestack-ai/kubestack-ai/plugins/kafka"
+	_ "github.com/kubestack-ai/kubestack-ai/plugins/mysql"
+	_ "github.com/kubestack-ai/kubestack-ai/plugins/redis"
 )
 
 // main is the entry point for the KubeStack-AI (ksa) command-line application.
