@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,21 +31,27 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/chain"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/parser"
 )
 
 // manager is the concrete implementation of the interfaces.DiagnosisManager.
 type manager struct {
-	log           logger.Logger
-	pluginManager interfaces.PluginManager
-	analyzers     []interfaces.DiagnosisAnalyzer
-	cache         *diagnosisCache
-	reportDir     string
+	log            logger.Logger
+	pluginManager  interfaces.PluginManager
+	analyzers      []interfaces.DiagnosisAnalyzer
+	diagnosisChain *chain.DiagnosisChain
+	cache          *diagnosisCache
+	reportDir      string
 }
 
-// NewManager creates a new instance of the diagnosis manager, which orchestrates
-// the entire diagnosis process. It takes a plugin manager to load the appropriate
-// middleware-specific logic and a slice of analyzers to process the collected data.
-func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer, reportDir string) interfaces.DiagnosisManager {
+// NewManager creates a new instance of the diagnosis manager.
+func NewManager(
+	pm interfaces.PluginManager,
+	analyzers []interfaces.DiagnosisAnalyzer,
+	diagnosisChain *chain.DiagnosisChain,
+	reportDir string,
+) interfaces.DiagnosisManager {
 	// Ensure the report directory exists
 	if reportDir == "" {
 		reportDir = "reports"
@@ -53,26 +60,16 @@ func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAna
 		os.MkdirAll(reportDir, 0755)
 	}
 	return &manager{
-		log:           logger.NewLogger("diagnosis-manager"),
-		pluginManager: pm,
-		analyzers:     analyzers,
-		cache:         newDiagnosisCache(10 * time.Minute), // Default 10 min cache TTL
-		reportDir:     reportDir,
+		log:            logger.NewLogger("diagnosis-manager"),
+		pluginManager:  pm,
+		analyzers:      analyzers,
+		diagnosisChain: diagnosisChain,
+		cache:          newDiagnosisCache(10 * time.Minute),
+		reportDir:      reportDir,
 	}
 }
 
-// RunDiagnosis executes the full, end-to-end diagnosis workflow. It handles
-// caching, plugin loading, data collection, analysis, and result summarization.
-// Progress updates are sent to the provided channel throughout the process.
-//
-// Parameters:
-//   ctx (context.Context): The context for the entire diagnosis operation.
-//   req (*models.DiagnosisRequest): The request detailing what to diagnose.
-//   progressChan (chan<- interfaces.DiagnosisProgress): A channel to send real-time progress updates.
-//
-// Returns:
-//   *models.DiagnosisResult: The final result of the diagnosis, including any identified issues.
-//   error: An error if a critical step in the workflow fails.
+// RunDiagnosis executes the full, end-to-end diagnosis workflow.
 func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest, progressChan chan<- interfaces.DiagnosisProgress) (*models.DiagnosisResult, error) {
 	if result, found := m.cache.Get(req); found {
 		m.log.Info("Returning diagnosis result from cache.")
@@ -98,29 +95,114 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	sendProgress(progressChan, "Data Collection", "Completed", "Data collection finished.")
 
 	sendProgress(progressChan, "Analysis", "InProgress", "Analyzing collected data...")
-	issues, err := m.AnalyzeData(ctx, req, collectedData)
+
+	// Rule-based analysis
+	ruleIssues, err := m.AnalyzeData(ctx, req, collectedData)
 	if err != nil {
-		sendProgress(progressChan, "Analysis", "Failed", err.Error())
-		return nil, fmt.Errorf("failed during data analysis: %w", err)
+		m.log.Warnf("Rule-based analysis failed: %v", err)
 	}
-	sendProgress(progressChan, "Analysis", "Completed", fmt.Sprintf("Analysis finished, found %d issues.", len(issues)))
+
+	// AI Analysis using DiagnosisChain
+	var aiIssues []*models.Issue
+	if m.diagnosisChain != nil {
+		sendProgress(progressChan, "AI Analysis", "InProgress", "Running AI diagnosis chain...")
+
+		// Build query from collected data (simplified for now)
+		query := buildQueryFromData(collectedData, req.TargetMiddleware.String())
+		chainResult, err := m.diagnosisChain.Execute(ctx, query)
+		if err != nil {
+			m.log.Warnf("AI analysis failed, falling back to rule-based only: %v", err)
+			sendProgress(progressChan, "AI Analysis", "Failed", "AI analysis failed, continuing with rule-based results.")
+		} else {
+			aiIssues = convertChainResultToIssues(chainResult)
+			sendProgress(progressChan, "AI Analysis", "Completed", "AI analysis finished.")
+		}
+	}
+
+	// Merge issues
+	allIssues := append(ruleIssues, aiIssues...)
+
+	sendProgress(progressChan, "Analysis", "Completed", fmt.Sprintf("Analysis finished, found %d issues.", len(allIssues)))
 
 	result := &models.DiagnosisResult{
 		ID:        uuid.New().String(),
 		Timestamp: time.Now().UTC(),
-		Status:    determineOverallStatus(issues),
-		Summary:   generateSummary(issues),
-		Issues:    issues,
+		Status:    determineOverallStatus(allIssues),
+		Summary:   generateSummary(allIssues),
+		Issues:    allIssues,
 	}
 
 	m.cache.Set(req, result)
 	if err := m.persistResult(ctx, result); err != nil {
 		m.log.Warnf("Failed to persist diagnosis result: %v", err)
-		// We don't return the error here, as failing to save the report
-		// should not fail the entire diagnosis operation.
 	}
-	m.log.Infof("Diagnosis completed for %s. Found %d issues. Report ID: %s", req.TargetMiddleware, len(issues), result.ID)
+	m.log.Infof("Diagnosis completed for %s. Found %d issues. Report ID: %s", req.TargetMiddleware, len(allIssues), result.ID)
 	return result, nil
+}
+
+func buildQueryFromData(data *models.CollectedData, mwType string) string {
+	// Simple query builder. In a real system, this should extract anomalies.
+	// For now, we construct a generic query about the middleware and any obvious errors.
+	query := fmt.Sprintf("Diagnose %s issues.", mwType)
+
+	if data.Metrics != nil {
+		// Example: Add metrics summary if possible, or just mention we have metrics.
+		// For now, just appending a string.
+		query += " Analyzing metrics."
+	}
+
+	if data.Logs != nil && len(data.Logs.Entries) > 0 {
+		// Append first few log lines as context or indicators
+		count := 3
+		if len(data.Logs.Entries) < count {
+			count = len(data.Logs.Entries)
+		}
+		query += " Recent logs: "
+		for i := 0; i < count; i++ {
+			query += data.Logs.Entries[i] + "; "
+		}
+	}
+	return query
+}
+
+func convertChainResultToIssues(res *parser.DiagnosisResult) []*models.Issue {
+	issues := make([]*models.Issue, 0)
+
+	severity := enum.SeverityWarning
+	switch strings.ToLower(res.Severity) {
+	case "critical":
+		severity = enum.SeverityCritical
+	case "high":
+		severity = enum.SeverityHigh
+	case "medium":
+		severity = enum.SeverityMedium
+	case "low":
+		severity = enum.SeverityLow // Fixed from SeverityInfo
+	}
+
+	// Convert recommendations/next steps
+	recommendations := make([]*models.Recommendation, 0)
+	for i, step := range res.NextSteps {
+		recommendations = append(recommendations, &models.Recommendation{
+			ID:          fmt.Sprintf("rec-%d", i),
+			Description: step,
+			CanAutoFix:  false, // AI usually needs verification
+		})
+	}
+
+	// Create a single issue from the AI result for now
+	issue := &models.Issue{
+		ID:              uuid.New().String(),
+		Source:          "AI",
+		Title:           res.RootCause,
+		Description:     strings.Join(res.ContributingFactors, ", "),
+		Severity:        severity,
+		Evidence:        strings.Join(res.Evidence, "\n"), // Map evidence
+		Recommendations: recommendations, // Map recommendations
+	}
+	issues = append(issues, issue)
+
+	return issues
 }
 
 // persistResult saves a diagnosis result to a JSON file in the configured report directory.
@@ -169,26 +251,13 @@ func (m *manager) collectData(ctx context.Context, plugin interfaces.MiddlewareP
 	wg.Wait()
 
 	if len(errs) > 0 {
-		// For simplicity, returning the first error. A real implementation might wrap all errors.
 		return nil, errs[0]
 	}
 
 	return data, nil
 }
 
-// AnalyzeData runs all registered diagnosis analyzers concurrently on the collected
-// data. It aggregates the issues identified by each analyzer into a single slice.
-// This method ensures that each type of analysis (metrics, logs, correlation) is
-// performed, allowing different analyzers to specialize.
-//
-// Parameters:
-//   ctx (context.Context): The context for the analysis operations.
-//   req (*models.DiagnosisRequest): The original request, used for context.
-//   data (*models.CollectedData): The collected data to be analyzed.
-//
-// Returns:
-//   []*models.Issue: A slice containing all issues identified by the analyzers.
-//   error: An error if the analysis process itself fails (nil in this implementation).
+// AnalyzeData runs all registered diagnosis analyzers concurrently.
 func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, data *models.CollectedData) ([]*models.Issue, error) {
 	var allIssues []*models.Issue
 	var wg sync.WaitGroup
@@ -212,7 +281,7 @@ func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest,
 	}
 
 	for _, analyzer := range m.analyzers {
-		wg.Add(3) // One for each analysis type
+		wg.Add(3)
 
 		// Analyze Metrics
 		go func(an interfaces.DiagnosisAnalyzer) {
@@ -259,7 +328,6 @@ func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest,
 	wg.Wait()
 
 	if len(errs) > 0 {
-		// In a real system, you might wrap these errors. For now, we'll log them.
 		for _, err := range errs {
 			m.log.Warnf("An error occurred during analysis: %v", err)
 		}
@@ -268,24 +336,17 @@ func (m *manager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest,
 	return allIssues, nil
 }
 
-// GenerateReport creates a simple, human-readable string summary of a diagnosis result.
-// NOTE: This is a placeholder. A more advanced implementation would use the
-// `internal/cli/ui/formatter` for rich, structured output.
-//
-// Parameters:
-//   result (*models.DiagnosisResult): The diagnosis result to be reported.
-//
-// Returns:
-//   string: A formatted string summarizing the report.
-//   error: An error if report generation fails (nil in this implementation).
 func (m *manager) GenerateReport(result *models.DiagnosisResult) (string, error) {
-	// This is a placeholder for a proper report generator, which might use text/template.
 	return fmt.Sprintf("Diagnosis Report (ID: %s)\nStatus: %s\nSummary: %s\nFound %d issues.",
 		result.ID, result.Status, result.Summary, len(result.Issues)), nil
 }
 
 // --- Helper Functions ---
 func sendProgress(ch chan<- interfaces.DiagnosisProgress, step, status, msg string) {
+	// If channel is nil, don't send
+	if ch == nil {
+		return
+	}
 	ch <- interfaces.DiagnosisProgress{Step: step, Status: status, Message: msg}
 }
 
@@ -337,5 +398,3 @@ func (c *diagnosisCache) Set(req *models.DiagnosisRequest, result *models.Diagno
 	defer c.mu.Unlock()
 	c.items[key] = &cacheItem{result: result, expiresAt: time.Now().Add(c.ttl)}
 }
-
-//Personal.AI order the ending

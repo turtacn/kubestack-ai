@@ -27,8 +27,10 @@ import (
 // RAGEngine orchestrates the Retrieval-Augmented Generation (RAG) pipeline.
 type RAGEngine struct {
 	searcher  search.Searcher
+	reranker  search.Reranker
 	llmClient llm.LLMClient
 	cfg       config.RAGEngineConfig
+	topK      int
 }
 
 // NewRAGEngine creates a new RAGEngine.
@@ -41,6 +43,10 @@ func NewRAGEngine(
 ) (*RAGEngine, error) {
 	var searcher search.Searcher
 	var err error
+
+	// Note: We might want to disable internal reranking in HybridSearcher if we do it here.
+	// But HybridSearcher uses reranker only if cfg.Reranker.Enabled is true.
+	// We assume knowledgeCfg passed here controls that.
 
 	switch knowledgeCfg.Retrieval.Mode {
 	case "hybrid":
@@ -55,19 +61,57 @@ func NewRAGEngine(
 		return nil, err
 	}
 
+	topK := knowledgeCfg.Retrieval.Reranker.TopK
+	if topK <= 0 {
+		topK = 5 // Default
+	}
+
 	return &RAGEngine{
 		searcher:  searcher,
+		reranker:  reranker,
 		llmClient: llmClient,
 		cfg:       knowledgeCfg.RAG.Engine,
+		topK:      topK,
 	}, nil
 }
 
 // GenerateAnswer performs the end-to-end RAG process.
 func (e *RAGEngine) GenerateAnswer(ctx context.Context, question string) (string, error) {
 	// 1. Retrieve relevant documents
+	// The searcher might already do reranking if it is HybridSearcher and configured so.
+	// However, the requirement is to explicitly integrate Reranker here.
 	docs, err := e.searcher.Search(ctx, question)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve documents: %w", err)
+	}
+
+	// Explicitly rerank if reranker is available and documents are retrieved
+	if e.reranker != nil && len(docs) > 0 {
+		// Searcher returns []Document (values), but Rerank needs []*Document.
+		docPtrs := make([]*search.Document, len(docs))
+		for i := range docs {
+			docPtrs[i] = &docs[i]
+		}
+
+		rerankedDocs, err := e.reranker.Rerank(ctx, question, docPtrs, e.topK)
+		if err != nil {
+			// Log warning but continue with original docs (or maybe sliced original docs)
+			// For now, we return error as per usual go practice unless we want to fail open.
+			// Let's just fallback to original docs sliced to topK if rerank fails?
+			// The task implies adding reranking logic.
+			return "", fmt.Errorf("failed to rerank documents: %w", err)
+		}
+
+		// Convert back to []Document
+		docs = make([]search.Document, len(rerankedDocs))
+		for i, doc := range rerankedDocs {
+			docs[i] = *doc
+		}
+	} else {
+		// If no reranker, just ensure we respect TopK
+		if len(docs) > e.topK {
+			docs = docs[:e.topK]
+		}
 	}
 
 	// 2. Build the prompt with the retrieved context
@@ -85,7 +129,7 @@ func (e *RAGEngine) GenerateAnswer(ctx context.Context, question string) (string
 		docContents[i] = doc.Content
 	}
 
-	prompt, err := builder.
+	promptData, err := builder.
 		WithData("context", docContents).
 		WithData("question", question).
 		Build()
@@ -94,7 +138,7 @@ func (e *RAGEngine) GenerateAnswer(ctx context.Context, question string) (string
 	}
 
 	// 3. Generate the answer using the language model
-	answer, err := e.llmClient.Generate(ctx, prompt)
+	answer, err := e.llmClient.Generate(ctx, promptData)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate answer: %w", err)
 	}

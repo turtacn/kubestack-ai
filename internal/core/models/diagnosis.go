@@ -52,6 +52,8 @@ type DiagnosisResult struct {
 type Issue struct {
 	// ID is the unique identifier for this issue.
 	ID string `json:"id" yaml:"id"`
+	// Source indicates where this issue originated (e.g., "AI", "Rule", "Manual").
+	Source string `json:"source" yaml:"source"`
 	// Title is a concise, human-readable title for the issue.
 	Title string `json:"title" yaml:"title"`
 	// Severity indicates the seriousness of the issue (e.g., Critical, High, Low).

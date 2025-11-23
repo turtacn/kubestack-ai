@@ -48,4 +48,13 @@ plugins:
   # Directory where KubeStack-AI looks for plugins.
   directory: "/var/lib/kubestack-ai/plugins"
 
+# Knowledge base configuration.
+knowledge:
+  retrieval:
+    reranker:
+      # Reranker type: "simple" (TF-IDF) or "api" (remote model).
+      type: "simple"
+      # Number of documents to return after reranking.
+      top_k: 5
+
 # Personal.AI order the ending

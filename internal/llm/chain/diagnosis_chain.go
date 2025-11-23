@@ -39,16 +39,21 @@ func NewDiagnosisChain(
 // Execute runs the diagnosis chain.
 func (c *DiagnosisChain) Execute(ctx context.Context, question string) (*parser.DiagnosisResult, error) {
 	// Step 1: Retrieval
-	docs, err := c.retriever.HybridRetrieve(ctx, question, &search.RetrieveOptions{TopK: 3})
+	// Using Retrieve with TopK=10 as requested
+	docs, err := c.retriever.Retrieve(ctx, question, 10)
 	if err != nil {
 		return nil, fmt.Errorf("retrieval failed: %w", err)
 	}
 
 	// Step 2: Few-shot retrieval (optional category inference, here simplistic)
-	examples, err := c.fewShotMgr.RetrieveSimilar(question, "", 3)
-	if err != nil {
-		// Log error but proceed? Or fail. Let's proceed with empty examples.
-		examples = nil
+	var examples []*prompt.FewShotExample
+	if c.fewShotMgr != nil {
+		var err error
+		examples, err = c.fewShotMgr.RetrieveSimilar(question, "", 3)
+		if err != nil {
+			// Log error but proceed? Or fail. Let's proceed with empty examples.
+			examples = nil
+		}
 	}
 
 	// Step 3: Prompt Construction
@@ -56,7 +61,10 @@ func (c *DiagnosisChain) Execute(ctx context.Context, question string) (*parser.
 		"Question":           question,
 		"RetrievedDocuments": docs,
 		"FewShotExamples":    examples,
-		// Metrics/Logs would be injected here if available in context
+		// Metrics/Logs would be injected here if available in context, but currently only question is passed.
+		// The caller usually passes a "context" object or data, but the signature here is just string.
+		// We might need to refactor this signature if we want to pass collected data.
+		// For now, we assume the question contains necessary info or prompt template handles it.
 	}
 
 	renderedPrompt, err := c.promptTemplate.Render(inputData)
