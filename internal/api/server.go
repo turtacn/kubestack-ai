@@ -14,6 +14,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
 	"github.com/kubestack-ai/kubestack-ai/internal/notification"
 	"github.com/kubestack-ai/kubestack-ai/internal/storage"
 	"github.com/kubestack-ai/kubestack-ai/internal/task"
@@ -32,9 +33,15 @@ type Server struct {
 	taskScheduler   *task.Scheduler
 	taskWorker      *task.Worker
 	taskStore       storage.TaskStore
+
+	// Knowledge Base API
+	knowledgeAPI    *KnowledgeAPI
 }
 
-func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager) *Server {
+// NewServer creates a new API server.
+// It accepts an optional KnowledgeBase. If provided, it uses it for the Knowledge API.
+// This allows sharing the KB instance with the DiagnosisManager.
+func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, kb *knowledge.KnowledgeBase) *Server {
 	authService := middleware.NewAuthService(cfg.Auth)
 	rbacMiddleware := middleware.NewRBACMiddleware(cfg.RBAC)
 	wsHandler := websocket.NewHandler(cfg.WebSocket)
@@ -43,8 +50,7 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager) 
 	var queue task.TaskQueue
 	var store storage.TaskStore
 
-	// Defaults to Redis if config present, else could fallback to memory (but requirement says Redis/RabbitMQ)
-	// For now assume Redis config exists or fail/fallback
+	// Defaults to Redis if config present, else could fallback to memory
 	if cfg.TaskQueue.Type == "redis" {
 		queue = task.NewRedisQueue(
 			cfg.TaskQueue.Redis.Addr,
@@ -59,17 +65,8 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager) 
 			24*time.Hour, // TTL
 		)
 	} else {
-		// Fallback for development if no config or unknown type
-		// Ideally log warning
+		// Fallback for development
 		store = storage.NewInMemoryTaskStore()
-		// We don't have an in-memory queue implementation ready in this plan but could add one or just use RedisQueue if redis is available.
-		// If redis is not available, queue will fail.
-		// Let's assume redis for now as per requirement.
-		// If no config, we might panic or return error, but here we construct Server.
-		// To be safe, let's init nil and handle later or create a dummy/memory one.
-		// Given time constraints, I'll rely on Redis config being present or basic defaults.
-		// Creating a memory queue is trivial if needed.
-		// Let's implement a simple channel based memory queue if needed, but for now let's assume Redis is intended.
 	}
 
 	scheduler := task.NewScheduler(queue, store)
@@ -94,6 +91,25 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager) 
 
 	worker := task.NewWorker(queue, diagnosisEngine, store, compositeNotifier)
 
+	// If KB is not provided, try to extract from engine or create new
+	if kb == nil {
+		if dm, ok := diagnosisEngine.(interface{ GetKnowledgeBase() *knowledge.KnowledgeBase }); ok {
+			kb = dm.GetKnowledgeBase()
+		}
+		if kb == nil {
+			// Fallback: create isolated KB (not ideal but safe)
+			kb = knowledge.NewKnowledgeBase()
+		}
+	}
+
+	loader := knowledge.NewRuleLoader(kb)
+
+	// Ensure we load rules if creating new KB
+	// This might duplicate loading if KB is shared but redundant loading is cheap (in-memory map update)
+	// Actually, if shared, we assume it's already initialized.
+
+	knowledgeAPI := NewKnowledgeAPI(kb, loader)
+
 	s := &Server{
 		router:          gin.Default(),
 		config:          cfg,
@@ -105,6 +121,7 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager) 
 		taskScheduler:   scheduler,
 		taskWorker:      worker,
 		taskStore:       store,
+		knowledgeAPI:    knowledgeAPI,
 	}
 
 	s.setupRoutes()
@@ -148,6 +165,9 @@ func (s *Server) setupRoutes() {
 	diagnosis := v1.Group("/diagnosis")
 	diagnosis.POST("", s.rbacMiddleware.CheckPermission("diagnosis:write"), diagnosisHandler.TriggerDiagnosis)
 	diagnosis.GET("/:id", s.rbacMiddleware.CheckPermission("diagnosis:read"), diagnosisHandler.GetDiagnosisResult)
+
+	// Knowledge Base Routes (NEW)
+	s.knowledgeAPI.RegisterRoutes(v1.Group("/knowledge"))
 
 	// Execution (Placeholder for now)
 	execution := v1.Group("/execution")

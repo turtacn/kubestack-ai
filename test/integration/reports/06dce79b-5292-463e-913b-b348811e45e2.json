@@ -1,0 +1,27 @@
+{
+  "id": "06dce79b-5292-463e-913b-b348811e45e2",
+  "timestamp": "2025-11-23T15:56:10.405381858Z",
+  "status": 1,
+  "summary": "Found 1 potential issue(s). Please review the details.",
+  "issues": [
+    {
+      "id": "6fa4704f-6ad7-4437-8ea0-732deaed57ef",
+      "source": "RuleEngine",
+      "title": "Knowledge Base Recommendations",
+      "severity": 5,
+      "description": "Recommendations generated based on knowledge base rules.",
+      "evidence": "",
+      "recommendations": [
+        {
+          "id": "1469255e-673f-4788-8a53-b1fd118c9ab4",
+          "description": "High Memory Usage: Scale up memory",
+          "canAutoFix": false,
+          "priority": 100
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "memory_usage": 85
+  }
+}

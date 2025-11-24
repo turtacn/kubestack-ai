@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -137,9 +137,11 @@ const (
 	SeverityWarning
 	// SeverityCritical indicates a critical issue that requires immediate attention to prevent system failure or data loss.
 	SeverityCritical
+	// SeverityInfo indicates an informational message or observation that is not necessarily a problem.
+	SeverityInfo
 )
 
-var severityLevelStrings = [...]string{"Low", "Medium", "High", "Warning", "Critical"}
+var severityLevelStrings = [...]string{"Low", "Medium", "High", "Warning", "Critical", "Info"}
 
 // String returns the string representation of the SeverityLevel.
 // It satisfies the fmt.Stringer interface.
@@ -147,7 +149,7 @@ var severityLevelStrings = [...]string{"Low", "Medium", "High", "Warning", "Crit
 // Returns:
 //   string: The string name of the severity level (e.g., "Critical"). Returns "Unknown" for invalid values.
 func (s SeverityLevel) String() string {
-	if s < SeverityLow || s > SeverityCritical {
+	if s < SeverityLow || s > SeverityInfo {
 		return "Unknown"
 	}
 	return severityLevelStrings[s]
@@ -158,7 +160,7 @@ func (s SeverityLevel) String() string {
 // Returns:
 //   bool: True if the severity level is valid, false otherwise.
 func (s SeverityLevel) IsValid() bool {
-	return s >= SeverityLow && s <= SeverityCritical
+	return s >= SeverityLow && s <= SeverityInfo
 }
 
 // ActionType defines the category of an action performed by the diagnosis or execution engine.
@@ -308,5 +310,3 @@ func (l LogLevel) String() string {
 func (l LogLevel) IsValid() bool {
 	return l >= LogLevelDebug && l <= LogLevelFatal
 }
-
-//Personal.AI order the ending

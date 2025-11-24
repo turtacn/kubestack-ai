@@ -1,0 +1,41 @@
+- id: redis-mem-001
+  name: Redis Memory Usage High
+  middleware_type: redis
+  category: performance
+  severity: HIGH
+  condition: memory_usage > 80
+  recommendation: |
+    1. Check memory eviction policy (maxmemory-policy)
+    2. Enable key expiration, clean up expired data
+    3. Consider increasing memory capacity or using Redis Cluster sharding
+  priority: 90
+  tags: [memory, performance]
+  version: "1.0"
+
+- id: redis-conn-001
+  name: Redis Connection Count High
+  middleware_type: redis
+  category: stability
+  severity: CRITICAL
+  condition: connection_count > 900
+  recommendation: |
+    1. Check for connection leaks (connections not closed properly)
+    2. Adjust maxclients configuration to increase connection limit
+    3. Implement connection pooling and reuse strategies
+  priority: 95
+  tags: [connection, stability]
+  version: "1.0"
+
+- id: redis-slow-001
+  name: Redis Slow Queries Detected
+  middleware_type: redis
+  category: performance
+  severity: MEDIUM
+  condition: slow_log_count > 100
+  recommendation: |
+    1. Use SLOWLOG GET to view specific slow query commands
+    2. Optimize data structures and query methods (avoid KEYS command)
+    3. Consider using Redis Pipeline for batch execution
+  priority: 70
+  tags: [performance, query]
+  version: "1.0"

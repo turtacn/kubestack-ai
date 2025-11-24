@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -19,13 +19,12 @@ import (
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
-	"github.com/kubestack-ai/kubestack-ai/internal/llm/rag"
 )
 
 // Manager defines the interface for the knowledge base, providing a unified
 // entry point for searching and managing knowledge.
 type Manager interface {
-	Search(ctx context.Context, query string) ([]rag.Document, error)
+	Search(ctx context.Context, query string) ([]search.Document, error)
 }
 
 // knowledgeManager is the concrete implementation of the Manager interface.
@@ -43,7 +42,7 @@ func NewManager(searcher search.Searcher) (Manager, error) {
 }
 
 // Search performs a search against the knowledge base.
-func (m *knowledgeManager) Search(ctx context.Context, query string) ([]rag.Document, error) {
+func (m *knowledgeManager) Search(ctx context.Context, query string) ([]search.Document, error) {
 	m.log.Infof("Searching knowledge base for query: %.50s...", query)
 	return m.searcher.Search(ctx, query)
 }

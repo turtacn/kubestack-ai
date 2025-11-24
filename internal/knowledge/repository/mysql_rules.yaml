@@ -1,0 +1,27 @@
+- id: mysql-conn-001
+  name: MySQL Connection Count High
+  middleware_type: mysql
+  category: stability
+  severity: HIGH
+  condition: connection_count > 800
+  recommendation: |
+    1. Check if the application is correctly using connection pools
+    2. Adjust max_connections parameter to increase connection limit
+    3. Analyze if slow queries are causing connections to be occupied for too long
+  priority: 90
+  tags: [connection, stability]
+  version: "1.0"
+
+- id: mysql-slow-001
+  name: MySQL Slow Queries Detected
+  middleware_type: mysql
+  category: performance
+  severity: HIGH
+  condition: slow_query_count > 50
+  recommendation: |
+    1. Analyze slow query logs to identify problematic SQL
+    2. Check for missing necessary indexes
+    3. Optimize query statements to avoid full table scans
+  priority: 88
+  tags: [performance, query]
+  version: "1.0"

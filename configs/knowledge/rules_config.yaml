@@ -1,0 +1,7 @@
+knowledge:
+  rule_files:
+    - "internal/knowledge/repository/redis_rules.yaml"
+    - "internal/knowledge/repository/mysql_rules.yaml"
+    - "internal/knowledge/repository/kafka_rules.yaml"
+  refresh_interval: 60s
+  enable_llm_enhancement: true

@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -49,6 +49,8 @@ type DiagnosisResult struct {
 	Summary string `json:"summary" yaml:"summary"`
 	// Issues is a slice of all the specific problems or anomalies found during the diagnosis.
 	Issues []*Issue `json:"issues" yaml:"issues"`
+	// Metrics holds important metrics collected during diagnosis.
+	Metrics map[string]interface{} `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
 // Issue represents a single, specific problem or anomaly identified during diagnosis.
@@ -81,7 +83,12 @@ type Recommendation struct {
 	CanAutoFix bool `json:"canAutoFix" yaml:"canAutoFix"`
 	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
 	Category string `json:"category,omitempty" yaml:"category,omitempty"`
+	// Priority indicates the importance of this recommendation.
+	Priority Priority `json:"priority,omitempty" yaml:"priority,omitempty"`
 }
+
+// Priority defines the importance of a recommendation.
+type Priority int
 
 // MetricsData is a generic container for collected performance metrics. It uses a
 // map to allow for flexibility, as different plugins may collect different metrics.
@@ -111,6 +118,15 @@ type AIAnalysisResult struct {
 	Reasoning string `json:"reasoning,omitempty" yaml:"reasoning,omitempty"`
 	// Issues is a slice of issues identified by the AI.
 	Issues []*Issue `json:"issues" yaml:"issues"`
+}
+
+// ComponentDiagnosisResult represents the result of a plugin's diagnosis for a specific component.
+// It is used to aggregate results from multiple plugins.
+type ComponentDiagnosisResult struct {
+	Component string                 `json:"component"`
+	Status    string                 `json:"status"`
+	Issues    []*Issue               `json:"issues"`
+	Metrics   map[string]interface{} `json:"metrics,omitempty"`
 }
 
 // --- Supporting Structs for Interfaces ---
@@ -176,5 +192,3 @@ type FixResult struct {
 	// Message provides details about the outcome, such as stdout or an error message.
 	Message string `json:"message" yaml:"message"`
 }
-
-//Personal.AI order the ending

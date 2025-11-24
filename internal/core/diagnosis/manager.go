@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -35,7 +35,9 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/rca"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/chain"
+	"github.com/kubestack-ai/kubestack-ai/internal/llm/client"
 	"github.com/kubestack-ai/kubestack-ai/internal/llm/parser"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
 )
@@ -50,14 +52,23 @@ type manager struct {
 	reportDir       string
 	anomalyDetector *detection.AnomalyDetector
 	rcaEngine       *rca.RulesEngine
+
+	// Knowledge Base Components
+	knowledgeBase   *knowledge.KnowledgeBase
+	ruleEngine      *knowledge.RuleEngine
+	ruleLoader      *knowledge.RuleLoader
+	llmIntegration  *knowledge.LLMIntegration
+	config          *config.Config
 }
 
 // NewManager creates a new instance of the diagnosis manager.
+// kb is optional, if provided it uses the existing knowledge base, otherwise it creates a new one.
 func NewManager(
 	registry *plugin.Registry,
 	analyzers []interfaces.DiagnosisAnalyzer,
 	diagnosisChain *chain.DiagnosisChain,
 	reportDir string,
+	kb *knowledge.KnowledgeBase, // Optional injection
 ) interfaces.DiagnosisManager {
 	// Ensure the report directory exists
 	if reportDir == "" {
@@ -67,14 +78,43 @@ func NewManager(
 		os.MkdirAll(reportDir, 0755)
 	}
 
-	// Load configuration for detection and RCA
-	// In a real application, the config object should be injected into NewManager
-	// For now, we'll try to load it or use defaults if loading fails
+	// Load configuration
 	cfg, err := config.LoadConfig("")
 	if err != nil {
-		// Log error and proceed with defaults
-		// We need a logger here, but it's initialized in the struct return
-		// Ideally, NewLogger should be called before
+		fmt.Printf("Error loading config: %v\n", err)
+		cfg = &config.Config{} // Empty config
+	}
+
+	// Initialize Knowledge Base Components
+	var ruleEngine *knowledge.RuleEngine
+	var ruleLoader *knowledge.RuleLoader
+
+	if kb == nil {
+		kb = knowledge.NewKnowledgeBase()
+	}
+
+	ruleEngine = knowledge.NewRuleEngine(kb)
+	ruleLoader = knowledge.NewRuleLoader(kb)
+
+	if len(cfg.Knowledge.RuleFiles) > 0 {
+		for _, file := range cfg.Knowledge.RuleFiles {
+			// Ignore errors for now or log them
+			_ = ruleLoader.LoadFromFile(file)
+		}
+	} else {
+		// Try loading from default directory
+		_ = ruleLoader.LoadFromDirectory("internal/knowledge/repository")
+	}
+
+	// Initialize LLM Integration
+	var llmInt *knowledge.LLMIntegration
+	if cfg.Knowledge.EnableLLMEnhancement {
+		c, err := client.NewClientFromConfig(&cfg.LLM)
+		if err == nil {
+			llmInt = knowledge.NewLLMIntegration(c, cfg.LLM)
+		} else {
+			fmt.Printf("Failed to initialize LLM client: %v\n", err)
+		}
 	}
 
 	return &manager{
@@ -86,6 +126,12 @@ func NewManager(
 		reportDir:       reportDir,
 		anomalyDetector: detection.NewAnomalyDetector(cfg),
 		rcaEngine:       rca.NewRulesEngine(cfg),
+
+		knowledgeBase:   kb,
+		ruleEngine:      ruleEngine,
+		ruleLoader:      ruleLoader,
+		llmIntegration:  llmInt,
+		config:          cfg,
 	}
 }
 
@@ -109,33 +155,12 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 
 	// Step 2: Anomaly Detection
 	sendProgress(progressChan, "Detection", "InProgress", "Running anomaly detection...")
-	// Note: We need to collect data first. In this new architecture, plugins are responsible for data collection.
-	// However, the AnomalyDetector expects raw metrics/logs.
-	// This creates a circular dependency or flow issue if plugins only return issues.
-	//
-	// Ideally, plugins should return raw data OR we have a separate collection phase.
-	// Since the task P5-T7 says "Integrate anomaly detection into diagnosis flow", we'll simulate data collection
-	// or assume we can extract it if possible.
-	//
-	// For this phase, we will assume we can get some metrics (maybe mock/simulated for now, or extracted if plugins supported it).
-	// Realistically, the plugin should probably export collected data.
-	//
-	// To unblock this, I will create a dummy input for detection. In a real scenario, this data comes from the plugin's collection step.
-	// We'll pass an empty input for now, which means detectors won't find much unless we mock it inside or change the flow.
-	//
-	// Wait, the prompt says "Integrate... call anomaly detector... pass result as context".
-	// This implies we have data BEFORE diagnosis? Or detection IS part of diagnosis?
-	// Usually: Collection -> Detection -> Diagnosis (RCA).
-	// But here Plugins do "Diagnose".
-	//
-	// Let's assume for this task that we construct detection input. Since I don't have a separate collector,
-	// I will just initialize the input. The actual data would need to come from a metric provider.
+
 	detectionInput := &detection_models.DetectionInput{
 		Context: map[string]string{
 			"middleware": req.TargetMiddleware.String(),
 			"instance":   req.Instance,
 		},
-		// In a real integration, we would fetch metrics from Prometheus/Monitoring here
 	}
 
 	detectionResult, err := m.anomalyDetector.Detect(ctx, detectionInput)
@@ -170,6 +195,8 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
+	metricsData := make(map[string]interface{})
+
 	for _, p := range plugins {
 		wg.Add(1)
 		go func(pl plugin.DiagnosticPlugin) {
@@ -182,6 +209,13 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 			mu.Lock()
 			if result != nil {
 				allIssues = append(allIssues, result.Issues...)
+				// Collect metrics if available
+				// Models.DiagnosisResult has Metrics now
+				if result.Metrics != nil {
+					for k, v := range result.Metrics {
+						metricsData[k] = v
+					}
+				}
 			}
 			mu.Unlock()
 		}(p)
@@ -190,7 +224,6 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	sendProgress(progressChan, "Diagnosis", "Completed", "Plugins finished.")
 
 	// Step 5: Merge RCA results into issues if not already present
-	// If the RCA engine found something significant, we should ensure it's reported as an issue.
 	if rcaResult := ctx.Value("root_cause"); rcaResult != nil {
 		if res, ok := rcaResult.(*rca.RCAResult); ok && res.Confidence > 0.5 {
 			rcaIssue := &models.Issue{
@@ -220,6 +253,79 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 		}
 	}
 
+	// Step 6: Knowledge Base Rule Engine Diagnosis (NEW)
+	sendProgress(progressChan, "RuleEngine", "InProgress", "Running knowledge base rules...")
+
+	diagCtx := &knowledge.DiagnosisContext{
+		MiddlewareType: req.TargetMiddleware.String(),
+		Namespace:      req.Namespace,
+		Metrics:        metricsData,
+		Issues:         allIssues,
+	}
+
+	ruleMatches, err := m.ruleEngine.Match(diagCtx)
+	var ruleRecommendations []*models.Recommendation
+	if err != nil {
+		m.log.Errorf("Rule matching failed: %v", err)
+	} else {
+		recommendations, err := m.ruleEngine.Execute(ruleMatches)
+		if err != nil {
+			m.log.Errorf("Rule execution failed: %v", err)
+		} else {
+			for _, rec := range recommendations {
+				ruleRecommendations = append(ruleRecommendations, &models.Recommendation{
+					ID:          uuid.New().String(),
+					Description: fmt.Sprintf("%s: %s", rec.Title, rec.Action),
+					CanAutoFix:  false, // Assuming rules don't define auto-fix yet
+					Priority:    models.Priority(rec.Priority), // Now valid
+				})
+			}
+			// Append rule recommendations to a generic "Rule Engine Findings" issue or distribute them
+			if len(ruleRecommendations) > 0 {
+				ruleIssue := &models.Issue{
+					ID:              uuid.New().String(),
+					Source:          "RuleEngine",
+					Title:           "Knowledge Base Recommendations",
+					Description:     "Recommendations generated based on knowledge base rules.",
+					Severity:        enum.SeverityInfo, // Now valid
+					Recommendations: ruleRecommendations,
+				}
+				allIssues = append(allIssues, ruleIssue)
+			}
+		}
+	}
+	sendProgress(progressChan, "RuleEngine", "Completed", fmt.Sprintf("Matched %d rules.", len(ruleMatches)))
+
+	// Step 7: LLM Enhancement (NEW)
+	if m.config.Knowledge.EnableLLMEnhancement && m.llmIntegration != nil {
+		sendProgress(progressChan, "LLM", "InProgress", "Enhancing diagnosis with LLM...")
+		llmRecs, err := m.llmIntegration.GenerateRecommendations(ctx, diagCtx)
+		if err != nil {
+			m.log.Warnf("LLM diagnosis failed: %v", err)
+		} else {
+			var llmModelsRecs []*models.Recommendation
+			for _, rec := range llmRecs {
+				llmModelsRecs = append(llmModelsRecs, &models.Recommendation{
+					ID:          uuid.New().String(),
+					Description: fmt.Sprintf("[AI] %s: %s", rec.Title, rec.Action),
+					CanAutoFix:  false,
+				})
+			}
+			if len(llmModelsRecs) > 0 {
+				llmIssue := &models.Issue{
+					ID:              uuid.New().String(),
+					Source:          "LLM",
+					Title:           "AI Enhanced Recommendations",
+					Description:     "Recommendations generated by AI assistant.",
+					Severity:        enum.SeverityInfo,
+					Recommendations: llmModelsRecs,
+				}
+				allIssues = append(allIssues, llmIssue)
+			}
+		}
+		sendProgress(progressChan, "LLM", "Completed", "LLM enhancement finished.")
+	}
+
 	sendProgress(progressChan, "Analysis", "Completed", fmt.Sprintf("Analysis finished, found %d issues.", len(allIssues)))
 
 	result := &models.DiagnosisResult{
@@ -228,6 +334,7 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 		Status:    determineOverallStatus(allIssues),
 		Summary:   generateSummary(allIssues),
 		Issues:    allIssues,
+		Metrics:   metricsData, // Include collected metrics in result
 	}
 
 	m.cache.Set(req, result)
@@ -356,6 +463,11 @@ func (m *manager) GetDiagnosisResult(id string) (*models.DiagnosisResult, error)
 	}
 
 	return &result, nil
+}
+
+// GetKnowledgeBase exposes the KnowledgeBase instance for sharing.
+func (m *manager) GetKnowledgeBase() *knowledge.KnowledgeBase {
+	return m.knowledgeBase
 }
 
 // --- Helper Functions ---

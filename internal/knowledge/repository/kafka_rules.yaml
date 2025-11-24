@@ -1,0 +1,27 @@
+- id: kafka-lag-001
+  name: Kafka Consumer Lag High
+  middleware_type: kafka
+  category: performance
+  severity: HIGH
+  condition: consumer_lag > 10000
+  recommendation: |
+    1. Increase the number of consumer instances to improve parallelism
+    2. Optimize consumption logic to increase processing speed
+    3. Check for consumer rebalance issues
+  priority: 90
+  tags: [consumer, lag]
+  version: "1.0"
+
+- id: kafka-disk-001
+  name: Kafka Disk Usage High
+  middleware_type: kafka
+  category: stability
+  severity: CRITICAL
+  condition: disk_usage > 85
+  recommendation: |
+    1. Adjust log.retention.hours to reduce data retention time
+    2. Enable log compression to reduce disk usage
+    3. Expand disk or add Broker nodes
+  priority: 95
+  tags: [disk, storage]
+  version: "1.0"
