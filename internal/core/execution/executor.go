@@ -65,10 +65,33 @@ func (e *actionExecutor) ApplyConfiguration(ctx context.Context, configChange *m
 	return fmt.Errorf("ApplyConfiguration is not implemented")
 }
 
-func (e *actionExecutor) RollbackChanges(ctx context.Context, action *models.ExecutionStep) error {
-	e.log.Infof("Rolling back action for step: %s", action.Name)
-	// Placeholder. A real implementation would require a 'before' state or a pre-defined compensating action.
-	return fmt.Errorf("RollbackChanges is not implemented")
+func (e *actionExecutor) RollbackChanges(ctx context.Context, steps []*models.ExecutionStep) error {
+	e.log.Info("Starting rollback for failed execution.")
+	var rollbackErrors []string
+	// Iterate backwards through the already completed steps.
+	for i := len(steps) - 1; i >= 0; i-- {
+		step := steps[i]
+		if step.Action.RollbackCommand == "" {
+			e.log.Warnf("Step '%s' has no rollback command, skipping.", step.Name)
+			continue
+		}
+
+		e.log.Infof("Rolling back step: %s (Command: `%s`)", step.Name, step.Action.RollbackCommand)
+		_, stderr, err := e.ExecuteCommand(ctx, step.Action.RollbackCommand)
+		if err != nil {
+			e.log.Errorf("Rollback for step '%s' failed: %v. Stderr: %s", step.Name, err, stderr)
+			rollbackErrors = append(rollbackErrors, fmt.Sprintf("step '%s': %v", step.Name, err))
+		} else {
+			e.log.Infof("Rollback for step '%s' completed successfully.", step.Name)
+		}
+	}
+
+	if len(rollbackErrors) > 0 {
+		return fmt.Errorf("one or more rollback actions failed: %s", strings.Join(rollbackErrors, "; "))
+	}
+
+	e.log.Info("Rollback completed successfully.")
+	return nil
 }
 
 // --- Execution Manager (Coordinator) Implementation ---
@@ -113,74 +136,93 @@ func (m *manager) PlanExecution(ctx context.Context, recommendations []*models.R
 	return m.planner.GeneratePlan(ctx, recommendations)
 }
 
-// ExecuteActions carries out the steps defined in an execution plan. It follows
-// the specified strategy (e.g., serial) and uses a confirmation function to
-// prompt the user before executing each step, providing a critical safety check.
-//
-// Parameters:
-//   ctx (context.Context): The context for the entire execution operation.
-//   plan (*models.ExecutionPlan): The plan to be executed.
-//   confirmFunc (interfaces.ConfirmationFunc): A function that prompts the user for confirmation.
-//
-// Returns:
-//   *models.ExecutionResult: A struct containing the outcome of the execution, including logs and step results.
-//   error: An error if a step fails and the execution is halted.
-func (m *manager) ExecuteActions(ctx context.Context, plan *models.ExecutionPlan, confirmFunc interfaces.ConfirmationFunc) (*models.ExecutionResult, error) {
+// ExecutePlan carries out the steps defined in an execution plan. It is a more
+// modern entry point for execution that encapsulates the logic for handling
+// different execution strategies, logging, and rollbacks.
+func (m *manager) ExecutePlan(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error) {
 	m.log.Infof("Starting execution of plan ID: %s with strategy: %s", plan.ID, plan.Strategy)
-
 	result := &models.ExecutionResult{
-		PlanID:      plan.ID,
-		Status:      "InProgress",
-		StartTime:   time.Now().UTC(),
-		StepResults: plan.Steps,
-		Logs:        make([]*models.ExecutionLog, 0),
+		PlanID:    plan.ID,
+		Status:    models.ExecutionStatusInProgress,
+		StartTime: time.Now().UTC(),
+		Logs:      make([]*models.ExecutionLog, 0),
 	}
 
-	// For now, only Serial strategy is implemented. Parallel would require a more complex dependency graph traversal.
+	// A stack to keep track of successfully completed steps for potential rollback.
+	completedSteps := make([]*models.ExecutionStep, 0)
+
+	// For now, only Serial strategy is implemented.
 	if plan.Strategy != models.SerialExecution {
-		return nil, fmt.Errorf("execution strategy '%s' is not implemented", plan.Strategy)
+		err := fmt.Errorf("execution strategy '%s' is not implemented", plan.Strategy)
+		result.Status = models.ExecutionStatusFailed
+		result.EndTime = time.Now().UTC()
+		return result, err
 	}
 
 	for _, step := range plan.Steps {
-		// Permission Check (Placeholder)
-		m.log.Debugf("Checking permissions for step: %s", step.Name)
-
-		prompt := fmt.Sprintf("Action: %s\nDescription: %s\nCommand: `%s`", step.Name, step.Description, step.Action.Command)
-		if !confirmFunc(prompt) {
-			m.log.Warnf("Execution of step '%s' skipped by user.", step.Name)
-			step.Status = "Skipped"
-			result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Warn", Message: "Step skipped by user."})
-			continue
-		}
-
-		step.Status = "Running"
-		result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Info", Message: fmt.Sprintf("Executing step: %s", step.Name)})
+		step.Status = models.StepStatusRunning
 		m.log.Infof("Executing step: %s", step.Name)
+		result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Info", Message: fmt.Sprintf("Executing step: %s", step.Name)})
 
+		// The actual execution is delegated to the internal executor.
 		stdout, stderr, err := m.executor.ExecuteCommand(ctx, step.Action.Command)
 		if err != nil {
-			step.Status = "Failed"
+			step.Status = models.StepStatusFailed
 			step.Result = fmt.Sprintf("Error: %v\nStderr: %s", err, stderr)
-			result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Error", Message: step.Result})
 			m.log.Errorf("Step '%s' failed: %v", step.Name, err)
+			result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Error", Message: step.Result})
 
-			// TODO: Implement rollback logic here, e.g., by executing the rollback plan.
+			// Trigger rollback for all previously completed steps.
+			rollbackErr := m.executor.RollbackChanges(ctx, completedSteps)
+			if rollbackErr != nil {
+				result.Status = models.ExecutionStatusFailedWithRollbackFailure
+				m.log.Errorf("Rollback failed: %v", rollbackErr)
+				result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), Level: "Critical", Message: fmt.Sprintf("Rollback failed: %v", rollbackErr)})
+			} else {
+				result.Status = models.ExecutionStatusFailedWithRollbackSuccess
+				m.log.Info("Rollback completed successfully.")
+				result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), Level: "Info", Message: "Rollback completed successfully."})
+			}
 
-			result.Status = "Failed"
 			result.EndTime = time.Now().UTC()
 			return result, fmt.Errorf("execution of step '%s' failed", step.Name)
 		}
 
-		step.Status = "Success"
+		step.Status = models.StepStatusSuccess
 		step.Result = stdout
-		result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Info", Message: "Step completed successfully."})
+		completedSteps = append(completedSteps, step) // Push to stack
 		m.log.Infof("Step '%s' completed successfully.", step.Name)
+		result.Logs = append(result.Logs, &models.ExecutionLog{Timestamp: time.Now().UTC(), StepID: step.ID, Level: "Info", Message: "Step completed successfully."})
 	}
 
-	result.Status = "Success"
+	result.Status = models.ExecutionStatusSuccess
 	result.EndTime = time.Now().UTC()
 	m.log.Infof("Execution of plan %s completed successfully.", plan.ID)
 	return result, nil
+}
+
+// ExecuteActions is the legacy entry point for execution, which includes a
+// user confirmation step. It's kept for backward compatibility and for CLI
+// scenarios where user interaction is required.
+func (m *manager) ExecuteActions(ctx context.Context, plan *models.ExecutionPlan, confirmFunc interfaces.ConfirmationFunc) (*models.ExecutionResult, error) {
+	m.log.Info("Executing plan with user confirmation step.")
+
+	// A simple check for high-risk plans. A more robust implementation
+	// would use the `RequiresApproval` flag from the risk assessment.
+	if plan.Risk.MaxSeverity >= models.RiskLevelHigh {
+		prompt := fmt.Sprintf("High-risk operation detected (Level: %s). Do you want to proceed with the execution?", plan.Risk.MaxSeverity)
+		if !confirmFunc(prompt) {
+			m.log.Warn("Execution aborted by user due to high risk.")
+			return &models.ExecutionResult{
+				PlanID: plan.ID,
+				Status: models.ExecutionStatusAborted,
+			}, nil
+		}
+	}
+
+	// This method now wraps ExecutePlan, adding the confirmation layer.
+	// The core execution logic is centralized in ExecutePlan.
+	return m.ExecutePlan(ctx, plan)
 }
 
 // ValidateExecution is responsible for verifying that an executed plan has

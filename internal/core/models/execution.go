@@ -56,7 +56,7 @@ type ExecutionStep struct {
 	// DependsOn lists the IDs of other steps that must be completed successfully before this step can start.
 	DependsOn []string `json:"dependsOn,omitempty" yaml:"dependsOn,omitempty"`
 	// Status indicates the current state of the step (e.g., "Pending", "Running", "Success", "Failed").
-	Status string `json:"status" yaml:"status"`
+	Status StepStatus `json:"status" yaml:"status"`
 	// Result holds a summary of the output or outcome of the step after execution.
 	Result string `json:"result,omitempty" yaml:"result,omitempty"`
 }
@@ -67,7 +67,7 @@ type ExecutionResult struct {
 	// PlanID is the ID of the execution plan that was run.
 	PlanID string `json:"planId" yaml:"planId"`
 	// Status is the final status of the execution (e.g., "Success", "Failed", "PartialSuccess").
-	Status string `json:"status" yaml:"status"`
+	Status ExecutionStatus `json:"status" yaml:"status"`
 	// StartTime is the UTC time when the execution began.
 	StartTime time.Time `json:"startTime" yaml:"startTime"`
 	// EndTime is the UTC time when the execution concluded.
@@ -78,15 +78,40 @@ type ExecutionResult struct {
 	Logs []*ExecutionLog `json:"logs,omitempty" yaml:"logs,omitempty"`
 }
 
-// RiskAssessment contains the analysis of potential risks associated with an execution plan.
-type RiskAssessment struct {
-	// Level is the assessed risk level (e.g., "Low", "Medium", "High", "Critical").
-	Level string `json:"level" yaml:"level"`
-	// Description is a human-readable summary of the risks identified.
-	Description string `json:"description" yaml:"description"`
-	// Impacts is a list of potential negative consequences if the plan fails or causes unintended side effects.
-	Impacts []string `json:"impacts,omitempty" yaml:"impacts,omitempty"`
+// RiskLevel defines the severity of a potential risk.
+type RiskLevel int
+
+const (
+	RiskLevelLow RiskLevel = iota
+	RiskLevelMedium
+	RiskLevelHigh
+	RiskLevelCritical
+)
+
+// String makes RiskLevel implement the Stringer interface.
+func (rl RiskLevel) String() string {
+	return [...]string{"Low", "Medium", "High", "Critical"}[rl]
 }
+
+// RiskAssessment provides a summary of the potential risks associated with an
+// execution plan.
+type RiskAssessment struct {
+	TotalScore       int       `json:"total_score"`
+	MaxSeverity      RiskLevel `json:"max_severity"`
+	RequiresApproval bool      `json:"requires_approval"`
+	Description      string    `json:"description"`
+}
+
+// StepStatus defines the possible states of an execution step.
+type StepStatus string
+
+const (
+	StepStatusPending StepStatus = "Pending"
+	StepStatusRunning StepStatus = "Running"
+	StepStatusSuccess StepStatus = "Success"
+	StepStatusFailed  StepStatus = "Failed"
+	StepStatusSkipped StepStatus = "Skipped"
+)
 
 // RollbackPlan defines the strategy and steps required for reverting a failed execution.
 // This is a critical component for ensuring the safety and transactional integrity of automated fixes.
@@ -96,6 +121,18 @@ type RollbackPlan struct {
 	// Steps is a list of compensating actions to revert the changes made by the execution plan.
 	Steps []*ExecutionStep `json:"steps" yaml:"steps"`
 }
+
+// ExecutionStatus defines the possible states of an execution.
+type ExecutionStatus string
+
+const (
+	ExecutionStatusInProgress             ExecutionStatus = "InProgress"
+	ExecutionStatusSuccess                ExecutionStatus = "Success"
+	ExecutionStatusFailed                 ExecutionStatus = "Failed"
+	ExecutionStatusFailedWithRollbackSuccess ExecutionStatus = "FailedWithRollbackSuccess"
+	ExecutionStatusFailedWithRollbackFailure ExecutionStatus = "FailedWithRollbackFailure"
+	ExecutionStatusAborted                ExecutionStatus = "Aborted"
+)
 
 // ExecutionLog records a single, timestamped log entry generated during the execution of a plan.
 type ExecutionLog struct {

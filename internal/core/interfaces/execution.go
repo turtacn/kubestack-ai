@@ -56,6 +56,11 @@ type ExecutionManager interface {
 	//   error: An error if a step fails and the execution is halted.
 	ExecuteActions(ctx context.Context, plan *models.ExecutionPlan, confirmFunc ConfirmationFunc) (*models.ExecutionResult, error)
 
+	// ExecutePlan carries out the steps defined in an execution plan. It is a more
+	// modern entry point for execution that encapsulates the logic for handling
+	// different execution strategies, logging, and rollbacks.
+	ExecutePlan(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error)
+
 	// ValidateExecution checks if the execution was successful and if the original issue
 	// has been resolved. This typically involves re-running a targeted health check.
 	//
@@ -142,16 +147,16 @@ type ActionExecutor interface {
 	//   error: An error if applying the configuration fails.
 	ApplyConfiguration(ctx context.Context, configChange *models.ConfigChange) error
 
-	// RollbackChanges reverts a specific action that was previously executed. This is
+	// RollbackChanges reverts a series of previously executed actions. This is
 	// crucial for transactional safety and is a key part of a robust execution engine.
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the rollback operation.
-	//   action (*models.ExecutionStep): The step containing the action to be rolled back.
+	//   steps ([]*models.ExecutionStep): The steps containing the actions to be rolled back.
 	//
 	// Returns:
 	//   error: An error if the rollback fails.
-	RollbackChanges(ctx context.Context, action *models.ExecutionStep) error
+	RollbackChanges(ctx context.Context, steps []*models.ExecutionStep) error
 }
 
 //Personal.AI order the ending

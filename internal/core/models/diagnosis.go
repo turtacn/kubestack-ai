@@ -85,6 +85,10 @@ type Recommendation struct {
 	Category string `json:"category,omitempty" yaml:"category,omitempty"`
 	// Priority indicates the importance of this recommendation.
 	Priority Priority `json:"priority,omitempty" yaml:"priority,omitempty"`
+	// RollbackCommand is the command to revert the action if it fails.
+	RollbackCommand string `json:"rollback_command,omitempty"`
+	// ValidationCommand is a command to verify the action was successful.
+	ValidationCommand string `json:"validation_command,omitempty"`
 }
 
 // Priority defines the importance of a recommendation.
@@ -183,6 +187,10 @@ type FixAction struct {
 	Parameters map[string]string `json:"parameters" yaml:"parameters"`
 	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
 	Category string `json:"category,omitempty" yaml:"category,omitempty"`
+	// RollbackCommand is the command to revert the action if it fails.
+	RollbackCommand string `json:"rollback_command,omitempty"`
+	// ValidationCommand is a command to verify the action was successful.
+	ValidationCommand string `json:"validation_command,omitempty"`
 }
 
 // FixResult represents the outcome of a single executed fix action.
