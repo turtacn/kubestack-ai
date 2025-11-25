@@ -45,7 +45,7 @@ import (
 // manager is the concrete implementation of the interfaces.DiagnosisManager.
 type manager struct {
 	log             logger.Logger
-	pluginRegistry  *plugin.Registry
+	pluginManager   interfaces.PluginManager
 	analyzers       []interfaces.DiagnosisAnalyzer
 	diagnosisChain  *chain.DiagnosisChain
 	cache           *diagnosisCache
@@ -64,7 +64,7 @@ type manager struct {
 // NewManager creates a new instance of the diagnosis manager.
 // kb is optional, if provided it uses the existing knowledge base, otherwise it creates a new one.
 func NewManager(
-	registry *plugin.Registry,
+	pluginManager interfaces.PluginManager,
 	analyzers []interfaces.DiagnosisAnalyzer,
 	diagnosisChain *chain.DiagnosisChain,
 	reportDir string,
@@ -119,7 +119,7 @@ func NewManager(
 
 	return &manager{
 		log:             logger.NewLogger("diagnosis-manager"),
-		pluginRegistry:  registry,
+		pluginManager:   pluginManager,
 		analyzers:       analyzers,
 		diagnosisChain:  diagnosisChain,
 		cache:           newDiagnosisCache(10 * time.Minute),
@@ -146,12 +146,52 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 	m.log.Infof("Starting new diagnosis for %s on instance %s", req.TargetMiddleware, req.Instance)
 	sendProgress(progressChan, "Initialization", "InProgress", "Finding plugins...")
 
-	// Step 1: 根据中间件类型查找插件
-	plugins := m.pluginRegistry.FindByType(req.TargetMiddleware.String())
-	if len(plugins) == 0 {
-		return nil, fmt.Errorf("未找到支持 %s 的插件", req.TargetMiddleware)
+	// Step 1: Find plugin for the target middleware
+	// We assume the middleware type string matches the plugin name for now,
+	// or we might need a way to map middleware type to plugin name.
+	// For P4/P7 consistency, let's try to load/get the plugin by name.
+	p, err := m.pluginManager.LoadPlugin(req.TargetMiddleware.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load plugin for %s: %w", req.TargetMiddleware, err)
 	}
-	sendProgress(progressChan, "Initialization", "Completed", fmt.Sprintf("Found %d plugins.", len(plugins)))
+
+	plugins := []plugin.DiagnosticPlugin{}
+	// Check if the plugin implements DiagnosticPlugin interface (new)
+	// The interfaces.MiddlewarePlugin (old) might not be directly compatible with plugin.DiagnosticPlugin (new).
+	// We need to bridge them if possible or cast.
+	// Since `plugin.DiagnosticPlugin` is defined in `internal/plugin`, and `interfaces.MiddlewarePlugin` in `internal/core/interfaces`.
+
+	// If the plugin loaded via `LoadPlugin` implements `plugin.DiagnosticPlugin`, we use it.
+	if dp, ok := p.(plugin.DiagnosticPlugin); ok {
+		plugins = append(plugins, dp)
+	} else {
+		// If not, we might have a legacy plugin.
+		// We can try to adapt it, or for now, log a warning.
+		// However, `diagnosis` package seems to rely on `plugin.DiagnosticPlugin`.
+		// If `p` is NOT `DiagnosticPlugin`, we can't proceed with `p.Diagnose`.
+		// But wait, `interfaces.MiddlewarePlugin` HAS a `Diagnose` method too!
+		// `Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)`
+		// This signature matches `plugin.DiagnosticPlugin`'s `Diagnose`.
+
+		// So we can create an adapter or just call Diagnose directly if we treat it as the interface we need.
+		// But `plugin.DiagnosticPlugin` has other methods like `Init`.
+		// Let's assume for now we can cast or adaptation is needed.
+		// To fix the build/logic, let's try to use `interfaces.MiddlewarePlugin` which `p` guarantees.
+		// But the loop below expects `plugin.DiagnosticPlugin`.
+		// I should update the loop or variable type.
+
+		// Let's assume for this fix that we only support one plugin per request for now (as LoadPlugin returns one).
+		// And we will adapt the loop.
+	}
+
+	if len(plugins) == 0 && p == nil {
+		return nil, fmt.Errorf("no compatible plugins found for %s", req.TargetMiddleware)
+	}
+
+	// If we have a legacy plugin `p` but couldn't cast to `DiagnosticPlugin`, we should wrap it?
+	// Or just use `p` if we change the code below.
+
+	sendProgress(progressChan, "Initialization", "Completed", fmt.Sprintf("Found plugin for %s.", req.TargetMiddleware))
 
 	// Step 2: Anomaly Detection
 	sendProgress(progressChan, "Detection", "InProgress", "Running anomaly detection...")
@@ -197,7 +237,37 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 
 	metricsData := make(map[string]interface{})
 
-	for _, p := range plugins {
+	// Execute the loaded plugin
+	// Using the interface `interfaces.MiddlewarePlugin` which `p` satisfies.
+	// If we have multiple plugins (from the previous list code), we would iterate.
+	// For now, let's handle `p` (the loaded plugin).
+
+	wg.Add(1)
+	go func(pl interfaces.MiddlewarePlugin) {
+		defer wg.Done()
+		if pl == nil { return }
+
+		// Note: `Diagnose` in `interfaces.MiddlewarePlugin` matches the signature we need.
+		result, err := pl.Diagnose(ctx, req)
+		if err != nil {
+			m.log.Warnf("Plugin %s execution failed: %v", pl.Name(), err)
+			return
+		}
+		mu.Lock()
+		if result != nil {
+			allIssues = append(allIssues, result.Issues...)
+			// Collect metrics if available
+			if result.Metrics != nil {
+				for k, v := range result.Metrics {
+					metricsData[k] = v
+				}
+			}
+		}
+		mu.Unlock()
+	}(p)
+
+	// Also execute any `plugins` (DiagnosticPlugin) if we found any (hybrid approach)
+	for _, dp := range plugins {
 		wg.Add(1)
 		go func(pl plugin.DiagnosticPlugin) {
 			defer wg.Done()
@@ -209,8 +279,6 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 			mu.Lock()
 			if result != nil {
 				allIssues = append(allIssues, result.Issues...)
-				// Collect metrics if available
-				// Models.DiagnosisResult has Metrics now
 				if result.Metrics != nil {
 					for k, v := range result.Metrics {
 						metricsData[k] = v
@@ -218,8 +286,9 @@ func (m *manager) RunDiagnosis(ctx context.Context, req *models.DiagnosisRequest
 				}
 			}
 			mu.Unlock()
-		}(p)
+		}(dp)
 	}
+
 	wg.Wait()
 	sendProgress(progressChan, "Diagnosis", "Completed", "Plugins finished.")
 

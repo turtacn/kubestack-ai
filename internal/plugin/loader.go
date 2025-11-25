@@ -124,13 +124,28 @@ func (l *Loader) instantiatePlugin(config PluginConfigEntry) (DiagnosticPlugin, 
 	return nil, fmt.Errorf("未知插件类型: %s (Did you forget to register it?)", config.Name)
 }
 
-// PluginFactory is a function that creates a new instance of a plugin
-type PluginFactory func() DiagnosticPlugin
+// PluginConstructor is a function that creates a new instance of a plugin
+type PluginConstructor func() DiagnosticPlugin
 
-var pluginFactories = make(map[string]PluginFactory)
+var pluginFactories = make(map[string]PluginConstructor)
 
 // RegisterPluginFactory registers a factory function for a plugin name.
 // This should be called by the plugin packages in their init() functions or by main.
-func RegisterPluginFactory(name string, factory PluginFactory) {
+func RegisterPluginFactory(name string, factory PluginConstructor) {
 	pluginFactories[name] = factory
+}
+
+// GetPluginFactory retrieves a registered plugin factory.
+func GetPluginFactory(name string) (PluginConstructor, bool) {
+	factory, ok := pluginFactories[name]
+	return factory, ok
+}
+
+// GetRegisteredPlugins returns a list of registered plugin names.
+func GetRegisteredPlugins() []string {
+	keys := make([]string, 0, len(pluginFactories))
+	for k := range pluginFactories {
+		keys = append(keys, k)
+	}
+	return keys
 }

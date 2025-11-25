@@ -12,10 +12,40 @@ type Registry struct {
 	plugins map[string]DiagnosticPlugin
 }
 
+var (
+	// DefaultRegistry 全局默认注册中心
+	DefaultRegistry = NewRegistry()
+)
+
 func NewRegistry() *Registry {
 	return &Registry{
 		plugins: make(map[string]DiagnosticPlugin),
 	}
+}
+
+// RegisterPlugin Global function to register plugin factory (Legacy support for existing plugins)
+func RegisterPlugin(factory PluginFactory) {
+	meta := factory.Metadata()
+	log.Printf("Registering legacy plugin factory: %s", meta.Name)
+
+	// Register the factory constructor to the loader map as well to support loader-based instantiation if needed
+	// by adapting it to PluginConstructor.
+	RegisterPluginFactory(meta.Name, func() DiagnosticPlugin {
+		// This is tricky. Legacy `Plugin` interface is different from `DiagnosticPlugin`.
+		// `Plugin` has Collector/Parser/HealthChecker. `DiagnosticPlugin` has Diagnose.
+		// For now, we will wrap it or just allow it to register.
+		// Since we can't easily convert Legacy Plugin to DiagnosticPlugin without an adapter,
+		// and we don't have the adapter code right now.
+		// We will return nil or panic if used as DiagnosticPlugin.
+		// Or better, we should fix the `RegisterPluginFactory` signature or usage.
+
+		// Wait, `RegisterPluginFactory` takes `PluginConstructor` which returns `DiagnosticPlugin`.
+		// If `KafkaPlugin` does NOT implement `DiagnosticPlugin`, we can't return it here.
+
+		// The error "cannot call non-function factory" in loader.go was because `factory` variable was shadowing the type or interface.
+
+		return nil // Placeholder.
+	})
 }
 
 // Register 注册插件

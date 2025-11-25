@@ -39,6 +39,107 @@ type Config struct {
 	Notification        NotificationConfig `mapstructure:"notification"`
 	Detection           DetectionConfig    `mapstructure:"detection"`
 	RCA                 RCAConfig          `mapstructure:"rca"`
+	Monitor             MonitorConfig      `mapstructure:"monitor"`
+	Crawler             CrawlerConfig      `mapstructure:"crawler"`
+}
+
+type CrawlerConfig struct {
+	AllowedDomains []string `mapstructure:"allowed_domains"`
+	MaxDepth       int      `mapstructure:"max_depth"`
+	RateLimit      string   `mapstructure:"rate_limit"`
+	UserAgent      string   `mapstructure:"user_agent"`
+	IgnoreRobotsTxt bool    `mapstructure:"ignore_robots_txt"`
+	Timeout        int      `mapstructure:"timeout"`
+
+	// New fields for advanced crawler
+	RequestTimeout string        `mapstructure:"request_timeout"`
+	MaxConcurrency int           `mapstructure:"max_concurrency"`
+	Targets        []Target      `mapstructure:"targets"`
+	Quality        QualityConfig `mapstructure:"quality"`
+}
+
+type Target struct {
+	StartURL       string      `mapstructure:"start_url"`
+	AllowedDomains []string    `mapstructure:"allowed_domains"`
+	MaxDepth       int         `mapstructure:"max_depth"`
+	URLPatterns    URLPatterns `mapstructure:"url_patterns"`
+}
+
+type URLPatterns struct {
+	Include []string `mapstructure:"include"`
+	Exclude []string `mapstructure:"exclude"`
+}
+
+type QualityConfig struct {
+	MinScore float64 `mapstructure:"min_score"`
+}
+
+type MonitorConfig struct {
+	Collection CollectionConfig `mapstructure:"collection"`
+	Alerting   AlertingConfig   `mapstructure:"alerting"`
+	Storage    StorageConfig    `mapstructure:"storage"`
+}
+
+type CollectionConfig struct {
+	Interval  time.Duration  `mapstructure:"interval"`
+	Retention time.Duration  `mapstructure:"retention"`
+	Sources   []SourceConfig `mapstructure:"sources"`
+}
+
+type SourceConfig struct {
+	Type        string   `mapstructure:"type"`
+	Enabled     bool     `mapstructure:"enabled"`
+	KubeConfig  string   `mapstructure:"kubeconfig"`
+	URL         string   `mapstructure:"url"`
+	Middlewares []string `mapstructure:"middlewares"`
+}
+
+type AlertingConfig struct {
+	Enabled            bool                  `mapstructure:"enabled"`
+	EvaluationInterval time.Duration         `mapstructure:"evaluation_interval"`
+	Notifiers          []AlertNotifierConfig `mapstructure:"notifiers"`
+	Rules              []AlertRuleConfig     `mapstructure:"rules"`
+}
+
+type AlertNotifierConfig struct {
+	Type       string     `mapstructure:"type"`
+	Name       string     `mapstructure:"name"`
+	Enabled    bool       `mapstructure:"enabled"`
+	URL        string     `mapstructure:"url"`
+	Timeout    time.Duration `mapstructure:"timeout"`
+	SMTP       SMTPConfig `mapstructure:"smtp"`
+	WebhookURL string     `mapstructure:"webhook_url"`
+	Channel    string     `mapstructure:"channel"`
+	To         []string   `mapstructure:"to"`
+}
+
+type SMTPConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	From     string `mapstructure:"from"`
+}
+
+type AlertRuleConfig struct {
+	Name        string            `mapstructure:"name"`
+	Expr        string            `mapstructure:"expr"`
+	For         time.Duration     `mapstructure:"for"`
+	Severity    string            `mapstructure:"severity"`
+	Labels      map[string]string `mapstructure:"labels"`
+	Annotations map[string]string `mapstructure:"annotations"`
+	Notifiers   []string          `mapstructure:"notifiers"`
+}
+
+type StorageConfig struct {
+	Type        string              `mapstructure:"type"`
+	Path        string              `mapstructure:"path"`
+	Aggregation []AggregationConfig `mapstructure:"aggregation"`
+}
+
+type AggregationConfig struct {
+	Interval  time.Duration `mapstructure:"interval"`
+	Retention time.Duration `mapstructure:"retention"`
 }
 
 // KnowledgeConfig is the top-level configuration for all knowledge-base related operations.

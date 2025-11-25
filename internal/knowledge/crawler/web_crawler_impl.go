@@ -168,7 +168,7 @@ func (c *advancedCrawler) CrawlWithFilter(ctx context.Context, startURL string) 
 		title := doc.Find("title").Text()
 
 		score := c.scorer.Score(cleanedContent)
-		if score >= c.config.Quality.MinScore {
+		if float64(score) >= c.config.Quality.MinScore {
 			doc := &CrawledDocument{
 				URL:     r.Request.URL.String(),
 				Content: cleanedContent,

@@ -33,9 +33,16 @@ type DiagnosticPlugin interface {
 type PluginMetadata struct {
 	Name           string   `json:"name"`
 	Version        string   `json:"version"`
+	APIVersion     string   `json:"api_version"` // Added APIVersion
 	SupportedTypes []string `json:"supported_types"`
 	Author         string   `json:"author"`
 	Description    string   `json:"description"`
+}
+
+// PluginFactory 插件工厂接口
+type PluginFactory interface {
+	Create() Plugin
+	Metadata() *PluginMetadata
 }
 
 // Plugin 插件核心接口 (Legacy, keeping for compatibility if needed, but DiagnosticPlugin is the main focus for P4)

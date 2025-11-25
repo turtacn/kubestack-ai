@@ -25,6 +25,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
 	"gopkg.in/yaml.v2"
 )
 
@@ -77,6 +78,22 @@ func (r *localRegistry) Scan() error {
 
 	r.manifests = make(map[string][]*models.PluginManifest) // Clear existing manifests
 
+	// 1. Discover built-in (static) plugins
+	for _, name := range plugin.GetRegisteredPlugins() {
+		// Create a synthetic manifest for built-in plugins
+		// We don't know the version unless we instantiate it or store it.
+		// For now, assume 1.0.0 or fetch via factory (if we change GetRegisteredPlugins to return metadata).
+		// Let's assume 1.0.0 for P7 shim.
+		manifest := &models.PluginManifest{
+			Name:        name,
+			Version:     "1.0.0", // Placeholder
+			Description: "Built-in plugin",
+			Entrypoint:  "static:" + name, // Special marker for loader
+		}
+		r.manifests[name] = append(r.manifests[name], manifest)
+	}
+
+	// 2. Discover local file-based plugins
 	for _, dir := range r.pluginDirs {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {

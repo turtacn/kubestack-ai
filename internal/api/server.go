@@ -15,8 +15,12 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
+	"github.com/kubestack-ai/kubestack-ai/internal/monitor/alert"
+	"github.com/kubestack-ai/kubestack-ai/internal/monitor/alert/channels"
+	"github.com/kubestack-ai/kubestack-ai/internal/monitor/collector"
+	"github.com/kubestack-ai/kubestack-ai/internal/monitor/storage"
 	"github.com/kubestack-ai/kubestack-ai/internal/notification"
-	"github.com/kubestack-ai/kubestack-ai/internal/storage"
+	storage_pkg "github.com/kubestack-ai/kubestack-ai/internal/storage"
 	"github.com/kubestack-ai/kubestack-ai/internal/task"
 	"github.com/kubestack-ai/kubestack-ai/internal/web"
 )
@@ -25,6 +29,7 @@ type Server struct {
 	router          *gin.Engine
 	config          *config.Config
 	diagnosisEngine interfaces.DiagnosisManager
+    pluginManager   interfaces.PluginManager // Needed for middleware collectors
 	// executionMgr    interfaces.ExecutionManager // To be added when available
 	authService     *middleware.AuthService
 	rbacMiddleware  *middleware.RBACMiddleware
@@ -32,25 +37,32 @@ type Server struct {
 	wsHandler       *websocket.Handler
 	taskScheduler   *task.Scheduler
 	taskWorker      *task.Worker
-	taskStore       storage.TaskStore
+	taskStore       storage_pkg.TaskStore
 
 	// Knowledge Base API
 	knowledgeAPI    *KnowledgeAPI
+
+    // Monitoring
+    monitorHandler *handlers.MonitorHandler
+    collectorScheduler *collector.CollectorScheduler
+    alertEvaluator *alert.AlertEvaluator
+    silenceManager *alert.SilenceManager
+    alertStore     storage.AlertStore
+    silenceStore   storage.SilenceStore
+    timeseriesStore storage.TimeseriesStore
 }
 
 // NewServer creates a new API server.
-// It accepts an optional KnowledgeBase. If provided, it uses it for the Knowledge API.
-// This allows sharing the KB instance with the DiagnosisManager.
-func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, kb *knowledge.KnowledgeBase) *Server {
+func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, kb *knowledge.KnowledgeBase, pluginManager interfaces.PluginManager) *Server {
 	authService := middleware.NewAuthService(cfg.Auth)
 	rbacMiddleware := middleware.NewRBACMiddleware(cfg.RBAC)
 	wsHandler := websocket.NewHandler(cfg.WebSocket)
+	log := logger.NewLogger("api-server")
 
 	// Initialize Task System
 	var queue task.TaskQueue
-	var store storage.TaskStore
+	var store storage_pkg.TaskStore
 
-	// Defaults to Redis if config present, else could fallback to memory
 	if cfg.TaskQueue.Type == "redis" {
 		queue = task.NewRedisQueue(
 			cfg.TaskQueue.Redis.Addr,
@@ -58,20 +70,19 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, 
 			cfg.TaskQueue.Redis.DB,
 			cfg.TaskQueue.Redis.QueueName,
 		)
-		store = storage.NewRedisTaskStore(
+		store = storage_pkg.NewRedisTaskStore(
 			cfg.TaskQueue.Redis.Addr,
 			cfg.TaskQueue.Redis.Password,
 			cfg.TaskQueue.Redis.DB,
-			24*time.Hour, // TTL
+			24*time.Hour,
 		)
 	} else {
-		// Fallback for development
-		store = storage.NewInMemoryTaskStore()
+		store = storage_pkg.NewInMemoryTaskStore()
 	}
 
 	scheduler := task.NewScheduler(queue, store)
 
-	// Composite Notifier
+	// Composite Notifier for Tasks
 	notifiers := []notification.Notifier{}
 	if cfg.Notification.Webhook.URL != "" {
 		notifiers = append(notifiers, notification.NewWebhookNotifier(cfg.Notification.Webhook.URL))
@@ -91,37 +102,109 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, 
 
 	worker := task.NewWorker(queue, diagnosisEngine, store, compositeNotifier)
 
-	// If KB is not provided, try to extract from engine or create new
+	// KB Init
 	if kb == nil {
 		if dm, ok := diagnosisEngine.(interface{ GetKnowledgeBase() *knowledge.KnowledgeBase }); ok {
 			kb = dm.GetKnowledgeBase()
 		}
 		if kb == nil {
-			// Fallback: create isolated KB (not ideal but safe)
 			kb = knowledge.NewKnowledgeBase()
 		}
 	}
-
 	loader := knowledge.NewRuleLoader(kb)
-
-	// Ensure we load rules if creating new KB
-	// This might duplicate loading if KB is shared but redundant loading is cheap (in-memory map update)
-	// Actually, if shared, we assume it's already initialized.
-
 	knowledgeAPI := NewKnowledgeAPI(kb, loader)
+
+    // --- Monitoring Subsystem Init ---
+    tsStore, err := storage.NewSQLiteTimeseriesStore(cfg.Monitor.Storage.Path)
+    if err != nil {
+        log.Warnf("Failed to init timeseries store, monitoring disabled: %v", err)
+    }
+
+    alertStore, err := storage.NewSQLiteAlertStore(cfg.Monitor.Storage.Path)
+    if err != nil {
+        log.Warnf("Failed to init alert store: %v", err)
+    }
+
+    silenceStore, err := storage.NewSQLiteSilenceStore(cfg.Monitor.Storage.Path)
+    if err != nil {
+        log.Warnf("Failed to init silence store: %v", err)
+    }
+
+    var colScheduler *collector.CollectorScheduler
+    var alEvaluator *alert.AlertEvaluator
+    var monHandler *handlers.MonitorHandler
+    var silenceMgr *alert.SilenceManager
+
+    if tsStore != nil && alertStore != nil {
+        colScheduler = collector.NewCollectorScheduler(tsStore, log)
+
+        // Register Collectors
+        for _, src := range cfg.Monitor.Collection.Sources {
+            if !src.Enabled {
+                continue
+            }
+            if src.Type == "kubernetes" {
+                kc, err := collector.NewK8sCollector(src.KubeConfig, "")
+                if err == nil {
+                    colScheduler.Register(kc)
+                } else {
+                    log.Errorf("Failed to create k8s collector: %v", err)
+                }
+            }
+            if src.Type == "middleware" {
+                for _, mw := range src.Middlewares {
+                    // Create middleware collector
+                    // Note: We pass pluginManager to collector, allowing it to load/use the plugin.
+                    mc := collector.NewMiddlewareCollector(mw, pluginManager)
+                    colScheduler.Register(mc)
+                }
+            }
+        }
+
+        // Alerting
+        ruleEngine := alert.NewRuleEngine(log)
+        if err := ruleEngine.LoadRules(cfg.Monitor.Alerting.Rules); err != nil {
+            log.Errorf("Failed to load alert rules: %v", err)
+        }
+
+        notifier := alert.NewNotifier(log)
+        for _, n := range cfg.Monitor.Alerting.Notifiers {
+            if !n.Enabled { continue }
+            if n.Type == "webhook" {
+                notifier.Register(channels.NewWebhookNotifier(n.Name, n.URL, n.Timeout))
+            } else if n.Type == "email" {
+                 notifier.Register(channels.NewEmailNotifier(n.Name, channels.SMTPConfig{
+                     Host: n.SMTP.Host, Port: n.SMTP.Port, Username: n.SMTP.Username, Password: n.SMTP.Password, From: n.SMTP.From, To: n.To,
+                 }))
+            }
+        }
+
+        silenceMgr = alert.NewSilenceManager(silenceStore)
+        alEvaluator = alert.NewAlertEvaluator(ruleEngine, tsStore, alertStore, notifier, silenceMgr, log)
+        monHandler = handlers.NewMonitorHandler(colScheduler, tsStore, alertStore, ruleEngine, silenceMgr)
+    }
+    // -----------------------------
 
 	s := &Server{
 		router:          gin.Default(),
 		config:          cfg,
 		diagnosisEngine: diagnosisEngine,
+		pluginManager:   pluginManager,
 		authService:     authService,
 		rbacMiddleware:  rbacMiddleware,
-		log:             logger.NewLogger("api-server"),
+		log:             log,
 		wsHandler:       wsHandler,
 		taskScheduler:   scheduler,
 		taskWorker:      worker,
 		taskStore:       store,
 		knowledgeAPI:    knowledgeAPI,
+        monitorHandler:  monHandler,
+        collectorScheduler: colScheduler,
+        alertEvaluator:  alEvaluator,
+        silenceManager:  silenceMgr,
+        timeseriesStore: tsStore,
+        alertStore:      alertStore,
+        silenceStore:    silenceStore,
 	}
 
 	s.setupRoutes()
@@ -180,6 +263,17 @@ func (s *Server) setupRoutes() {
     conf := v1.Group("/config")
     conf.GET("", s.rbacMiddleware.CheckPermission("diagnosis:read"), configHandler.GetConfig)
     conf.PUT("", s.rbacMiddleware.CheckPermission("diagnosis:write"), configHandler.UpdateConfig)
+
+    // Monitor Routes
+    if s.monitorHandler != nil {
+        // mon := v1.Group("/monitor") // Unused for now
+        // Requirement says: GET /api/v1/metrics
+        v1.GET("/metrics", s.rbacMiddleware.CheckPermission("monitor:read"), s.monitorHandler.GetMetrics)
+
+        alerts := v1.Group("/alerts")
+        alerts.GET("/history", s.rbacMiddleware.CheckPermission("monitor:read"), s.monitorHandler.GetAlertHistory)
+        alerts.POST("/silence", s.rbacMiddleware.CheckPermission("monitor:write"), s.monitorHandler.CreateSilence)
+    }
 }
 
 func (s *Server) Start(ctx context.Context) error {
@@ -191,6 +285,18 @@ func (s *Server) Start(ctx context.Context) error {
 		s.taskWorker.Start()
 		defer s.taskWorker.Stop()
 	}
+
+    // Start Monitoring
+    if s.collectorScheduler != nil {
+        go s.collectorScheduler.Start(ctx)
+        defer s.collectorScheduler.Stop()
+    }
+    if s.alertEvaluator != nil {
+        go s.alertEvaluator.Start(ctx, s.config.Monitor.Alerting.EvaluationInterval)
+    }
+    if s.silenceManager != nil {
+        go s.silenceManager.GC(ctx)
+    }
 
 	addr := fmt.Sprintf(":%d", s.config.Server.Port)
 	srv := &http.Server{
@@ -220,6 +326,16 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
+
+    if s.timeseriesStore != nil {
+        s.timeseriesStore.Close()
+    }
+    if s.alertStore != nil {
+        s.alertStore.Close()
+    }
+    if s.silenceStore != nil {
+        s.silenceStore.Close()
+    }
 
 	s.log.Info("Server exiting")
 	return nil

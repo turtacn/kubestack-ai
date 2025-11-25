@@ -92,6 +92,8 @@ running on Kubernetes or bare metal servers.`,
 			return fmt.Errorf("failed to create AI analyzer: %w", err)
 		}
 		analyzers := []interfaces.DiagnosisAnalyzer{ruleAnalyzer, aiAnalyzer}
+
+		// P7: Use the unified plugin manager
 		diagManager = diagnosis.NewManager(pluginManager, analyzers, nil, "reports", kb)
 
 		// Execution components (using placeholder)
