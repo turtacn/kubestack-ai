@@ -17,7 +17,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
@@ -45,37 +44,57 @@ func NewPlanner() interfaces.ExecutionPlanner {
 }
 
 // GeneratePlan creates a detailed, step-by-step execution plan from a list of
-// high-level recommendations. It filters for autofixable recommendations,
+// high-level recommendations. It filters for auto-fixable recommendations,
 // converts them into execution steps, and then performs a risk analysis on the
 // resulting plan.
 //
 // Parameters:
-//   _ (context.Context): The context for the operation (currently unused).
+//   ctx (context.Context): The context for the operation.
 //   recommendations ([]*models.Recommendation): A slice of recommendations from a diagnosis.
 //
 // Returns:
 //   *models.ExecutionPlan: A structured plan containing executable steps and a risk assessment.
 //   error: An error if risk analysis fails.
-func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
+func (p *planner) GeneratePlan(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
 	p.log.Infof("Generating execution plan from %d recommendations.", len(recommendations))
 
-	steps := make([]*models.ExecutionStep, 0, len(recommendations))
+	steps := make([]*models.ExecutionStep, 0)
+	actions := make([]*models.FixAction, 0)
+
 	for _, rec := range recommendations {
 		if !rec.CanAutoFix || rec.Command == "" {
 			p.log.Debugf("Skipping non-autofixable recommendation: %s", rec.Description)
 			continue
 		}
+		action := &models.FixAction{
+			ID:               rec.ID,
+			Description:      rec.Description,
+			Command:          rec.Command,
+			Category:         rec.Category,
+			RollbackCommand:  rec.RollbackCommand, // Make sure the rollback command is included
+			ValidationCommand: rec.ValidationCommand,
+		}
+		actions = append(actions, action)
+	}
+
+	// This is a placeholder for getting the current environment.
+	// In a real application, this would come from configuration or context.
+	environment := "Production"
+
+	// Perform risk analysis on the collected actions.
+	riskAssessment, err := AnalyzeRisk(ctx, actions, environment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze plan risk: %w", err)
+	}
+
+	// Convert actions to steps after risk analysis.
+	for _, action := range actions {
 		step := &models.ExecutionStep{
 			ID:          uuid.New().String(),
-			Name:        fmt.Sprintf("Fix for '%s'", rec.Description),
-			Description: rec.Description,
-			Action: &models.FixAction{
-				ID:          rec.ID,
-				Description: rec.Description,
-				Command:     rec.Command,
-				Category:    rec.Category,
-			},
-			Status: "Pending",
+			Name:        fmt.Sprintf("Fix for '%s'", action.Description),
+			Description: action.Description,
+			Action:      action,
+			Status:      models.StepStatusPending,
 		}
 		steps = append(steps, step)
 	}
@@ -90,66 +109,28 @@ func (p *planner) GeneratePlan(_ context.Context, recommendations []*models.Reco
 		ID:       uuid.New().String(),
 		Strategy: models.SerialExecution, // Serial execution is safest for dependent steps.
 		Steps:    sortedSteps,
+		Risk:     riskAssessment,
 	}
 
-	// After generating the basic plan, analyze its risk.
-	risk, err := p.AnalyzeRisk(context.Background(), plan)
-	if err != nil {
-		return nil, fmt.Errorf("failed to analyze plan risk: %w", err)
-	}
-	plan.Risk = risk
-
+	p.log.Infof("Successfully generated execution plan with risk level: %s", plan.Risk.MaxSeverity)
 	return plan, nil
 }
 
-// RiskRule defines a pattern and associated risk level for classifying commands.
-type RiskRule struct {
-	Pattern     string
-	Level       string
-	Description string
-}
-
-var riskRules = []RiskRule{
-	{Pattern: "rm -rf", Level: "Critical", Description: "Potential for irreversible, widespread data loss."},
-	{Pattern: "dd ", Level: "Critical", Description: "Potential for raw disk writes, which can cause catastrophic data loss."},
-	{Pattern: "mkfs", Level: "Critical", Description: "Formats a filesystem, which will destroy all data on the target partition."},
-	{Pattern: "format", Level: "Critical", Description: "Formats a disk, destroying all data."},
-	{Pattern: "reboot", Level: "High", Description: "Will cause a service outage by rebooting the machine."},
-	{Pattern: "shutdown", Level: "High", Description: "Will cause a service outage by shutting down the machine."},
-	{Pattern: "kill -9", Level: "High", Description: "Forcibly terminates a process, which can lead to data corruption."},
-	{Pattern: "drop database", Level: "High", Description: "Deletes an entire database, leading to major data loss."},
-	{Pattern: "delete from", Level: "Medium", Description: "Deletes data from a table. If no WHERE clause is present, this could be high risk."},
-	{Pattern: "systemctl restart", Level: "Medium", Description: "Restarts a service, which will cause a brief service interruption."},
-	{Pattern: "kubectl delete", Level: "Medium", Description: "Deletes a Kubernetes resource, which could impact service availability."},
-	{Pattern: "kill", Level: "Medium", Description: "Terminates a process, which could cause a service interruption."},
-}
-
-// AnalyzeRisk assesses the potential risks of an execution plan by inspecting the
-// commands in each step against a predefined set of risk rules.
-func (p *planner) AnalyzeRisk(_ context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
+// AnalyzeRisk assesses the potential risks of an execution plan. It is now a wrapper
+// that extracts actions from the plan and uses the centralized risk_rules logic.
+func (p *planner) AnalyzeRisk(ctx context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
 	p.log.Info("Analyzing risk for generated execution plan.")
 
-	highestRisk := &models.RiskAssessment{
-		Level:       "Low",
-		Description: "No significant risks detected.",
+	actions := make([]*models.FixAction, len(plan.Steps))
+	for i, step := range plan.Steps {
+		actions[i] = step.Action
 	}
 
-	riskLevels := map[string]int{"Low": 0, "Medium": 1, "High": 2, "Critical": 3}
+	// This is a placeholder for getting the current environment.
+	// In a real application, this would come from configuration or context.
+	environment := "Production"
 
-	for _, step := range plan.Steps {
-		cmd := strings.ToLower(step.Action.Command)
-		for _, rule := range riskRules {
-			if strings.Contains(cmd, rule.Pattern) {
-				if riskLevels[rule.Level] > riskLevels[highestRisk.Level] {
-					highestRisk.Level = rule.Level
-					highestRisk.Description = rule.Description
-					p.log.Warnf("Risk rule triggered. Level: %s, Pattern: '%s', Step: '%s'", rule.Level, rule.Pattern, step.Name)
-				}
-			}
-		}
-	}
-
-	return highestRisk, nil
+	return AnalyzeRisk(ctx, actions, environment)
 }
 
 // OptimizeSequence is responsible for reordering the steps in a plan to ensure
