@@ -160,11 +160,10 @@ func (o *orchestrator) ProcessNaturalLanguage(ctx context.Context, query string)
 	return fmt.Sprintf("AI Response to '%s' (full implementation pending)", query), nil
 }
 
-// ManageExecution delegates the safe, user-confirmed execution of a fix plan
-// to the execution manager.
-func (o *orchestrator) ManageExecution(ctx context.Context, plan *models.ExecutionPlan, confirmFunc interfaces.ConfirmationFunc) (*models.ExecutionResult, error) {
+// ManageExecution delegates the execution of a fix plan to the execution manager.
+func (o *orchestrator) ManageExecution(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error) {
 	o.log.Infof("Managing execution for plan ID: %s", plan.ID)
-	return o.executionManager.ExecuteActions(ctx, plan, confirmFunc)
+	return o.executionManager.ExecutePlan(ctx, plan)
 }
 
 // ProcessNaturalLanguageStream handles a streaming 'ask' command query.
@@ -184,9 +183,9 @@ func (o *orchestrator) ProcessNaturalLanguageStream(ctx context.Context, query s
 }
 
 // PlanExecution delegates the task of generating an execution plan to the execution manager.
-func (o *orchestrator) PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
+func (o *orchestrator) PlanExecution(ctx context.Context, issues []models.Issue) (*models.ExecutionPlan, error) {
 	o.log.Info("Orchestrating execution planning.")
-	return o.executionManager.PlanExecution(ctx, recommendations)
+	return o.executionManager.GeneratePlan(ctx, issues)
 }
 
 // ValidateExecution delegates the task of validating a completed execution

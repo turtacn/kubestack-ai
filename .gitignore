@@ -39,3 +39,7 @@ Thumbs.db
 
 # Personal.AI order the ending
 /ai/
+
+# Test report directories
+reports/
+reports_test/

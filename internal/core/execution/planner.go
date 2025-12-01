@@ -43,71 +43,47 @@ func NewPlanner() interfaces.ExecutionPlanner {
 	}
 }
 
-// GeneratePlan creates a detailed, step-by-step execution plan from a list of
-// high-level recommendations. It filters for auto-fixable recommendations,
-// converts them into execution steps, and then performs a risk analysis on the
-// resulting plan.
-//
-// Parameters:
-//   ctx (context.Context): The context for the operation.
-//   recommendations ([]*models.Recommendation): A slice of recommendations from a diagnosis.
-//
-// Returns:
-//   *models.ExecutionPlan: A structured plan containing executable steps and a risk assessment.
-//   error: An error if risk analysis fails.
-func (p *planner) GeneratePlan(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error) {
-	p.log.Infof("Generating execution plan from %d recommendations.", len(recommendations))
+// GeneratePlan creates a detailed, step-by-step execution plan from a list of issues.
+func (p *planner) GeneratePlan(ctx context.Context, issues []models.Issue) (*models.ExecutionPlan, error) {
+	p.log.Infof("Generating execution plan from %d issues.", len(issues))
 
-	steps := make([]*models.ExecutionStep, 0)
-	actions := make([]*models.FixAction, 0)
-
-	for _, rec := range recommendations {
-		if !rec.CanAutoFix || rec.Command == "" {
-			p.log.Debugf("Skipping non-autofixable recommendation: %s", rec.Description)
-			continue
+	var actions []*models.FixAction
+	for _, issue := range issues {
+		for _, rec := range issue.Recommendations {
+			if rec.CanAutoFix {
+				actions = append(actions, &rec.Fix)
+			}
 		}
-		action := &models.FixAction{
-			ID:               rec.ID,
-			Description:      rec.Description,
-			Command:          rec.Command,
-			Category:         rec.Category,
-			RollbackCommand:  rec.RollbackCommand, // Make sure the rollback command is included
-			ValidationCommand: rec.ValidationCommand,
-		}
-		actions = append(actions, action)
 	}
 
-	// This is a placeholder for getting the current environment.
-	// In a real application, this would come from configuration or context.
-	environment := "Production"
+	if len(actions) == 0 {
+		return nil, fmt.Errorf("no autofixable actions found in the provided issues")
+	}
 
-	// Perform risk analysis on the collected actions.
-	riskAssessment, err := AnalyzeRisk(ctx, actions, environment)
+	riskAssessment, err := p.AnalyzeRisk(ctx, actions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to analyze plan risk: %w", err)
+		return nil, fmt.Errorf("failed to analyze risk: %w", err)
 	}
 
-	// Convert actions to steps after risk analysis.
-	for _, action := range actions {
-		step := &models.ExecutionStep{
+	steps := make([]*models.ExecutionStep, len(actions))
+	for i, action := range actions {
+		steps[i] = &models.ExecutionStep{
 			ID:          uuid.New().String(),
 			Name:        fmt.Sprintf("Fix for '%s'", action.Description),
 			Description: action.Description,
 			Action:      action,
 			Status:      models.StepStatusPending,
 		}
-		steps = append(steps, step)
 	}
 
-	// Build a dependency graph and sort the steps topologically.
 	sortedSteps, err := p.buildDependencyGraphAndSort(steps)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sort execution steps by dependency: %w", err)
+		return nil, fmt.Errorf("failed to sort execution steps: %w", err)
 	}
 
 	plan := &models.ExecutionPlan{
 		ID:       uuid.New().String(),
-		Strategy: models.SerialExecution, // Serial execution is safest for dependent steps.
+		Strategy: models.SerialExecution,
 		Steps:    sortedSteps,
 		Risk:     riskAssessment,
 	}
@@ -116,21 +92,40 @@ func (p *planner) GeneratePlan(ctx context.Context, recommendations []*models.Re
 	return plan, nil
 }
 
-// AnalyzeRisk assesses the potential risks of an execution plan. It is now a wrapper
-// that extracts actions from the plan and uses the centralized risk_rules logic.
-func (p *planner) AnalyzeRisk(ctx context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error) {
-	p.log.Info("Analyzing risk for generated execution plan.")
+// AnalyzeRisk assesses the potential risks of a set of actions based on predefined rules.
+func (p *planner) AnalyzeRisk(ctx context.Context, actions []*models.FixAction) (*models.RiskAssessment, error) {
+	p.log.Info("Analyzing risk for proposed actions.")
 
-	actions := make([]*models.FixAction, len(plan.Steps))
-	for i, step := range plan.Steps {
-		actions[i] = step.Action
+	assessment := &models.RiskAssessment{
+		TotalScore:       0,
+		MaxSeverity:      models.RiskLevelLow,
+		RequiresApproval: false,
+	}
+	rules := DefaultRiskRules()
+
+	for _, action := range actions {
+		for _, rule := range rules {
+			if rule.Condition(action) {
+				assessment.TotalScore += rule.Score
+				if rule.Severity > assessment.MaxSeverity {
+					assessment.MaxSeverity = rule.Severity
+				}
+				p.log.Debugf("Action '%s' matched risk rule, adding score %d. New total: %d", action.Description, rule.Score, assessment.TotalScore)
+			}
+		}
 	}
 
-	// This is a placeholder for getting the current environment.
-	// In a real application, this would come from configuration or context.
-	environment := "Production"
+	// Define thresholds for requiring approval
+	if assessment.TotalScore >= 80 || assessment.MaxSeverity >= models.RiskLevelHigh {
+		assessment.RequiresApproval = true
+		assessment.Description = "High-risk operations detected, manual approval is required."
+	} else if assessment.TotalScore >= 40 {
+		assessment.Description = "Moderate risk operations detected."
+	} else {
+		assessment.Description = "Low risk operations, no approval required."
+	}
 
-	return AnalyzeRisk(ctx, actions, environment)
+	return assessment, nil
 }
 
 // OptimizeSequence is responsible for reordering the steps in a plan to ensure

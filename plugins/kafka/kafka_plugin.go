@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	plugin.RegisterPluginFactory("kafka", func() plugin.DiagnosticPlugin {
+	plugin.RegisterPluginFactory("Kafka", func() plugin.DiagnosticPlugin {
 		return &KafkaPlugin{}
 	})
 }

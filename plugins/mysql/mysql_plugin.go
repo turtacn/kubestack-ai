@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	plugin.RegisterPluginFactory("mysql", func() plugin.DiagnosticPlugin {
+	plugin.RegisterPluginFactory("MySQL", func() plugin.DiagnosticPlugin {
 		return &MySQLPlugin{}
 	})
 }
@@ -147,13 +147,19 @@ func (p *MySQLPlugin) attachRecommendations(issues []*models.Issue) {
 		if strings.Contains(issue.Title, "慢查询") {
 			recs = append(recs, &models.Recommendation{
 				Description: "优化SQL查询，添加合适的索引",
-				Category:    "Optimization",
+				Fix: models.FixAction{
+					Description: "优化SQL查询，添加合适的索引",
+					Category:    "Optimization",
+				},
 			})
 		}
 		if strings.Contains(issue.Title, "死锁") {
 			recs = append(recs, &models.Recommendation{
 				Description: "检查事务逻辑，避免长时间持有锁",
-				Category:    "Application",
+				Fix: models.FixAction{
+					Description: "检查事务逻辑，避免长时间持有锁",
+					Category:    "Application",
+				},
 			})
 		}
 		issue.Recommendations = recs

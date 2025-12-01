@@ -53,14 +53,24 @@ This command follows a safe, multi-step process:
 			// This requires a persistence layer for diagnosis results, which is not yet implemented.
 			// We will use placeholder recommendations to demonstrate the flow.
 			fmt.Printf("Fetching recommendations for diagnosis ID: %s (using placeholder data)\n", diagnosisID)
-			recommendations := []*models.Recommendation{
-				{ID: "rec-001", Description: "Increase the max_connections parameter.", Command: "mysql -e 'SET GLOBAL max_connections = 500;'", CanAutoFix: true},
-				{ID: "rec-002", Description: "Restart the database server to apply changes.", Command: "systemctl restart mysqld", CanAutoFix: true},
+			issues := []models.Issue{
+				{
+					Recommendations: []*models.Recommendation{
+						{
+							ID: "rec-001", Description: "Increase the max_connections parameter.", CanAutoFix: true,
+							Fix: models.FixAction{Command: "mysql -e 'SET GLOBAL max_connections = 500;'"},
+						},
+						{
+							ID: "rec-002", Description: "Restart the database server to apply changes.", CanAutoFix: true,
+							Fix: models.FixAction{Command: "systemctl restart mysqld"},
+						},
+					},
+				},
 			}
 
 			// 2. Generate the execution plan.
 			fmt.Println("Generating execution plan...")
-			plan, err := orchestrator.PlanExecution(cmd.Context(), recommendations)
+			plan, err := orchestrator.PlanExecution(cmd.Context(), issues)
 			if err != nil {
 				return fmt.Errorf("failed to generate execution plan: %w", err)
 			}
@@ -68,7 +78,7 @@ This command follows a safe, multi-step process:
 			// 3. Display the plan and ask for user confirmation. This is a critical safety step.
 			// TODO: Use a proper UI component from `internal/cli/ui` to render the plan nicely.
 			fmt.Println("\n--- [Execution Plan Review] ---")
-			fmt.Printf(" Risk Level: %s\n", plan.Risk.Level)
+			fmt.Printf(" Risk Level: %s\n", plan.Risk.MaxSeverity)
 			fmt.Printf(" Description: %s\n", plan.Risk.Description)
 			fmt.Println(" Steps to be executed:")
 			for i, step := range plan.Steps {
@@ -86,16 +96,8 @@ This command follows a safe, multi-step process:
 
 			// 4. Execute the plan.
 			fmt.Println("\nExecuting plan...")
-			// The confirmation function for individual steps is created here and passed down to the executor.
-			stepConfirmFunc := func(prompt string) bool {
-				// TODO: Use a better UI component for this, e.g., from the 'survey' library.
-				fmt.Printf("\n[CONFIRMATION REQUIRED]\n%s\n\nExecute this step? [y/N]: ", prompt)
-				var response string
-				fmt.Scanln(&response)
-				return response == "y" || response == "Y"
-			}
 
-			execResult, err := orchestrator.ManageExecution(cmd.Context(), plan, stepConfirmFunc)
+			execResult, err := orchestrator.ManageExecution(cmd.Context(), plan)
 			if err != nil {
 				fmt.Printf("\n--- [Execution Failed] ---\n")
 				fmt.Printf("Error: %v\n", err)

@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	plugin.RegisterPluginFactory("elasticsearch", func() plugin.DiagnosticPlugin {
+	plugin.RegisterPluginFactory("Elasticsearch", func() plugin.DiagnosticPlugin {
 		return &ElasticsearchPlugin{}
 	})
 }

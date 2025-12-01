@@ -12,11 +12,12 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/api"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
-    "github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
-    "github.com/kubestack-ai/kubestack-ai/internal/core/models"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/mock"
-    "context"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"context"
 )
 
 // MockDiagnosisManager
@@ -40,6 +41,23 @@ func (m *MockDiagnosisManager) GenerateReport(result *models.DiagnosisResult) (s
 func (m *MockDiagnosisManager) AnalyzeData(ctx context.Context, req *models.DiagnosisRequest, collectedData *models.CollectedData) ([]*models.Issue, error) {
     return nil, nil
 }
+func (m *MockDiagnosisManager) GetDiagnosisResult(id string) (*models.DiagnosisResult, error) {
+    return &models.DiagnosisResult{ID: id}, nil
+}
+
+// Mock KnowledgeBase and PluginManager
+type mockKnowledgeBase struct{}
+func (m *mockKnowledgeBase) AddRule(rule *knowledge.Rule) error { return nil }
+func (m *mockKnowledgeBase) GetRule(id string) (*knowledge.Rule, error) { return nil, nil }
+func (m *mockKnowledgeBase) UpdateRule(rule *knowledge.Rule) error { return nil }
+func (m *mockKnowledgeBase) DeleteRule(id string) error { return nil }
+func (m *mockKnowledgeBase) ListRules() ([]*knowledge.Rule, error) { return nil, nil }
+
+type mockPluginManager struct{}
+func (m *mockPluginManager) LoadPlugin(name string) (interfaces.MiddlewarePlugin, error) { return nil, nil }
+func (m *mockPluginManager) UnloadPlugin(name string) error { return nil }
+func (m *mockPluginManager) GetPlugin(name string) (interfaces.MiddlewarePlugin, bool) { return nil, false }
+func (m *mockPluginManager) ListPlugins() []interfaces.MiddlewarePlugin { return nil }
 
 func TestDiagnosisAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -56,8 +74,11 @@ func TestDiagnosisAPI(t *testing.T) {
     // Mocks
     mockEngine := new(MockDiagnosisManager)
     mockEngine.On("RunDiagnosis", mock.Anything, mock.Anything, mock.Anything).Return(&models.DiagnosisResult{ID: "test-id"}, nil)
+    // Add mock implementations for KnowledgeBase and PluginManager
+    mockKb := knowledge.NewKnowledgeBase()
+    mockPm := &mockPluginManager{}
 
-	server := api.NewServer(cfg, mockEngine)
+	server := api.NewServer(cfg, mockEngine, mockKb, mockPm)
 
     // 1. Login to get token
     loginBody := []byte(`{"username": "admin", "password": "admin"}`)

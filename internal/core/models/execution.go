@@ -122,18 +122,6 @@ type RollbackPlan struct {
 	Steps []*ExecutionStep `json:"steps" yaml:"steps"`
 }
 
-// ExecutionStatus defines the possible states of an execution.
-type ExecutionStatus string
-
-const (
-	ExecutionStatusInProgress             ExecutionStatus = "InProgress"
-	ExecutionStatusSuccess                ExecutionStatus = "Success"
-	ExecutionStatusFailed                 ExecutionStatus = "Failed"
-	ExecutionStatusFailedWithRollbackSuccess ExecutionStatus = "FailedWithRollbackSuccess"
-	ExecutionStatusFailedWithRollbackFailure ExecutionStatus = "FailedWithRollbackFailure"
-	ExecutionStatusAborted                ExecutionStatus = "Aborted"
-)
-
 // ExecutionLog records a single, timestamped log entry generated during the execution of a plan.
 type ExecutionLog struct {
 	// Timestamp is the UTC time when the log entry was created.

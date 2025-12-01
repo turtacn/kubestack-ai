@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package execution
+
+package execution_test
 
 import (
 	"context"
@@ -23,27 +24,36 @@ import (
 )
 
 func TestAnalyzeRisk_HighRisk(t *testing.T) {
+	planner := execution.NewPlanner()
 	actions := []*models.FixAction{
-		{Category: "Restart"},
+		{Description: "Restart server", Category: "Restart"},
 	}
-	assessment, err := execution.AnalyzeRisk(context.Background(), actions, "Production")
+
+	assessment, err := planner.AnalyzeRisk(context.Background(), actions)
+
 	assert.NoError(t, err)
+	assert.NotNil(t, assessment)
 	assert.Equal(t, models.RiskLevelHigh, assessment.MaxSeverity)
 	assert.True(t, assessment.RequiresApproval)
 }
 
 func TestGeneratePlan_Ordering(t *testing.T) {
-	recommendations := []*models.Recommendation{
-		{ID: "rec-restart", CanAutoFix: true, Command: "systemctl restart myservice", Category: "Restart"},
-		{ID: "rec-config", CanAutoFix: true, Command: "echo 'timeout=500' >> /etc/myservice.conf", Category: "ConfigChange"},
+	planner := execution.NewPlanner()
+	issues := []models.Issue{
+		{
+			Recommendations: []*models.Recommendation{
+				{CanAutoFix: true, Fix: models.FixAction{Description: "Restart", Category: "Restart"}},
+				{CanAutoFix: true, Fix: models.FixAction{Description: "Change config", Category: "ConfigChange"}},
+			},
+		},
 	}
 
-	planner := execution.NewPlanner()
-	plan, err := planner.GeneratePlan(context.Background(), recommendations)
+	plan, err := planner.GeneratePlan(context.Background(), issues)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, plan)
 	assert.Len(t, plan.Steps, 2)
-	assert.Equal(t, "ConfigChange", plan.Steps[0].Action.Category)
-	assert.Equal(t, "Restart", plan.Steps[1].Action.Category)
+	// Expect ConfigChange to come before Restart
+	assert.Equal(t, "Fix for 'Change config'", plan.Steps[0].Name)
+	assert.Equal(t, "Fix for 'Restart'", plan.Steps[1].Name)
 }

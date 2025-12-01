@@ -50,12 +50,11 @@ func TestAdvancedCrawler_CrawlWithFilter(t *testing.T) {
 		MaxConcurrency: 2,
 		RequestTimeout: "10s",
 		UserAgent:      "test-crawler",
-		Quality: config.Quality{
+		Quality: config.QualityConfig{
 			MinScore: 0,
 		},
 		Targets: []config.Target{
 			{
-				Name:     "test-site",
 				StartURL: server.URL,
 				AllowedDomains: []string{
 					u.Hostname(),

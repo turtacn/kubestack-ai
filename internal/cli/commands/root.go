@@ -96,8 +96,9 @@ running on Kubernetes or bare metal servers.`,
 		// P7: Use the unified plugin manager
 		diagManager = diagnosis.NewManager(pluginManager, analyzers, nil, "reports", kb)
 
-		// Execution components (using placeholder)
-		execManager := &execution.PlaceholderManager{}
+		// Execution components
+		execPlanner := execution.NewPlanner()
+		execManager := execution.NewManager(execPlanner)
 
 		// --- Orchestrator ---
 		// Warning: Missing KnowledgeManager and other components for RAG.

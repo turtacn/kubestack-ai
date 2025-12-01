@@ -129,7 +129,15 @@ func (a *RuleBasedAnalyzer) AnalyzeMetrics(_ context.Context, data *models.Metri
 					Title:    rule.IssueTitle,
 					Severity: rule.Severity,
 					Evidence: fmt.Sprintf("Metric '%s' value is %.2f, which violates the threshold of %s %.2f.", rule.MetricName, floatValue, rule.Operator, rule.Threshold),
-					Recommendations: []*models.Recommendation{{Description: rule.Recommendation, CanAutoFix: false}},
+					Recommendations: []*models.Recommendation{
+						{
+							Description: rule.Recommendation,
+							CanAutoFix:  false,
+							Fix: models.FixAction{
+								Description: rule.Recommendation,
+							},
+						},
+					},
 				}
 				issues = append(issues, issue)
 			}
@@ -158,7 +166,15 @@ func (a *RuleBasedAnalyzer) AnalyzeLogs(_ context.Context, data *models.LogData)
 					Title:    rule.IssueTitle,
 					Severity: rule.Severity,
 					Evidence: fmt.Sprintf("Found pattern '%s' in log entry: %s", rule.Pattern, logEntry),
-					Recommendations: []*models.Recommendation{{Description: rule.Recommendation, CanAutoFix: false}},
+					Recommendations: []*models.Recommendation{
+						{
+							Description: rule.Recommendation,
+							CanAutoFix:  false,
+							Fix: models.FixAction{
+								Description: rule.Recommendation,
+							},
+						},
+					},
 				})
 				// To avoid flooding with similar issues, we only report the first occurrence of a pattern.
 				// A more advanced implementation could aggregate findings.
@@ -342,9 +358,11 @@ func (a *AIAnalyzer) parseLLMResponse(responseContent string) ([]*models.Issue, 
 		for _, llmRec := range llmIssue.Recommendations {
 			recommendations = append(recommendations, &models.Recommendation{
 				Description: llmRec.Description,
-				Command:     llmRec.Command,
-				// AI-generated fixes should be reviewed by default
-				CanAutoFix: llmRec.Command != "",
+				CanAutoFix:  llmRec.Command != "",
+				Fix: models.FixAction{
+					Description: llmRec.Description,
+					Command:     llmRec.Command,
+				},
 			})
 		}
 

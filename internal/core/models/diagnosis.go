@@ -77,22 +77,34 @@ type Recommendation struct {
 	ID string `json:"id" yaml:"id"`
 	// Description is a human-readable explanation of the recommended action.
 	Description string `json:"description" yaml:"description"`
-	// Command is the specific shell command to be executed for an automated fix, if available.
-	Command string `json:"command,omitempty" yaml:"command,omitempty"`
 	// CanAutoFix indicates whether this recommendation can be safely and automatically applied by the execution engine.
 	CanAutoFix bool `json:"canAutoFix" yaml:"canAutoFix"`
-	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
-	Category string `json:"category,omitempty" yaml:"category,omitempty"`
 	// Priority indicates the importance of this recommendation.
 	Priority Priority `json:"priority,omitempty" yaml:"priority,omitempty"`
-	// RollbackCommand is the command to revert the action if it fails.
-	RollbackCommand string `json:"rollback_command,omitempty"`
-	// ValidationCommand is a command to verify the action was successful.
-	ValidationCommand string `json:"validation_command,omitempty"`
+	// Fix holds the detailed action to be performed.
+	Fix FixAction `json:"fix,omitempty" yaml:"fix,omitempty"`
 }
 
 // Priority defines the importance of a recommendation.
 type Priority int
+
+const (
+	PriorityLow Priority = iota
+	PriorityMedium
+	PriorityHigh
+)
+
+// ExecutionStatus defines the possible states of an execution.
+type ExecutionStatus string
+
+const (
+	ExecutionStatusInProgress             ExecutionStatus = "InProgress"
+	ExecutionStatusSuccess                ExecutionStatus = "Success"
+	ExecutionStatusFailed                 ExecutionStatus = "Failed"
+	ExecutionStatusFailedWithRollbackSuccess ExecutionStatus = "FailedWithRollbackSuccess"
+	ExecutionStatusFailedWithRollbackFailure ExecutionStatus = "FailedWithRollbackFailure"
+	ExecutionStatusAborted                ExecutionStatus = "Aborted"
+)
 
 // MetricsData is a generic container for collected performance metrics. It uses a
 // map to allow for flexibility, as different plugins may collect different metrics.
@@ -183,14 +195,12 @@ type FixAction struct {
 	Description string `json:"description" yaml:"description"`
 	// Command is the shell command to be executed.
 	Command string `json:"command" yaml:"command"`
+	// RollbackCommand is the shell command to be executed to undo the action.
+	RollbackCommand string `json:"rollbackCommand,omitempty" yaml:"rollbackCommand,omitempty"`
 	// Parameters provides any additional parameters needed to execute the fix.
 	Parameters map[string]string `json:"parameters" yaml:"parameters"`
 	// Category helps classify the action type for dependency analysis (e.g., "ConfigChange", "Restart", "Validation").
 	Category string `json:"category,omitempty" yaml:"category,omitempty"`
-	// RollbackCommand is the command to revert the action if it fails.
-	RollbackCommand string `json:"rollback_command,omitempty"`
-	// ValidationCommand is a command to verify the action was successful.
-	ValidationCommand string `json:"validation_command,omitempty"`
 }
 
 // FixResult represents the outcome of a single executed fix action.

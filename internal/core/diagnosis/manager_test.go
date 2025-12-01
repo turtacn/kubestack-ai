@@ -174,7 +174,7 @@ func TestRunDiagnosis_WithDiagnosisChain(t *testing.T) {
 
 	// Manager
 	analyzers := []interfaces.DiagnosisAnalyzer{} // empty rule based analyzers
-	manager := NewManager(mockPM, analyzers, diagChain, "reports_test")
+	manager := NewManager(mockPM, analyzers, diagChain, "reports_test", nil)
 
 	// Action
 	req := &models.DiagnosisRequest{

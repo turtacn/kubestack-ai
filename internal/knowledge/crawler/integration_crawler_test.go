@@ -57,12 +57,11 @@ func TestIntegration_CrawlRedisOfficialDocs(t *testing.T) {
 		MaxConcurrency: 5,
 		RequestTimeout: "30s",
 		UserAgent:      "test-crawler",
-		Quality: config.Quality{
+		Quality: config.QualityConfig{
 			MinScore: 0,
 		},
 		Targets: []config.Target{
 			{
-				Name:     "redis-docs",
 				StartURL: server.URL,
 				AllowedDomains: []string{
 					u.Hostname(),

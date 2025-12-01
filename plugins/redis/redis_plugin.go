@@ -13,15 +13,13 @@ import (
 )
 
 func init() {
-	plugin.RegisterPluginFactory("redis", func() plugin.DiagnosticPlugin {
+	plugin.RegisterPluginFactory("Redis", func() plugin.DiagnosticPlugin {
 		return &RedisPlugin{}
 	})
 }
 
-// RedisPlugin Redis诊断插件
-type RedisPlugin struct {
-	client *redis.Client
-}
+// RedisPlugin Redis诊断插件. This plugin is stateless.
+type RedisPlugin struct{}
 
 func (p *RedisPlugin) Name() string {
 	return "redis"
@@ -35,47 +33,55 @@ func (p *RedisPlugin) Version() string {
 	return "1.0.0"
 }
 
+// Init is a no-op for the stateless Redis plugin.
 func (p *RedisPlugin) Init(config map[string]interface{}) error {
-	addr, ok := config["addr"].(string)
-	if !ok {
-		return fmt.Errorf("config 'addr' is required and must be a string")
-	}
-	password, _ := config["password"].(string)
-	db, _ := config["db"].(int)
-
-	p.client = redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       db,
-	})
-
-	// Test connection
-	if err := p.client.Ping(context.Background()).Err(); err != nil {
-		return fmt.Errorf("Redis连接失败: %w", err)
-	}
-
-	return nil
+	return nil // Stateless, no init needed.
 }
 
 func (p *RedisPlugin) Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
+	if req.Instance == "" {
+		return nil, fmt.Errorf("redis diagnosis requires an instance endpoint in the request")
+	}
+
+	addr := req.Instance
+	// NOTE: The current DiagnosisRequest model does not support passing credentials.
+	// Assuming no password for now.
+	var password string
+
+	// TODO: Add support for specifying the database index in the request.
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       0,
+	})
+	defer client.Close()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis at '%s': %w", addr, err)
+	}
+
 	result := &models.DiagnosisResult{
-		Issues: []*models.Issue{},
+		Issues:  []*models.Issue{},
+		Metrics: make(map[string]interface{}),
 	}
 
 	// Step 1: 检查内存使用
-	memoryIssue := p.checkMemory(ctx)
+	memoryIssue, metrics := p.checkMemory(ctx, client)
 	if memoryIssue != nil {
 		result.Issues = append(result.Issues, memoryIssue)
 	}
+	for k, v := range metrics {
+		result.Metrics[k] = v
+	}
 
 	// Step 2: 检查连接数
-	connectionIssue := p.checkConnections(ctx)
+	connectionIssue := p.checkConnections(ctx, client)
 	if connectionIssue != nil {
 		result.Issues = append(result.Issues, connectionIssue)
 	}
 
 	// Step 3: 检查慢查询
-	slowQueryIssue := p.checkSlowLog(ctx)
+	slowQueryIssue := p.checkSlowLog(ctx, client)
 	if slowQueryIssue != nil {
 		result.Issues = append(result.Issues, slowQueryIssue)
 	}
@@ -86,24 +92,38 @@ func (p *RedisPlugin) Diagnose(ctx context.Context, req *models.DiagnosisRequest
 	return result, nil
 }
 
-func (p *RedisPlugin) checkMemory(ctx context.Context) *models.Issue {
-	info := p.client.Info(ctx, "memory").Val()
+func (p *RedisPlugin) checkMemory(ctx context.Context, client *redis.Client) (*models.Issue, map[string]interface{}) {
+	metrics := make(map[string]interface{})
+	info, err := client.Info(ctx, "memory").Result()
+	if err != nil {
+		return nil, metrics // Or return a specific error issue
+	}
+
 	usedMemory := parseMemoryInfo(info, "used_memory")
 	maxMemory := parseMemoryInfo(info, "maxmemory")
+	usedMemoryMB := usedMemory / 1024 / 1024
 
+	metrics["used_memory"] = usedMemory
+	metrics["maxmemory"] = maxMemory
+	metrics["used_memory_mb"] = usedMemoryMB
+
+	var issue *models.Issue
 	if maxMemory > 0 && float64(usedMemory)/float64(maxMemory) > 0.9 {
-		return &models.Issue{
+		issue = &models.Issue{
 			Title:       "Redis内存使用率过高",
 			Severity:    enum.SeverityHigh,
-			Description: fmt.Sprintf("当前内存使用: %dMB, 最大内存: %dMB", usedMemory/1024/1024, maxMemory/1024/1024),
+			Description: fmt.Sprintf("当前内存使用: %dMB, 最大内存: %dMB", usedMemoryMB, maxMemory/1024/1024),
 			Source:      "RedisPlugin",
 		}
 	}
-	return nil
+	return issue, metrics
 }
 
-func (p *RedisPlugin) checkConnections(ctx context.Context) *models.Issue {
-	info := p.client.Info(ctx, "clients").Val()
+func (p *RedisPlugin) checkConnections(ctx context.Context, client *redis.Client) *models.Issue {
+	info, err := client.Info(ctx, "clients").Result()
+	if err != nil {
+		return nil // Or return a specific error issue
+	}
 	connectedClients := parseClientsInfo(info, "connected_clients")
 
 	if connectedClients > 10000 {
@@ -117,8 +137,8 @@ func (p *RedisPlugin) checkConnections(ctx context.Context) *models.Issue {
 	return nil
 }
 
-func (p *RedisPlugin) checkSlowLog(ctx context.Context) *models.Issue {
-	slowLogs, err := p.client.SlowLogGet(ctx, 10).Result()
+func (p *RedisPlugin) checkSlowLog(ctx context.Context, client *redis.Client) *models.Issue {
+	slowLogs, err := client.SlowLogGet(ctx, 10).Result()
 	if err != nil {
 		return nil // Ignore error or return warning
 	}
@@ -140,13 +160,19 @@ func (p *RedisPlugin) attachRecommendations(issues []*models.Issue) []*models.Is
 		if strings.Contains(issue.Title, "内存") {
 			recs = append(recs, &models.Recommendation{
 				Description: "设置maxmemory-policy为allkeys-lru",
-				Category:    "Configuration",
+				Fix: models.FixAction{
+					Description: "设置maxmemory-policy为allkeys-lru",
+					Category:    "Configuration",
+				},
 			})
 		}
 		if strings.Contains(issue.Title, "连接数") {
 			recs = append(recs, &models.Recommendation{
 				Description: "检查客户端连接泄漏，优化连接池配置",
-				Category:    "Application",
+				Fix: models.FixAction{
+					Description: "检查客户端连接泄漏，优化连接池配置",
+					Category:    "Application",
+				},
 			})
 		}
 		issue.Recommendations = recs
@@ -154,8 +180,9 @@ func (p *RedisPlugin) attachRecommendations(issues []*models.Issue) []*models.Is
 	return issues
 }
 
+// Shutdown is a no-op for the stateless Redis plugin.
 func (p *RedisPlugin) Shutdown() error {
-	return p.client.Close()
+	return nil
 }
 
 // Helpers

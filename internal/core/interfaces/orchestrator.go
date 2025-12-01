@@ -74,10 +74,10 @@ type Orchestrator interface {
 	ProcessNaturalLanguageStream(ctx context.Context, query string) (<-chan llm_interfaces.StreamingChunk, error)
 
 	// PlanExecution generates a detailed execution plan for a set of proposed actions.
-	PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error)
+	PlanExecution(ctx context.Context, issues []models.Issue) (*models.ExecutionPlan, error)
 
 	// ManageExecution handles the safe, user-confirmed execution of a plan.
-	ManageExecution(ctx context.Context, plan *models.ExecutionPlan, confirmFunc ConfirmationFunc) (*models.ExecutionResult, error)
+	ManageExecution(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error)
 
 	// ValidateExecution checks if an execution was successful and the original issue is resolved.
 	ValidateExecution(ctx context.Context, result *models.ExecutionResult) error

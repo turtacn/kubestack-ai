@@ -1,7 +1,7 @@
 // Copyright © 2024 KubeStack-AI Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// you may not not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package execution
+
+package execution_test
 
 import (
 	"context"
@@ -23,39 +24,35 @@ import (
 )
 
 func TestExecute_Success(t *testing.T) {
-	planner := execution.NewPlanner()
-	manager := execution.NewManager(planner)
-
+	manager := execution.NewManager(nil) // Planner not needed for direct execution
 	plan := &models.ExecutionPlan{
-		ID:       "test-plan",
-		Strategy: models.SerialExecution,
+		ID: "test-plan",
 		Steps: []*models.ExecutionStep{
-			{ID: "step-1", Action: &models.FixAction{Command: "echo 'step 1'"}},
-			{ID: "step-2", Action: &models.FixAction{Command: "echo 'step 2'"}},
+			{Name: "Step 1", Action: &models.FixAction{Command: "echo 'step 1'"}},
+			{Name: "Step 2", Action: &models.FixAction{Command: "echo 'step 2'"}},
 		},
-		Risk: &models.RiskAssessment{MaxSeverity: models.RiskLevelLow},
 	}
 
 	result, err := manager.ExecutePlan(context.Background(), plan)
+
 	assert.NoError(t, err)
+	assert.NotNil(t, result)
 	assert.Equal(t, models.ExecutionStatusSuccess, result.Status)
 }
 
 func TestExecute_RollbackTrigger(t *testing.T) {
-	planner := execution.NewPlanner()
-	manager := execution.NewManager(planner)
-
+	manager := execution.NewManager(nil)
 	plan := &models.ExecutionPlan{
-		ID:       "test-plan-rollback",
-		Strategy: models.SerialExecution,
+		ID: "test-plan-rollback",
 		Steps: []*models.ExecutionStep{
-			{ID: "step-1", Action: &models.FixAction{Command: "echo 'step 1'", RollbackCommand: "echo 'rollback 1'"}},
-			{ID: "step-2", Action: &models.FixAction{Command: "fail"}},
+			{Name: "Step 1", Action: &models.FixAction{Command: "echo 'step 1'", RollbackCommand: "echo 'rollback 1'"}},
+			{Name: "Step 2", Action: &models.FixAction{Command: "fail"}}, // This command will fail
 		},
-		Risk: &models.RiskAssessment{MaxSeverity: models.RiskLevelLow},
 	}
 
 	result, err := manager.ExecutePlan(context.Background(), plan)
+
 	assert.Error(t, err)
+	assert.NotNil(t, result)
 	assert.Equal(t, models.ExecutionStatusFailedWithRollbackSuccess, result.Status)
 }

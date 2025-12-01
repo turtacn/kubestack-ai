@@ -21,6 +21,7 @@ import (
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
+	intplugin "github.com/kubestack-ai/kubestack-ai/internal/plugin"
 )
 
 // pluginManager is the concrete implementation of the interfaces.PluginManager.
@@ -102,6 +103,34 @@ func (m *pluginManager) LoadPlugin(pluginName string) (interfaces.MiddlewarePlug
 
 	// 1. Find plugin manifest from the registry.
 	// An empty version constraint "" implies finding the latest compatible version.
+	// First, check for a static plugin factory.
+	if factory, ok := intplugin.GetPluginFactory(pluginName); ok {
+		plugin := factory()
+		// Case 1: Plugin is already the correct type
+		if mp, ok := plugin.(interfaces.MiddlewarePlugin); ok {
+			m.loadedPlugins[pluginName] = mp
+			m.log.Infof("Statically linked plugin '%s' loaded successfully.", pluginName)
+			return mp, nil
+		}
+		// Case 2: Plugin is a DiagnosticPlugin, needs adapting
+		if dp, ok := plugin.(intplugin.DiagnosticPlugin); ok {
+			adapter := &DiagnosticPluginAdapter{p: dp}
+			m.loadedPlugins[pluginName] = adapter
+			m.log.Infof("Statically linked diagnostic plugin '%s' loaded successfully with adapter.", pluginName)
+			return adapter, nil
+		}
+		// Case 3: Plugin is a legacy Plugin, needs adapting
+		if lp, ok := plugin.(intplugin.Plugin); ok {
+			adapter := &LegacyPluginAdapter{p: lp}
+			m.loadedPlugins[pluginName] = adapter
+			m.log.Infof("Statically linked legacy plugin '%s' loaded successfully with adapter.", pluginName)
+			return adapter, nil
+		}
+
+		// If none of the above, then we have a problem.
+		return nil, fmt.Errorf("statically linked plugin '%s' does not implement a known plugin interface", pluginName)
+	}
+
 	manifest, err := m.registry.FindPlugin(pluginName, "")
 	if err != nil {
 		return nil, fmt.Errorf("could not find plugin '%s' in registry: %w", pluginName, err)

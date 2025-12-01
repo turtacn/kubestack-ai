@@ -35,30 +35,22 @@ type ExecutionManager interface {
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the planning operation.
-	//   recommendations ([]*models.Recommendation): A slice of recommendations to be turned into a plan.
+	//   issues ([]models.Issue): A slice of issues containing recommendations to be turned into a plan.
 	//
 	// Returns:
 	//   *models.ExecutionPlan: The generated plan, ready for user review and execution.
 	//   error: An error if plan generation fails.
-	PlanExecution(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error)
+	GeneratePlan(ctx context.Context, issues []models.Issue) (*models.ExecutionPlan, error)
 
-	// ExecuteActions executes all steps in a given execution plan, respecting its defined
-	// strategy (e.g., serial). It uses the provided confirmation function to get user
-	// approval before executing each step.
+	// ExecutePlan executes all steps in a given execution plan, respecting its defined strategy.
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the entire execution operation.
 	//   plan (*models.ExecutionPlan): The plan to be executed.
-	//   confirmFunc (ConfirmationFunc): The callback function for user confirmation.
 	//
 	// Returns:
 	//   *models.ExecutionResult: A struct containing the outcome of the execution.
 	//   error: An error if a step fails and the execution is halted.
-	ExecuteActions(ctx context.Context, plan *models.ExecutionPlan, confirmFunc ConfirmationFunc) (*models.ExecutionResult, error)
-
-	// ExecutePlan carries out the steps defined in an execution plan. It is a more
-	// modern entry point for execution that encapsulates the logic for handling
-	// different execution strategies, logging, and rollbacks.
 	ExecutePlan(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error)
 
 	// ValidateExecution checks if the execution was successful and if the original issue
@@ -83,24 +75,23 @@ type ExecutionPlanner interface {
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the planning operation.
-	//   recommendations ([]*models.Recommendation): A slice of recommendations to be planned.
+	//   issues ([]models.Issue): A slice of issues containing recommendations to be planned.
 	//
 	// Returns:
 	//   *models.ExecutionPlan: The generated plan.
 	//   error: An error if plan generation fails.
-	GeneratePlan(ctx context.Context, recommendations []*models.Recommendation) (*models.ExecutionPlan, error)
+	GeneratePlan(ctx context.Context, issues []models.Issue) (*models.ExecutionPlan, error)
 
-	// AnalyzeRisk assesses the potential risks associated with an execution plan by
-	// inspecting its actions. This is a crucial safety step.
+	// AnalyzeRisk assesses the potential risks associated with a set of proposed actions.
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the risk analysis.
-	//   plan (*models.ExecutionPlan): The plan to be analyzed.
+	//   actions ([]*models.FixAction): The actions to be analyzed.
 	//
 	// Returns:
 	//   *models.RiskAssessment: A struct containing the assessed risk level and description.
 	//   error: An error if risk analysis fails.
-	AnalyzeRisk(ctx context.Context, plan *models.ExecutionPlan) (*models.RiskAssessment, error)
+	AnalyzeRisk(ctx context.Context, actions []*models.FixAction) (*models.RiskAssessment, error)
 
 	// OptimizeSequence reorders the steps within a plan to ensure dependencies are met
 	// and risks are minimized. For example, it might use a topological sort on a
@@ -147,12 +138,12 @@ type ActionExecutor interface {
 	//   error: An error if applying the configuration fails.
 	ApplyConfiguration(ctx context.Context, configChange *models.ConfigChange) error
 
-	// RollbackChanges reverts a series of previously executed actions. This is
+	// RollbackChanges reverts a specific action that was previously executed. This is
 	// crucial for transactional safety and is a key part of a robust execution engine.
 	//
 	// Parameters:
 	//   ctx (context.Context): The context for the rollback operation.
-	//   steps ([]*models.ExecutionStep): The steps containing the actions to be rolled back.
+	//   steps ([]*models.ExecutionStep): The steps that have completed successfully and may need to be rolled back.
 	//
 	// Returns:
 	//   error: An error if the rollback fails.
