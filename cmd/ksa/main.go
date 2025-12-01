@@ -21,6 +21,7 @@ import (
 	_ "github.com/kubestack-ai/kubestack-ai/plugins/elasticsearch"
 	_ "github.com/kubestack-ai/kubestack-ai/plugins/kafka"
 	_ "github.com/kubestack-ai/kubestack-ai/plugins/mysql"
+	_ "github.com/kubestack-ai/kubestack-ai/plugins/postgresql"
 	_ "github.com/kubestack-ai/kubestack-ai/plugins/redis"
 )
 

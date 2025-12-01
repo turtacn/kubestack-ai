@@ -69,7 +69,7 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 
 ### 🧩 **Plugin Architecture**
 - **Extensible Design**: Add support for any middleware through plugins
-- **Core Plugins**: Native support for Redis, Kafka, MySQL, and Elasticsearch
+- **Core Plugins**: Native support for Redis, Kafka, MySQL, PostgreSQL, and Elasticsearch
 - **Community Driven**: Open plugin ecosystem
 - **Hot-swappable**: Install, update, and remove plugins without downtime
 - **Middleware Support**:

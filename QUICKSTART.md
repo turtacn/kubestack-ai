@@ -18,6 +18,7 @@ This guide will help you get started with KubeStack-AI quickly.
 
 2.  Build the project:
     ```bash
+    go mod tidy
     go build -o ksa ./cmd/ksa
     ```
 
@@ -47,10 +48,15 @@ docker run -d --rm --name redis -p 6379:6379 redis:alpine
 
 ### 1. Diagnose a Service
 
-To diagnose a specific middleware instance (e.g., Redis):
+To diagnose a specific middleware instance (e.g., Redis, PostgreSQL):
 
 ```bash
+# Redis
 ./ksa diagnose redis --namespace default --instance my-redis
+
+# PostgreSQL
+export KSA_POSTGRES_DSN="postgres://user:password@localhost:5432/dbname?sslmode=disable"
+./ksa diagnose postgresql
 ```
 
 ### 2. Search Knowledge Base
