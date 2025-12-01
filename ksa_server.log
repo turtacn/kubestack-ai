@@ -1,0 +1,43 @@
+time="2025-12-01 11:21:32.569" level=info msg="Scanning for plugins..." module=plugin-registry
+time="2025-12-01 11:21:32.570" level=info msg="Plugin scan complete. Found 4 unique plugins." module=plugin-registry
+time="2025-12-01 11:21:32.585" level=info msg="Loaded 3 rules from internal/knowledge/repository/redis_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.585" level=info msg="Loaded 2 rules from internal/knowledge/repository/mysql_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.585" level=info msg="Loaded 2 rules from internal/knowledge/repository/kafka_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.585" level=info msg="Orchestrator and all dependencies initialized successfully."
+time="2025-12-01 11:21:32.592" level=info msg="Scanning for plugins..." module=plugin-registry
+time="2025-12-01 11:21:32.592" level=info msg="Plugin scan complete. Found 4 unique plugins." module=plugin-registry
+time="2025-12-01 11:21:32.596" level=info msg="Loaded 3 rules from internal/knowledge/repository/redis_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.596" level=info msg="Loaded 2 rules from internal/knowledge/repository/mysql_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.596" level=info msg="Loaded 2 rules from internal/knowledge/repository/kafka_rules.yaml" module=rule-loader
+time="2025-12-01 11:21:32.596" level=warning msg="Failed to init timeseries store, monitoring disabled: failed to init db: unable to open database file: no such file or directory" module=api-server
+time="2025-12-01 11:21:32.596" level=warning msg="Failed to init alert store: failed to init alert db: unable to open database file: no such file or directory" module=api-server
+time="2025-12-01 11:21:32.597" level=warning msg="Failed to init silence store: failed to init silence db: unable to open database file: no such file or directory" module=api-server
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /ws/diagnosis/:id         --> github.com/kubestack-ai/kubestack-ai/internal/api/websocket.(*Handler).ServeHTTP-fm (4 handlers)
+[GIN-debug] Loaded HTML Templates (2):
+	-
+	- diagnosis_result.html
+
+[GIN-debug] POST   /console/diagnose         --> github.com/kubestack-ai/kubestack-ai/internal/web.(*ConsoleHandler).HandleDiagnoseRequest-fm (4 handlers)
+[GIN-debug] GET    /console/result-view      --> github.com/kubestack-ai/kubestack-ai/internal/web.(*ConsoleHandler).ServeResultTemplate-fm (4 handlers)
+[GIN-debug] GET    /console/task/status/:taskId --> github.com/kubestack-ai/kubestack-ai/internal/web.(*ConsoleHandler).HandleGetTaskStatus-fm (4 handlers)
+[GIN-debug] POST   /api/v1/auth/login        --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*AuthHandler).Login-fm (4 handlers)
+[GIN-debug] POST   /api/v1/diagnosis         --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*DiagnosisHandler).TriggerDiagnosis-fm (6 handlers)
+[GIN-debug] GET    /api/v1/diagnosis/:id     --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*DiagnosisHandler).GetDiagnosisResult-fm (6 handlers)
+[GIN-debug] GET    /api/v1/knowledge/rules   --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).ListRules-fm (5 handlers)
+[GIN-debug] POST   /api/v1/knowledge/rules   --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).CreateRule-fm (5 handlers)
+[GIN-debug] GET    /api/v1/knowledge/rules/:id --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).GetRule-fm (5 handlers)
+[GIN-debug] PUT    /api/v1/knowledge/rules/:id --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).UpdateRule-fm (5 handlers)
+[GIN-debug] DELETE /api/v1/knowledge/rules/:id --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).DeleteRule-fm (5 handlers)
+[GIN-debug] GET    /api/v1/knowledge/rules/export --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).ExportRules-fm (5 handlers)
+[GIN-debug] POST   /api/v1/knowledge/rules/import --> github.com/kubestack-ai/kubestack-ai/internal/api.(*KnowledgeAPI).ImportRules-fm (5 handlers)
+[GIN-debug] POST   /api/v1/execution/plan/:id/execute --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*ExecutionHandler).ExecutePlan-fm (6 handlers)
+[GIN-debug] GET    /api/v1/execution/history --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*ExecutionHandler).GetHistory-fm (6 handlers)
+[GIN-debug] GET    /api/v1/config            --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*ConfigHandler).GetConfig-fm (6 handlers)
+[GIN-debug] PUT    /api/v1/config            --> github.com/kubestack-ai/kubestack-ai/internal/api/handlers.(*ConfigHandler).UpdateConfig-fm (6 handlers)
+time="2025-12-01 11:21:32.597" level=info msg="Starting HTTP server on :8080" module=api-server

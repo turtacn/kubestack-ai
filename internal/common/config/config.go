@@ -426,6 +426,11 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
+	// Final unmarshal to capture all merged settings.
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal final config: %w", err)
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}

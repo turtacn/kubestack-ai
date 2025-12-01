@@ -50,6 +50,10 @@ var rootCmd = &cobra.Command{
 analyze, and fix issues with your middleware infrastructure, whether it is
 running on Kubernetes or bare metal servers.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// If no config file is specified, default to ./configs/config.yaml
+		if cfgFile == "" {
+			cfgFile = "configs/config.yaml"
+		}
 		// 1. Load configuration
 		cfg, err := config.LoadConfig(cfgFile)
 		if err != nil {

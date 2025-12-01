@@ -4,6 +4,7 @@
 # It's configured for a standard Go project.
 
 # Binaries for programs and plugins
+ksa
 *.exe
 *.exe~
 *.dll

@@ -57,4 +57,13 @@ knowledge:
       # Number of documents to return after reranking.
       top_k: 5
 
+# Monitoring configuration.
+monitor:
+  storage:
+    path: "data/monitor.db" # Path to the SQLite database file.
+  collection:
+    interval: "1m" # Default collection interval.
+  alerting:
+    evaluation_interval: "1m" # Default alert evaluation interval.
+
 # Personal.AI order the ending
