@@ -1,49 +1,70 @@
-# Quickstart
+# Quickstart Guide
 
-This guide provides the essential steps to build and run KubeStack-AI.
+This guide will help you get started with KubeStack-AI quickly.
 
 ## Prerequisites
 
-- Go 1.18 or later
-- Git
+*   Go 1.21+
+*   Docker (for running dependencies like ChromaDB, Redis)
+*   An OpenAI API key (or compatible LLM provider)
 
-## 1. Clone the Repository
+## Installation
 
-Clone the project from GitHub:
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/kubestack-ai/kubestack-ai.git
+    cd kubestack-ai
+    ```
 
-```sh
-git clone https://github.com/kubestack-ai/kubestack-ai.git
-cd kubestack-ai
+2.  Build the project:
+    ```bash
+    go build -o ksa ./cmd/ksa
+    ```
+
+## Configuration
+
+1.  Copy the example configuration:
+    ```bash
+    cp configs/config.yaml.example configs/config.yaml
+    ```
+    *Note: If `config.yaml.example` is missing, you can start with a minimal config.*
+
+2.  Set your OpenAI API Key:
+    ```bash
+    export KSA_LLM_OPENAI_API_KEY="your-api-key"
+    ```
+
+## Running Dependencies
+
+Start ChromaDB (for RAG) and Redis (for Task Queue):
+
+```bash
+docker run -d --rm --name chromadb -p 8000:8000 -v "$(pwd)/chroma-data":/chroma -e IS_PERSISTENT=TRUE -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma
+docker run -d --rm --name redis -p 6379:6379 redis:alpine
 ```
 
-## 2. Build the Binary
+## Usage
 
-Compile the `ksa` command-line tool from the source:
+### 1. Diagnose a Service
 
-```sh
-go build -o ksa cmd/ksa/main.go
+To diagnose a specific middleware instance (e.g., Redis):
+
+```bash
+./ksa diagnose redis --namespace default --instance my-redis
 ```
 
-This will create a binary named `ksa` in the root of the project directory.
+### 2. Search Knowledge Base
 
-## 3. Start the Server
+To search for solutions in the knowledge base:
 
-Run the KubeStack-AI server. This will start the API and web console on `http://localhost:8080`.
-
-```sh
-./ksa server start
+```bash
+./ksa kb search "Redis OOM"
 ```
 
-You should see log output indicating that the server has started successfully.
+## Running Tests
 
-## 4. Run a Diagnosis
+To run all tests:
 
-In a separate terminal, you can use the `ksa` CLI to run a diagnosis on a middleware component.
-
-For example, to diagnose a Redis instance running on `localhost:6379`:
-
-```sh
-./ksa diagnose redis --instance localhost:6379
+```bash
+make test
 ```
-
-This will trigger a diagnosis and display the results in your terminal.

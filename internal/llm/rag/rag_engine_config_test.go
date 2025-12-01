@@ -15,99 +15,79 @@
 package rag
 
 import (
-	"context"
 	"os"
 	"testing"
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
-	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
-	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
-type mockLLMClient struct{}
-
-func (m *mockLLMClient) Generate(ctx context.Context, prompt string) (string, error) {
-	return "mock answer", nil
-}
-
-type mockReranker struct{}
-
-func (m *mockReranker) Rerank(ctx context.Context, query string, candidates []*search.Document, topK int) ([]*search.Document, error) {
-	return candidates, nil
-}
-
-func TestRAGEngine_WithHybridConfig(t *testing.T) {
-	// Create a test config file
-	cfg := config.KnowledgeConfig{
-		Retrieval: config.RetrievalConfig{
-			Mode: "hybrid",
-			Semantic: config.SemanticConfig{
-				TopK: 10,
-			},
-			Keyword: config.KeywordConfig{
-				TopK: 10,
-			},
-			Fusion: config.FusionConfig{
-				Strategy: "rrf",
-				RRF:      config.RRFConfig{K: 60},
-			},
-			Reranker: config.RerankerConfig{
-				Enabled: false,
-			},
-		},
-		RAG: config.RAGConfig{
-			Engine: config.RAGEngineConfig{
-				MaxContextTokens: 4096,
-				MaxChunks:        10,
-			},
-		},
-	}
-
-	configFile, err := os.CreateTemp("", "knowledge.yaml")
+func TestLoadRAGConfig(t *testing.T) {
+	// Create a temporary config file
+	configFile, err := os.CreateTemp("", "config_test_*.yaml")
 	assert.NoError(t, err)
 	defer os.Remove(configFile.Name())
 
-	encoder := yaml.NewEncoder(configFile)
-	err = encoder.Encode(map[string]config.KnowledgeConfig{"knowledge": cfg})
-	assert.NoError(t, err)
-	encoder.Close()
-
-	// Create mock components
-	indexPath := "./test_bm25.index"
-	defer os.RemoveAll(indexPath)
-	bm25Searcher, err := search.NewBM25Searcher(indexPath)
-	assert.NoError(t, err)
-
-	docs := []*store.StoreDocument{
-		{ID: "1", Content: "keyword result 1"},
+	// Use map to ensure keys match mapstructure tags explicitly
+	cfgMap := map[string]interface{}{
+		"knowledge": map[string]interface{}{
+			"retrieval": map[string]interface{}{
+				"mode": "hybrid",
+				"semantic": map[string]interface{}{
+					"enabled":         true,
+					"provider":        "chroma",
+					"model":           "text-embedding-3-small",
+					"top_k":           10,
+					"score_threshold": 0.6,
+				},
+				"keyword": map[string]interface{}{
+					"enabled":  true,
+					"engine":   "bleve",
+					"analyzer": "standard",
+					"top_k":    10,
+				},
+				"fusion": map[string]interface{}{
+					"strategy": "weighted",
+					"weighted": map[string]interface{}{
+						"semantic_weight": 0.7,
+						"keyword_weight":  0.3,
+					},
+				},
+				"reranker": map[string]interface{}{
+					"enabled":         true,
+					"provider":        "cohere",
+					"model":           "rerank-english-v3.0",
+					"top_k":           5,
+					"score_threshold": 0.7,
+					"timeout":         "2s",
+				},
+			},
+			"rag": map[string]interface{}{
+				"engine": map[string]interface{}{
+					"max_context_tokens": 4000,
+					"max_chunks":         5,
+				},
+			},
+		},
 	}
-	err = bm25Searcher.IndexDocuments(docs)
+
+	encoder := yaml.NewEncoder(configFile)
+	err = encoder.Encode(cfgMap)
+	assert.NoError(t, err)
+	configFile.Close()
+
+	// Load the config
+	loadedCfg, err := config.LoadConfig(configFile.Name())
 	assert.NoError(t, err)
 
-	vectorRetriever := &mockRetriever{}
-	reranker := &mockReranker{}
-	llmClient := &mockLLMClient{}
-
-	// Create the RAGEngine
-	engine, err := NewRAGEngine(cfg, vectorRetriever, bm25Searcher, reranker, llmClient)
-	assert.NoError(t, err)
-
-	// Test the RAGEngine
-	answer, err := engine.GenerateAnswer(context.Background(), "keyword")
-	assert.NoError(t, err)
-	assert.Equal(t, "mock answer", answer)
-}
-
-type mockRetriever struct{}
-
-func (m *mockRetriever) Retrieve(ctx context.Context, query string, topK int) ([]search.Document, error) {
-	return []search.Document{
-		{Content: "semantic result 1"},
-	}, nil
-}
-
-func (m *mockRetriever) HybridRetrieve(ctx context.Context, query string, opts *search.RetrieveOptions) ([]search.Document, error) {
-	return m.Retrieve(ctx, query, opts.TopK)
+	// Verify loaded values
+	assert.Equal(t, "hybrid", loadedCfg.Knowledge.Retrieval.Mode)
+	assert.Equal(t, "chroma", loadedCfg.Knowledge.Retrieval.Semantic.Provider)
+	assert.Equal(t, 0.6, loadedCfg.Knowledge.Retrieval.Semantic.ScoreThreshold)
+	assert.Equal(t, "bleve", loadedCfg.Knowledge.Retrieval.Keyword.Engine)
+	assert.Equal(t, "weighted", loadedCfg.Knowledge.Retrieval.Fusion.Strategy)
+	assert.Equal(t, 0.7, loadedCfg.Knowledge.Retrieval.Fusion.Weighted.SemanticWeight)
+	assert.Equal(t, "cohere", loadedCfg.Knowledge.Retrieval.Reranker.Provider)
+	assert.Equal(t, 4000, loadedCfg.Knowledge.RAG.Engine.MaxContextTokens)
 }

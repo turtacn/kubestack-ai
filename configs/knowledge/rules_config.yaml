@@ -1,7 +1,46 @@
 knowledge:
   rule_files:
-    - "internal/knowledge/repository/redis_rules.yaml"
-    - "internal/knowledge/repository/mysql_rules.yaml"
-    - "internal/knowledge/repository/kafka_rules.yaml"
-  refresh_interval: 60s
+    - "rules/redis_rules.yaml"
+    - "rules/mysql_rules.yaml"
+  refresh_interval: 1h
   enable_llm_enhancement: true
+
+  default_index: "kubestack_ai"
+  language: "en"
+
+  retrieval:
+    mode: "hybrid" # semantic, keyword, hybrid
+
+    semantic:
+      enabled: true
+      provider: "chroma" # chroma, elasticsearch
+      model: "text-embedding-3-small"
+      top_k: 10
+      score_threshold: 0.6
+
+    keyword:
+      enabled: true
+      engine: "bleve"
+      analyzer: "standard"
+      top_k: 10
+
+    fusion:
+      strategy: "rrf" # rrf, weighted
+      rrf:
+        k: 60
+      weighted:
+        semantic_weight: 0.7
+        keyword_weight: 0.3
+
+    reranker:
+      enabled: true
+      provider: "cohere"
+      model: "rerank-english-v3.0"
+      top_k: 5
+      score_threshold: 0.7
+      timeout: 2s
+
+  rag:
+    engine:
+      max_context_tokens: 4000
+      max_chunks: 5

@@ -18,6 +18,7 @@
 
 <p align="center">
   <a href="README-zh.md">中文文档</a> •
+  <a href="QUICKSTART.md">Quickstart</a> •
   <a href="docs/architecture.md">Architecture</a> •
   <a href="docs/contributing.md">Contributing</a> •
   <a href="docs/plugin_development.md">Plugin Development</a>

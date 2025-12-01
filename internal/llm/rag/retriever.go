@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/search"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge/store" // Will be created later
@@ -100,7 +101,87 @@ func (r *vectorRetriever) Retrieve(ctx context.Context, query string, topK int) 
 }
 
 // HybridRetrieve implements the Retriever interface for hybrid search.
-// For the vectorRetriever, this will just call the regular Retrieve method.
+// For the vectorRetriever, this will just call the regular Retrieve method but apply filtering.
 func (r *vectorRetriever) HybridRetrieve(ctx context.Context, query string, opts *search.RetrieveOptions) ([]search.Document, error) {
-	return r.Retrieve(ctx, query, opts.TopK)
+	docs, err := r.Retrieve(ctx, query, opts.TopK)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by score if MinScore is set in options
+	if opts.MinScore > 0 {
+		var filtered []search.Document
+		for _, doc := range docs {
+			// doc.Score is float32, opts.MinScore is float64
+			if float64(doc.Score) >= opts.MinScore {
+				filtered = append(filtered, doc)
+			}
+		}
+		docs = filtered
+	}
+
+	return docs, nil
+}
+
+// HybridRetriever wraps the search.HybridSearcher to implement the Retriever interface.
+// It provides true hybrid search capabilities (Vector + Keyword + Fusion).
+type HybridRetriever struct {
+	searcher search.Searcher // Expecting a *search.HybridSearcher or compatible
+	log      logger.Logger
+}
+
+// NewHybridRetriever creates a new HybridRetriever.
+func NewHybridRetriever(
+	vectorRetriever search.Retriever,
+	bm25Searcher *search.BM25Searcher,
+	reranker search.Reranker,
+	cfg config.RetrievalConfig,
+) (search.Retriever, error) {
+	searcher, err := search.NewHybridSearcher(vectorRetriever, bm25Searcher, reranker, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &HybridRetriever{
+		searcher: searcher,
+		log:      logger.NewLogger("hybrid_retriever"),
+	}, nil
+}
+
+func (hr *HybridRetriever) Retrieve(ctx context.Context, query string, topK int) ([]search.Document, error) {
+	// HybridRetriever's basic Retrieve also does hybrid search, as it wraps HybridSearcher.
+	// However, if we wanted strictly semantic, we would need to access the underlying vector retriever.
+	// For now, we delegate to the searcher.
+	return hr.searcher.Search(ctx, query)
+}
+
+func (hr *HybridRetriever) HybridRetrieve(ctx context.Context, query string, opts *search.RetrieveOptions) ([]search.Document, error) {
+	// The underlying HybridSearcher uses config for TopK.
+	// We might need to override it if opts provides it, but HybridSearcher.Search interface doesn't take opts.
+	// We'll call Search and then apply post-filtering if needed, though HybridSearcher should handle most.
+	// Ideally, HybridSearcher should accept options.
+	// Since we can't change HybridSearcher signature easily here, we rely on the config passed during creation.
+	// But we can filter by score here.
+
+	docs, err := hr.searcher.Search(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply MinScore filter
+	if opts.MinScore > 0 {
+		var filtered []search.Document
+		for _, doc := range docs {
+			if float64(doc.Score) >= opts.MinScore {
+				filtered = append(filtered, doc)
+			}
+		}
+		docs = filtered
+	}
+
+	// Apply TopK if needed (though Searcher likely used configured TopK)
+	if opts.TopK > 0 && len(docs) > opts.TopK {
+		docs = docs[:opts.TopK]
+	}
+
+	return docs, nil
 }

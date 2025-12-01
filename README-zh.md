@@ -18,6 +18,7 @@
 
 <p align="center">
   <a href="README.md">English</a> •
+  <a href="QUICKSTART.md">快速开始</a> •
   <a href="docs/architecture.md">架构设计</a> •
   <a href="docs/contributing.md">贡献指南</a> •
   <a href="docs/plugins.md">插件开发</a>
