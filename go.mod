@@ -27,6 +27,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.41.1
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/shirou/gopsutil/v3 v3.24.5

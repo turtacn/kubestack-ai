@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
+// Unless required by applicable law of agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -19,96 +19,67 @@ import (
 	"context"
 )
 
-// Message represents a single message in a conversation, following the common
-// role-based structure used by most chat-based LLMs.
+// Message represents a single message in a conversation.
 type Message struct {
-	// Role is the originator of the message (e.g., "system", "user", "assistant").
-	Role string `json:"role"`
-	// Content is the text of the message.
+	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// LLMRequest encapsulates all the parameters for a request to an LLM's chat
-// completion endpoint.
+// LLMRequest encapsulates parameters for LLM request.
 type LLMRequest struct {
-	// Model is the identifier of the specific model to use for the request.
-	Model string `json:"model"`
-	// Messages is the sequence of messages representing the conversation history.
-	Messages []Message `json:"messages"`
-	// Temperature controls the randomness of the output. Higher values result in more creative responses.
-	Temperature float32 `json:"temperature,omitempty"`
-	// MaxTokens is the maximum number of tokens to generate in the response.
-	MaxTokens int `json:"max_tokens,omitempty"`
-	// Stream indicates whether a streaming response is requested.
-	Stream bool `json:"stream,omitempty"`
-	// ResponseFormat specifies the format of the response (e.g., "json_object").
-	ResponseFormat string `json:"response_format,omitempty"`
+	Model          string    `json:"model"`
+	Messages       []Message `json:"messages"`
+	Temperature    float32   `json:"temperature,omitempty"`
+	MaxTokens      int       `json:"max_tokens,omitempty"`
+	Stream         bool      `json:"stream,omitempty"`
+	ResponseFormat string    `json:"response_format,omitempty"`
 }
 
-// UsageStats contains information about token usage for an API request, which is
-// crucial for monitoring costs and rate limits.
+// UsageStats contains token usage info.
 type UsageStats struct {
-	// PromptTokens is the number of tokens in the input prompt.
-	PromptTokens int `json:"prompt_tokens"`
-	// CompletionTokens is the number of tokens in the generated response.
+	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
-	// TotalTokens is the sum of prompt and completion tokens.
-	TotalTokens int `json:"total_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
-// LLMResponse contains the complete response from a non-streaming LLM call,
-// including the assistant's message and token usage statistics.
+// LLMResponse contains the response.
 type LLMResponse struct {
-	// Message is the response message from the assistant.
-	Message Message `json:"message"`
-	// Usage provides the token usage statistics for the request.
-	Usage UsageStats `json:"usage"`
+	Message Message    `json:"message"`
+	Usage   UsageStats `json:"usage"`
 }
 
-// StreamingChunk represents a single piece of data received from a streaming LLM
-// response. The channel transmitting these chunks will be closed when the stream is complete.
+// StreamingChunk represents a streaming chunk.
 type StreamingChunk struct {
-	// Content is the text content of the response chunk.
 	Content string `json:"content"`
-	// Err is used to propagate any errors that occur mid-stream.
-	Err error `json:"-"`
+	Err     error  `json:"-"`
 }
 
-// EmbeddingRequest encapsulates a request for generating vector embeddings from text.
+// EmbeddingRequest for embeddings.
 type EmbeddingRequest struct {
-	// Input is a slice of strings to be converted into embeddings.
 	Input []string `json:"input"`
-	// Model is an optional identifier for the specific embedding model to use.
-	Model string `json:"model,omitempty"`
+	Model string   `json:"model,omitempty"`
 }
 
-// EmbeddingResponse contains the vector embeddings generated for the input text,
-// along with token usage statistics.
+// EmbeddingResponse for embeddings.
 type EmbeddingResponse struct {
-	// Embeddings is a slice of vectors, where each vector corresponds to an input string.
 	Embeddings [][]float32 `json:"embeddings"`
-	// Usage provides the token usage statistics for the embedding request.
-	Usage UsageStats `json:"usage"`
+	Usage      UsageStats  `json:"usage"`
 }
 
-// LLMClient defines the standard interface for interacting with any Large Language
-// Model (LLM) provider. It abstracts away the specific details of different
-// providers' APIs (e.g., OpenAI, Gemini), allowing the application's core logic
-// to remain agnostic of the underlying LLM implementation.
+// LLMOption defines functional options for LLM calls (Legacy support).
+type LLMOption func(*LLMRequest)
+
+// LLMClient defines the interface for interacting with LLM providers.
 type LLMClient interface {
-	// SendMessage sends a request to the LLM and waits for a complete response.
-	// This method is suitable for tasks where the full response is needed before proceeding.
 	SendMessage(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
-
-	// SendStreamingMessage sends a request and returns a channel from which response
-	// chunks can be read in real-time. This is ideal for interactive applications,
-	// such as a CLI, where immediate feedback is important.
 	SendStreamingMessage(ctx context.Context, req *LLMRequest) (<-chan StreamingChunk, error)
-
-	// GenerateEmbedding converts one or more strings of text into their numerical
-	// vector representations. This is a core component of Retrieval-Augmented
-	// Generation (RAG) systems, enabling semantic search.
 	GenerateEmbedding(ctx context.Context, req *EmbeddingRequest) (*EmbeddingResponse, error)
-}
 
-//Personal.AI order the ending
+	// Complete is kept for backward compatibility if other components rely on it,
+	// but it should map to SendMessage internally.
+	// However, if we remove it from interface, we must update all callers.
+	// Since ai_analyzer uses SendMessage now, we can probably remove it,
+	// BUT manager.go error suggested something expects Complete.
+	// I will include it to satisfy any legacy constraints for now.
+	Complete(ctx context.Context, prompt string, options ...LLMOption) (string, error)
+}

@@ -41,6 +41,12 @@ type Config struct {
 	RCA                 RCAConfig          `mapstructure:"rca"`
 	Monitor             MonitorConfig      `mapstructure:"monitor"`
 	Crawler             CrawlerConfig      `mapstructure:"crawler"`
+	Cron                CronConfig         `mapstructure:"cron"`
+}
+
+type CronConfig struct {
+	InspectionSchedule string `mapstructure:"inspection_schedule"`
+	Enabled            bool   `mapstructure:"enabled"`
 }
 
 type CrawlerConfig struct {
@@ -254,8 +260,11 @@ type RedisConfig struct {
 }
 
 type NotificationConfig struct {
-	Webhook WebhookConfig `mapstructure:"webhook"`
-	Email   EmailConfig   `mapstructure:"email"`
+	Webhook       WebhookConfig `mapstructure:"webhook"`
+	Email         EmailConfig   `mapstructure:"email"`
+	Slack         SlackConfig   `mapstructure:"slack"`
+	AlertSeverity string        `mapstructure:"alert_severity"`
+	DashboardURL  string        `mapstructure:"dashboard_url"`
 }
 
 type WebhookConfig struct {
@@ -269,6 +278,11 @@ type EmailConfig struct {
 	Password  string `mapstructure:"password"`
 	From      string `mapstructure:"from"`
 	DefaultTo string `mapstructure:"default_to"`
+}
+
+type SlackConfig struct {
+	WebhookURL string `mapstructure:"webhook_url"`
+	Enabled    bool   `mapstructure:"enabled"`
 }
 
 type PluginConfig struct {
@@ -399,6 +413,15 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
+	// Load alert rules
+	viper.AddConfigPath("configs")
+	viper.SetConfigName("alert_rules")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg.Notification); err != nil {
+			// Ignore
+		}
+	}
+
 	// Load detection config
 	viper.AddConfigPath("configs/detection")
 	viper.SetConfigName("thresholds")
@@ -449,17 +472,5 @@ func (c *KnowledgeConfig) Validate() error {
 			// return fmt.Errorf("semantic_weight and keyword_weight must sum to 1.0")
 		}
 	}
-	// Temporarily disable strict validation to avoid issues with existing incomplete configs
-	/*
-	if c.Retrieval.Semantic.TopK <= 0 {
-		return fmt.Errorf("semantic top_k must be greater than 0")
-	}
-	if c.Retrieval.Keyword.TopK <= 0 {
-		return fmt.Errorf("keyword top_k must be greater than 0")
-	}
-	if c.Retrieval.Reranker.TopK <= 0 {
-		return fmt.Errorf("reranker top_k must be greater than 0")
-	}
-	*/
 	return nil
 }

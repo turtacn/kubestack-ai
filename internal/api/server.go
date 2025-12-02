@@ -83,24 +83,9 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, 
 	scheduler := task.NewScheduler(queue, store)
 
 	// Composite Notifier for Tasks
-	notifiers := []notification.Notifier{}
-	if cfg.Notification.Webhook.URL != "" {
-		notifiers = append(notifiers, notification.NewWebhookNotifier(cfg.Notification.Webhook.URL))
-	}
-	if cfg.Notification.Email.Host != "" {
-		emailConfig := notification.EmailConfig{
-			Host:      cfg.Notification.Email.Host,
-			Port:      cfg.Notification.Email.Port,
-			Username:  cfg.Notification.Email.Username,
-			Password:  cfg.Notification.Email.Password,
-			From:      cfg.Notification.Email.From,
-			DefaultTo: cfg.Notification.Email.DefaultTo,
-		}
-		notifiers = append(notifiers, notification.NewEmailNotifier(emailConfig))
-	}
-	compositeNotifier := notification.NewCompositeNotifier(notifiers)
+	compositeNotifier := notification.NewCompositeNotifier(cfg.Notification)
 
-	worker := task.NewWorker(queue, diagnosisEngine, store, compositeNotifier)
+	worker := task.NewWorker(queue, diagnosisEngine, store, compositeNotifier, cfg.Notification)
 
 	// KB Init
 	if kb == nil {
