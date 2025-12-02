@@ -90,7 +90,7 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 
 ## 🚀 Getting Started
 
-For a fast setup, see our **[Quickstart Guide](QUICKSTART.md)**.
+**We highly recommend checking out our comprehensive [Quickstart Guide](QUICKSTART.md) for detailed setup, configuration, and usage instructions.**
 
 ### Installation
 

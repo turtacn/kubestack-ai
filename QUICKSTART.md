@@ -19,16 +19,18 @@ This guide will help you get started with KubeStack-AI quickly.
 2.  Build the project:
     ```bash
     go mod tidy
-    go build -o ksa ./cmd/ksa
+    go build -o ksa ./cmd/ksa/main.go
     ```
 
 ## Configuration
 
 1.  Copy the example configuration:
     ```bash
-    cp configs/config.yaml.example configs/config.yaml
+    mkdir -p ~/.kubestack-ai
+    cp configs/config.yaml.example ~/.kubestack-ai/config.yaml
+    # OR set up in current directory
+    cp configs/config.yaml.example config.yaml
     ```
-    *Note: If `config.yaml.example` is missing, you can start with a minimal config.*
 
 2.  Set your OpenAI API Key:
     ```bash
@@ -40,15 +42,37 @@ This guide will help you get started with KubeStack-AI quickly.
 Start ChromaDB (for RAG) and Redis (for Task Queue):
 
 ```bash
-docker run -d --rm --name chromadb -p 8000:8000 -v "$(pwd)/chroma-data":/chroma -e IS_PERSISTENT=TRUE -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma
+# Start Redis
 docker run -d --rm --name redis -p 6379:6379 redis:alpine
+
+# Start ChromaDB
+mkdir -p chroma-data
+docker run -d --rm --name chromadb -p 8000:8000 -v "$(pwd)/chroma-data":/chroma -e IS_PERSISTENT=TRUE -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma
 ```
 
-## Usage
+## Running the Server (Web Console)
+
+KubeStack-AI includes a web console for real-time diagnosis streaming.
+
+1.  Start the server:
+    ```bash
+    ./ksa server start
+    ```
+
+2.  Open your browser and navigate to:
+    [http://localhost:8080](http://localhost:8080)
+
+3.  Use the form to trigger a diagnosis:
+    *   **Middleware**: Select the type (e.g., Redis).
+    *   **Target Host**: e.g., `localhost:6379`.
+    *   **Instance Name**: e.g., `my-redis`.
+    *   Click "Start Diagnosis" and watch the real-time logs.
+
+## CLI Usage
 
 ### 1. Diagnose a Service
 
-To diagnose a specific middleware instance (e.g., Redis, PostgreSQL):
+To diagnose a specific middleware instance via CLI:
 
 ```bash
 # Redis
