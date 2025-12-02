@@ -64,6 +64,11 @@ func (w *Worker) run() {
 				continue
 			}
 
+			if task == nil {
+				// Should not happen if err is nil, but safety check
+				continue
+			}
+
 			w.processTask(task)
 		}
 	}

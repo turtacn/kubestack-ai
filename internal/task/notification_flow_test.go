@@ -55,13 +55,12 @@ func (m *MockDiagnosisManager) GetKnowledgeBase() *knowledge.KnowledgeBase {
 // MockTaskStore
 type MockTaskStore struct{}
 
-func (m *MockTaskStore) CreateTask(task *storage.TaskState) error { return nil }
-func (m *MockTaskStore) SaveTask(task *storage.TaskState) error { return nil }
-func (m *MockTaskStore) UpdateStatus(taskID string, status storage.TaskStatus) error { return nil }
-func (m *MockTaskStore) SaveResult(taskID string, result interface{}) error { return nil }
+func (m *MockTaskStore) CreateTask(taskID string) error { return nil }
+func (m *MockTaskStore) UpdateStatus(taskID string, state storage.TaskState) error { return nil }
+func (m *MockTaskStore) SaveResult(taskID string, result *models.DiagnosisResult) error { return nil }
 func (m *MockTaskStore) SaveError(taskID string, err error) error { return nil }
-func (m *MockTaskStore) GetTask(taskID string) (*storage.TaskState, error) { return nil, nil }
-func (m *MockTaskStore) ListTasks(limit int, offset int) ([]*storage.TaskState, error) { return nil, nil }
+func (m *MockTaskStore) GetStatus(taskID string) (*storage.TaskStatus, error) { return nil, nil }
+func (m *MockTaskStore) GetResult(taskID string) (*models.DiagnosisResult, error) { return nil, nil }
 
 // LocalMockQueue
 type LocalMockQueue struct {

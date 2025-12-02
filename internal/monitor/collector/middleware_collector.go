@@ -30,8 +30,8 @@ func (c *MiddlewareCollector) Collect(ctx context.Context) ([]*model.MetricPoint
 		return nil, fmt.Errorf("failed to load plugin %s: %w", c.middlewareName, err)
 	}
 
-	// Call CollectMetrics
-	metricsData, err := p.CollectMetrics(ctx)
+	// Call CollectMetrics with target (using middlewareName as target for now)
+	metricsData, err := p.CollectMetrics(ctx, c.middlewareName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect metrics for %s: %w", c.middlewareName, err)
 	}

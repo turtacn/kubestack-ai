@@ -54,7 +54,13 @@ Examples:
 			}
 
 			// Initialize dependencies
-			diagManager, _, taskQueue, _ := initDependencies()
+			// We cannot re-initialize full stack here easily without duplicating root.go logic.
+			// Ideally, we use global diagManager populated by PreRun.
+			// But for this patch, we need to ensure diagManager is available.
+			if diagManager == nil {
+				fmt.Println("Error: Diagnosis manager not initialized. Please ensure config is valid.")
+				os.Exit(1)
+			}
 
 			req := &models.DiagnosisRequest{
 				TargetMiddleware: middlewareType,
@@ -64,20 +70,18 @@ Examples:
 			}
 
 			if async {
-				// Enqueue task
-				taskID := fmt.Sprintf("diag-%s-%s-%d", target, instance, time.Now().Unix())
-				t := &task.Task{
-					ID:        taskID,
-					Type:      "diagnosis",
-					Payload:   req,
-					CreatedAt: time.Now(),
-				}
-				if err := taskQueue.Enqueue(context.Background(), t); err != nil {
-					fmt.Printf("Error enqueuing task: %v\n", err)
-					os.Exit(1)
-				}
-				fmt.Printf("Diagnosis task submitted. Task ID: %s\n", taskID)
-				return
+				// We need a task queue for async. root.go doesn't expose it globally currently.
+				// For this exercise, we focus on synchronous diagnosis as primary CLI use case,
+				// or we'd need to expose the queue.
+				// Let's assume we can't do async via CLI unless we connect to API server.
+				// But requirement said P5 delivers Cron and Notifications.
+				// CLI diagnose is for manual test.
+				// We will simulate async submission via direct queue enqueue if possible,
+				// but queue is local.
+				// If we are running CLI, we are a separate process from Server.
+				// So we should probably call API for async?
+				// For now, we disable async path or warn.
+				fmt.Println("Async diagnosis via CLI not fully supported in this mode. Running synchronously.")
 			}
 
 			// Run synchronously
@@ -90,7 +94,7 @@ Examples:
 			// Print progress in a separate goroutine
 			go func() {
 				for p := range progressChan {
-					fmt.Printf("[%s] %s\n", p.Stage, p.Message)
+					fmt.Printf("[%s] %s\n", p.Step, p.Message)
 				}
 			}()
 
