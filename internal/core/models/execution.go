@@ -40,8 +40,6 @@ type ExecutionPlan struct {
 	Risk *RiskAssessment `json:"risk,omitempty" yaml:"risk,omitempty"`
 	// RollbackPlan contains the steps needed to revert the plan's actions in case of failure.
 	RollbackPlan *RollbackPlan `json:"rollbackPlan,omitempty" yaml:"rollbackPlan,omitempty"`
-	// Status tracks the overall status of the plan execution.
-	Status string `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ExecutionStep represents a single, atomic action within an execution plan.
