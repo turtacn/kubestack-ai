@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law of agreed to in writing, software
+// Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -123,12 +123,10 @@ func (a *LegacyPluginAdapter) Shutdown() error {
 	return a.p.Shutdown()
 }
 
-func (a *LegacyPluginAdapter) Diagnose(ctx context.Context, target string) (*models.ComponentDiagnosisResult, error) {
+// Diagnose must match the new interface signature:
+// Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)
+func (a *LegacyPluginAdapter) Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	// Not implemented in legacy
-	return nil, nil
-}
-
-func (a *LegacyPluginAdapter) DiagnoseFull(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	return nil, nil
 }
 
@@ -173,10 +171,18 @@ func (a *LegacyPluginAdapter) HealthCheck(ctx context.Context, target string) (*
 	return &models.HealthStatus{IsHealthy: true}, nil
 }
 func (a *LegacyPluginAdapter) Ping(ctx context.Context, target string) error { return nil }
-func (a *LegacyPluginAdapter) CanAutoFix(issue *models.Issue) bool { return false }
+
+// CanAutoFix updated to return (bool, *models.FixAction)
+func (a *LegacyPluginAdapter) CanAutoFix(issue *models.Issue) (bool, *models.FixAction) {
+	return false, nil
+}
+
+// ExecuteFix
 func (a *LegacyPluginAdapter) ExecuteFix(ctx context.Context, fix *models.FixAction) (*models.FixResult, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-func (a *LegacyPluginAdapter) ValidateFix(ctx context.Context, fix *models.FixAction) error {
-	return fmt.Errorf("not implemented")
+
+// ValidateFix updated signature
+func (a *LegacyPluginAdapter) ValidateFix(ctx context.Context, issue *models.Issue, result *models.FixResult) (bool, string, error) {
+	return false, "", fmt.Errorf("not implemented")
 }

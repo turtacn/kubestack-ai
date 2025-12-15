@@ -18,27 +18,28 @@ func TestAllPlugins_ImplementFixInterface(t *testing.T) {
 	// Initialize all plugins
 	redisP, _ := redis.New()
 	mysqlP, _ := mysql.New()
-	kafkaP, _ := kafka.New()
-	esP, _ := elasticsearch.New()
+	kafkaP, kafkaErr := kafka.New()
+	esP, esErr := elasticsearch.New()
 	pgP, _ := postgresql.New()
 
 	plugins := []struct {
 		Name   string
-		Plugin interface{} // Use interface{} to check capability dynamically if needed, or specific interface
+		Plugin interface{}
+		Err    error
 	}{
-		{"redis", redisP},
-		{"mysql", mysqlP},
-		{"kafka", kafkaP},
-		{"elasticsearch", esP},
-		{"postgresql", pgP},
+		{"redis", redisP, nil},
+		{"mysql", mysqlP, nil},
+		{"kafka", kafkaP, kafkaErr},
+		{"elasticsearch", esP, esErr},
+		{"postgresql", pgP, nil},
 	}
 
 	for _, p := range plugins {
 		t.Run(p.Name, func(t *testing.T) {
-			// Ensure it implements the interface methods
-			// Since we compiled it, we know it does, but we can test runtime behavior
-			// We can't cast to MiddlewarePlugin here easily without importing interfaces which creates cycle potentially
-			// But here we are in _test package so we can import interfaces.
+			if p.Err != nil {
+				t.Skipf("Skipping %s due to init error (likely missing dependency): %v", p.Name, p.Err)
+			}
+			assert.NotNil(t, p.Plugin)
 		})
 	}
 }
