@@ -1,0 +1,21 @@
+rag:
+  engine:
+    timeout: 30s
+  retrieval:
+    mode: "hybrid" # semantic, keyword, hybrid
+    recall_top_k: 100
+    coarse_top_k: 50
+    fine_top_k: 20
+    final_top_k: 10
+    # When using RRF, scores are typically low (e.g. < 0.02).
+    # Set min_score appropriately. 0.0 disables the check.
+    # If using Weighted fusion with normalized scores, 0.5 is reasonable.
+    min_score: 0.0
+    fusion_strategy: "rrf" # rrf, weighted
+    reranker:
+      enabled: true
+      type: "threshold" # threshold, llm
+      min_score: 0.6
+  query:
+    rewrite: true
+    expand: false
