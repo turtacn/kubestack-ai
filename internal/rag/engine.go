@@ -19,6 +19,7 @@ type RAGEngine struct {
 	queryExpander       *query.QueryExpander
 	llmClient           llm.LLMClient
 	fusionStrategy      retriever.FusionStrategy
+	finalTopK           int
 }
 
 // NewRAGEngine creates a new RAGEngine.
@@ -27,20 +28,28 @@ func NewRAGEngine(
 	rewriter *query.QueryRewriter,
 	expander *query.QueryExpander,
 	llmClient llm.LLMClient,
-	// Optional: pass fusion strategy for query fusion, if different from internal
 ) *RAGEngine {
 	return &RAGEngine{
 		multiStageRetriever: retriever,
 		queryRewriter:       rewriter,
 		queryExpander:       expander,
 		llmClient:           llmClient,
-		// Default to basic RRF for query fusion if not provided, or reuse logic
+		// Default to RRF for query fusion
+		fusionStrategy:      nil, // Set dynamically or via method
+		finalTopK:           10,  // Default limit
 	}
 }
 
 // SetFusionStrategy allows setting the fusion strategy for merging results from expanded queries.
 func (e *RAGEngine) SetFusionStrategy(f retriever.FusionStrategy) {
 	e.fusionStrategy = f
+}
+
+// SetFinalTopK allows configuring the context window size.
+func (e *RAGEngine) SetFinalTopK(k int) {
+	if k > 0 {
+		e.finalTopK = k
+	}
 }
 
 // Query performs the end-to-end RAG process.
@@ -113,8 +122,8 @@ func (e *RAGEngine) Query(ctx context.Context, question string) (string, error) 
 	}
 
 	// Limit context window
-	if len(finalResults) > 10 {
-		finalResults = finalResults[:10]
+	if len(finalResults) > e.finalTopK {
+		finalResults = finalResults[:e.finalTopK]
 	}
 
 	// 5. Build Prompt

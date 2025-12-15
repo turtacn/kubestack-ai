@@ -24,22 +24,25 @@ func NewQueryRewriter(typoDict map[string]string, synonymDict map[string][]strin
 }
 
 func (r *QueryRewriter) Rewrite(ctx context.Context, query string) (string, error) {
-	// Simple whitespace tokenization (replace with better tokenizer if needed)
+	// Improve tokenization: handle punctuation slightly better
+	// For this phase, we'll just check if the query contains the typo directly
+	// or stick to fields but clean punctuation.
+
+	// Simple whitespace tokenization
 	tokens := strings.Fields(query)
 	var rewrites []string
 
 	for _, token := range tokens {
-		// 1. Check Typo Dict
-		lowerToken := strings.ToLower(token)
+		// Clean punctuation for lookup
+		cleanToken := strings.TrimRight(token, ".,?!:;")
+		lowerToken := strings.ToLower(cleanToken)
+
 		if fixed, ok := r.typoDict[lowerToken]; ok {
-			rewrites = append(rewrites, fixed)
+			// Preserve punctuation
+			punctuation := token[len(cleanToken):]
+			rewrites = append(rewrites, fixed+punctuation)
 			continue
 		}
-
-		// 2. Synonyms expansion?
-		// For rewriting, we usually just replace typos.
-		// Synonym expansion is more for query expansion (multiple queries).
-		// But if we want to normalize terms, we can do it here.
 
 		rewrites = append(rewrites, token)
 	}
