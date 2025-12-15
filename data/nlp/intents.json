@@ -1,0 +1,68 @@
+{
+  "intents": [
+    {
+      "type": "diagnose",
+      "examples": [
+        "帮我诊断一下Redis",
+        "看看MySQL有什么问题",
+        "Kafka消费延迟了，帮忙分析下",
+        "ES查询很慢，排查一下",
+        "Redis怎么了",
+        "检查下生产环境的PG"
+      ]
+    },
+    {
+      "type": "query",
+      "examples": [
+        "Redis内存使用率是多少",
+        "查看MySQL当前连接数",
+        "Kafka消费者lag多少",
+        "ES集群状态怎么样",
+        "显示Redis的QPS"
+      ]
+    },
+    {
+      "type": "fix",
+      "examples": [
+        "清理Redis慢日志",
+        "杀掉MySQL慢查询",
+        "释放Redis内存",
+        "重置Kafka消费位点",
+        "修复主从延迟"
+      ]
+    },
+    {
+      "type": "alert",
+      "examples": [
+        "当Redis内存超过80%时通知我",
+        "设置MySQL连接数告警",
+        "配置Kafka延迟监控",
+        "添加ES磁盘告警"
+      ]
+    },
+    {
+      "type": "config",
+      "examples": [
+        "把Redis maxmemory改成4gb",
+        "调整MySQL最大连接数为1000",
+        "修改Kafka保留时间为7天"
+      ]
+    },
+    {
+      "type": "explain",
+      "examples": [
+        "什么是Redis内存碎片",
+        "解释下MySQL主从延迟",
+        "Kafka的ISR是什么意思"
+      ]
+    },
+    {
+      "type": "help",
+      "examples": [
+        "你能做什么",
+        "帮助",
+        "有什么功能"
+      ]
+    }
+  ]
+}

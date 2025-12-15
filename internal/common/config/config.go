@@ -42,6 +42,50 @@ type Config struct {
 	Monitor             MonitorConfig      `mapstructure:"monitor"`
 	Crawler             CrawlerConfig      `mapstructure:"crawler"`
 	Cron                CronConfig         `mapstructure:"cron"`
+	NLP                 NLPConfig          `mapstructure:"nlp"`
+}
+
+type NLPConfig struct {
+	Tokenizer TokenizerConfig `mapstructure:"tokenizer"`
+	Intent    IntentConfig    `mapstructure:"intent"`
+	Entity    EntityConfig    `mapstructure:"entity"`
+	Context   ContextConfig   `mapstructure:"context"`
+	LLM       NLPLLMConfig    `mapstructure:"llm"`
+}
+
+type TokenizerConfig struct {
+	Type          string `mapstructure:"type"`
+	StopwordsFile string `mapstructure:"stopwords_file"`
+}
+
+type IntentConfig struct {
+	RecognizerType          string  `mapstructure:"recognizer_type"`
+	RuleConfidenceThreshold float64 `mapstructure:"rule_confidence_threshold"`
+	LLMFallbackThreshold    float64 `mapstructure:"llm_fallback_threshold"`
+	LLMTimeout              string  `mapstructure:"llm_timeout"`
+}
+
+type EntityConfig struct {
+	Dictionaries   []string `mapstructure:"dictionaries"`
+	CustomPatterns []string `mapstructure:"custom_patterns"`
+}
+
+type ContextConfig struct {
+	MaxTurns   int                `mapstructure:"max_turns"`
+	SessionTTL time.Duration      `mapstructure:"session_ttl"`
+	StoreType  string             `mapstructure:"store_type"`
+	Redis      ContextRedisConfig `mapstructure:"redis"`
+}
+
+type ContextRedisConfig struct {
+	KeyPrefix string `mapstructure:"key_prefix"`
+}
+
+type NLPLLMConfig struct {
+	Enabled     bool    `mapstructure:"enabled"`
+	Model       string  `mapstructure:"model"`
+	MaxTokens   int     `mapstructure:"max_tokens"`
+	Temperature float64 `mapstructure:"temperature"`
 }
 
 type CronConfig struct {
@@ -372,7 +416,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		if err := viper.MergeInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to merge knowledge config: %w", err)
 		}
-		if err := viper.Unmarshal(&cfg); err != nil { // Fixed: Unmarshal entire config
+		if err := viper.Unmarshal(&cfg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal merged config: %w", err)
 		}
 	} else {
@@ -380,7 +424,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		viper.AddConfigPath("configs/knowledge")
 		viper.SetConfigName("rules_config")
 		if err := viper.MergeInConfig(); err == nil {
-			if err := viper.Unmarshal(&cfg); err != nil { // Fixed: Unmarshal entire config
+			if err := viper.Unmarshal(&cfg); err != nil {
 				// Ignore error
 			}
 		}
@@ -445,6 +489,15 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	viper.SetConfigName("llm_config")
 	if err := viper.MergeInConfig(); err == nil {
 		if err := viper.Unmarshal(&cfg.LLM); err != nil {
+			// Ignore
+		}
+	}
+
+	// Load NLP config
+	viper.AddConfigPath("configs")
+	viper.SetConfigName("nlp")
+	if err := viper.MergeInConfig(); err == nil {
+		if err := viper.Unmarshal(&cfg); err != nil {
 			// Ignore
 		}
 	}

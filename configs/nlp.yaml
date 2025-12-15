@@ -1,0 +1,34 @@
+# NLP Processor Configuration
+nlp:
+  # Tokenizer configuration
+  tokenizer:
+    type: simple       # simple | jieba
+    stopwords_file: data/nlp/stopwords.txt
+
+  # Intent recognition configuration
+  intent:
+    recognizer_type: hybrid  # rule | llm | hybrid
+    rule_confidence_threshold: 0.7
+    llm_fallback_threshold: 0.6
+    llm_timeout: 5s
+
+  # Entity extraction configuration
+  entity:
+    dictionaries:
+      - data/nlp/entities.json
+    custom_patterns: []
+
+  # Context management configuration
+  context:
+    max_turns: 10
+    session_ttl: 30m
+    store_type: memory  # memory | redis | file
+    redis:
+      key_prefix: "kubestack:nlp:session"
+
+  # LLM configuration for intent recognition
+  llm:
+    enabled: false
+    model: gpt-3.5-turbo
+    max_tokens: 100
+    temperature: 0.1
