@@ -6,7 +6,7 @@
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law of agreed to in writing, software
+// Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
@@ -42,8 +42,7 @@ type DiagnosticPlugin interface {
 	Shutdown() error
 
 	// Diagnostics & Data Collection
-	// Note: target string is added to support stateless plugins. If not needed, implementations can ignore it.
-	Diagnose(ctx context.Context, target string) (*models.ComponentDiagnosisResult, error)
+	Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)
 	CollectMetrics(ctx context.Context, target string) (*models.MetricsData, error)
 	CollectLogs(ctx context.Context, target string, opts *models.LogOptions) (*models.LogData, error)
 	CollectConfig(ctx context.Context, target string) (*models.ConfigData, error)
@@ -52,10 +51,10 @@ type DiagnosticPlugin interface {
 	HealthCheck(ctx context.Context, target string) (*models.HealthStatus, error)
 	Ping(ctx context.Context, target string) error
 
-	// Remediation (Optional, can return false/error if not supported)
-	CanAutoFix(issue *models.Issue) bool
+	// Remediation
+	CanAutoFix(issue *models.Issue) (bool, *models.FixAction)
 	ExecuteFix(ctx context.Context, fix *models.FixAction) (*models.FixResult, error)
-	ValidateFix(ctx context.Context, fix *models.FixAction) error
+	ValidateFix(ctx context.Context, issue *models.Issue, result *models.FixResult) (bool, string, error)
 }
 
 // PluginManager defines the contract for the component responsible for managing the

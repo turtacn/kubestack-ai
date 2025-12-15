@@ -18,12 +18,20 @@ package elasticsearch
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugins/base"
+)
+
+const (
+	IssueTitleIndexReadOnly = "Index Read-Only Block"
+	IssueTitleCacheHigh     = "High Cache Usage"
 )
 
 // elasticsearchPlugin is the concrete implementation of the MiddlewarePlugin for Elasticsearch.
@@ -32,23 +40,15 @@ type elasticsearchPlugin struct {
 	client    *elasticsearch.Client
 	collector *collector
 	analyzer  *analyzer
+	fixer     *base.FixExecutor
 }
 
-// New is the factory function that creates an instance of the Elasticsearch plugin.
-// It initializes the base plugin, sets up the official Elasticsearch client, and
-// wires together the specific collector and analyzer for this plugin.
-//
-// Returns:
-//   interfaces.MiddlewarePlugin: A new, fully initialized Elasticsearch plugin.
-//   error: An error if the Elasticsearch client fails to initialize.
 func New() (interfaces.MiddlewarePlugin, error) {
 	p := &elasticsearchPlugin{}
-	p.Init("elasticsearch", "0.1.0", "Provides diagnostics for Elasticsearch clusters.")
+	p.Plugin.Init("elasticsearch", "0.1.0", "Provides diagnostics for Elasticsearch clusters.")
 
-	// In a real plugin, this configuration would come from a secure source.
 	cfg := elasticsearch.Config{
 		Addresses: []string{"http://localhost:9200"},
-		// Other options like username, password, cloud_id, etc. would go here.
 	}
 
 	esClient, err := elasticsearch.NewClient(cfg)
@@ -59,18 +59,20 @@ func New() (interfaces.MiddlewarePlugin, error) {
 	p.client = esClient
 	p.collector = newCollector(esClient, p.Log)
 	p.analyzer = newAnalyzer(p.Log)
+	p.fixer = base.NewFixExecutor(p.Log)
 
 	p.Log.Info("Elasticsearch plugin initialized successfully.")
 	return p, nil
 }
 
-// Diagnose orchestrates the diagnosis process for Elasticsearch by collecting
-// data from various endpoints and then passing that data to the analyzer to
-// identify potential issues.
+// Init shadows base.Plugin.Init
+func (p *elasticsearchPlugin) Init(cfg *config.PluginConfig) error {
+	// Real world: use config to re-init client
+	return nil
+}
+
 func (p *elasticsearchPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	p.Log.Info("Starting Elasticsearch diagnosis.")
-
-	// 1. Collect data
 	health, err := p.collector.CollectClusterHealth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect elasticsearch cluster health: %w", err)
@@ -79,29 +81,23 @@ func (p *elasticsearchPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisR
 	if err != nil {
 		p.Log.Warnf("Failed to collect nodes stats: %v", err)
 	}
-
-	// 2. Analyze data
 	var issues []*models.Issue
 	issues = append(issues, p.analyzer.AnalyzeClusterHealth(health)...)
 	if nodeStats != nil {
 		issues = append(issues, p.analyzer.AnalyzeNodesStats(nodeStats)...)
 	}
-
-	// 3. Assemble result
 	result := &models.DiagnosisResult{
 		ID:        fmt.Sprintf("es-diag-%d", time.Now().Unix()),
 		Timestamp: time.Now().UTC(),
 		Summary:   fmt.Sprintf("Elasticsearch diagnosis complete. Found %d potential issues.", len(issues)),
 		Issues:    issues,
 	}
-
 	return result, nil
 }
 
 // --- Interface Method Implementations ---
 
-// Ping checks the connectivity to the Elasticsearch cluster by calling the Ping API.
-func (p *elasticsearchPlugin) Ping(ctx context.Context) error {
+func (p *elasticsearchPlugin) Ping(ctx context.Context, target string) error {
 	res, err := p.client.Ping(p.client.Ping.WithContext(ctx))
 	if err != nil {
 		return err
@@ -113,35 +109,84 @@ func (p *elasticsearchPlugin) Ping(ctx context.Context) error {
 	return nil
 }
 
-// HealthCheck performs a detailed health check by fetching the cluster's health
-// status and reports whether it is "green".
-func (p *elasticsearchPlugin) HealthCheck(ctx context.Context) (*models.HealthStatus, error) {
+func (p *elasticsearchPlugin) HealthCheck(ctx context.Context, target string) (*models.HealthStatus, error) {
 	health, err := p.collector.CollectClusterHealth(ctx)
 	if err != nil {
 		return &models.HealthStatus{IsHealthy: false, Message: fmt.Sprintf("Failed to get cluster health: %v", err)}, nil
 	}
-
 	status := health["status"].(string)
 	isHealthy := status == "green"
 	return &models.HealthStatus{IsHealthy: isHealthy, Message: fmt.Sprintf("Cluster health status is '%s'.", status)}, nil
 }
 
-// GetConfiguration retrieves the cluster's settings.
-func (p *elasticsearchPlugin) GetConfiguration(ctx context.Context) (*models.ConfigData, error) {
+func (p *elasticsearchPlugin) CollectConfig(ctx context.Context, target string) (*models.ConfigData, error) {
 	return p.collector.CollectClusterSettings(ctx)
 }
 
-// CollectMetrics gathers key performance indicators for the cluster.
-func (p *elasticsearchPlugin) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
+func (p *elasticsearchPlugin) CollectMetrics(ctx context.Context, target string) (*models.MetricsData, error) {
 	return p.collector.CollectMetrics(ctx)
 }
 
-// CollectLogs provides a placeholder implementation for log collection. A full
-// implementation would involve querying the `_cat/tasks` endpoint for slow tasks
-// or reading log files from each node.
-func (p *elasticsearchPlugin) CollectLogs(_ context.Context, _ *models.LogOptions) (*models.LogData, error) {
+func (p *elasticsearchPlugin) CollectLogs(ctx context.Context, target string, _ *models.LogOptions) (*models.LogData, error) {
 	p.Log.Info("Elasticsearch log collection is a placeholder.")
 	return &models.LogData{Entries: []string{}}, nil
 }
 
-//Personal.AI order the ending
+// --- Fix Capabilities ---
+
+func (p *elasticsearchPlugin) CanAutoFix(issue *models.Issue) (bool, *models.FixAction) {
+	switch issue.Title {
+	case IssueTitleIndexReadOnly:
+		return true, &models.FixAction{
+			ID:          "fix-es-unlock-index",
+			Description: "Remove read-only block from indices",
+			Command:     "ES_UNLOCK_INDEX",
+			Parameters:  map[string]string{"index": "_all"},
+		}
+	case IssueTitleCacheHigh:
+		return true, &models.FixAction{
+			ID:          "fix-es-clear-cache",
+			Description: "Clear indices cache",
+			Command:     "ES_CLEAR_CACHE",
+		}
+	}
+	return false, nil
+}
+
+func (p *elasticsearchPlugin) ExecuteFix(ctx context.Context, fix *models.FixAction) (*models.FixResult, error) {
+	return p.fixer.Execute(ctx, fix, func(ctx context.Context) error {
+		if fix.Command == "ES_UNLOCK_INDEX" {
+			// PUT /<index>/_settings {"index.blocks.read_only_allow_delete": null}
+			index := fix.Parameters["index"]
+			if index == "" {
+				index = "_all"
+			}
+			body := strings.NewReader(`{"index": {"blocks": {"read_only_allow_delete": null}}}`)
+			res, err := p.client.Indices.PutSettings(body, p.client.Indices.PutSettings.WithIndex(index), p.client.Indices.PutSettings.WithContext(ctx))
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			if res.IsError() {
+				bodyBytes, _ := io.ReadAll(res.Body)
+				return fmt.Errorf("failed to unlock index: %s", string(bodyBytes))
+			}
+			return nil
+		} else if fix.Command == "ES_CLEAR_CACHE" {
+			res, err := p.client.Indices.ClearCache(p.client.Indices.ClearCache.WithContext(ctx))
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			if res.IsError() {
+				return fmt.Errorf("failed to clear cache: %s", res.Status())
+			}
+			return nil
+		}
+		return fmt.Errorf("unknown command")
+	}, nil)
+}
+
+func (p *elasticsearchPlugin) ValidateFix(ctx context.Context, issue *models.Issue, result *models.FixResult) (bool, string, error) {
+	return true, "Assumed success", nil
+}

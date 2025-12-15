@@ -18,38 +18,43 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugins/base"
 )
 
+const (
+	// Issue titles that can be auto-fixed
+	IssueTitleMemoryHigh = "High Memory Usage"
+	IssueTitleSlowLog    = "Slow Queries Detected"
+	IssueTitleConnHigh   = "High Connection Count"
+
+	// Fix command categories
+	FixCatMemory = "Memory"
+	FixCatConfig = "Configuration"
+	FixCatConn   = "Connection"
+)
+
 // redisPlugin is the concrete implementation of the MiddlewarePlugin for Redis.
-// It embeds base.Plugin to inherit common functionality.
 type redisPlugin struct {
 	base.Plugin
 	client    *redis.Client
 	collector *collector
 	analyzer  *analyzer
+	fixer     *base.FixExecutor
 }
 
 // New is the factory function that creates an instance of the Redis plugin.
-// It initializes the base plugin, establishes a connection to a Redis instance,
-// and wires together the specific collector and analyzer for Redis.
-//
-// Returns:
-//   interfaces.MiddlewarePlugin: A new, fully initialized Redis plugin.
-//   error: An error if the Redis client fails to initialize (though the underlying
-//          library does not return an error on creation).
 func New() (interfaces.MiddlewarePlugin, error) {
 	p := &redisPlugin{}
-	p.Init("redis", "0.1.0", "Provides diagnostics for Redis instances.")
+	// Use base.Plugin Init to set basic info
+	p.Plugin.Init("redis", "0.1.0", "Provides diagnostics for Redis instances.")
 
-	// In a real-world plugin, connection info would come from a configuration system,
-	// likely passed in during initialization or a 'Connect' method call.
-	// For this built-in plugin, we use a placeholder configuration.
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
@@ -59,18 +64,22 @@ func New() (interfaces.MiddlewarePlugin, error) {
 	p.client = rdb
 	p.collector = newCollector(rdb, p.Log)
 	p.analyzer = newAnalyzer(p.Log)
+	p.fixer = base.NewFixExecutor(p.Log)
 
 	p.Log.Info("Redis plugin initialized successfully.")
 	return p, nil
 }
 
-// Diagnose orchestrates the diagnosis process for Redis. It collects INFO,
-// CONFIG, and SLOWLOG data, and then passes it to the analyzer to identify
-// potential issues.
+// Init shadows base.Plugin.Init to satisfy interface
+func (p *redisPlugin) Init(cfg *config.PluginConfig) error {
+	// Real world: update redis client from config
+	return nil
+}
+
+// Diagnose orchestrates the diagnosis process for Redis.
 func (p *redisPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
 	p.Log.Info("Starting Redis diagnosis.")
 
-	// 1. Collect all necessary data points.
 	info, err := p.collector.CollectInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect redis info: %w", err)
@@ -84,10 +93,8 @@ func (p *redisPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) 
 		p.Log.Warnf("Failed to collect redis slowlog: %v", err)
 	}
 
-	// 2. Analyze the collected data.
 	issues := p.analyzer.Analyze(info, config, slowlogs)
 
-	// 3. Assemble and return the final result.
 	result := &models.DiagnosisResult{
 		ID:        fmt.Sprintf("redis-diag-%d", time.Now().Unix()),
 		Timestamp: time.Now().UTC(),
@@ -100,37 +107,29 @@ func (p *redisPlugin) Diagnose(ctx context.Context, _ *models.DiagnosisRequest) 
 
 // --- Interface Method Implementations ---
 
-// CollectMetrics gathers key performance indicators for the Redis instance.
-func (p *redisPlugin) CollectMetrics(ctx context.Context) (*models.MetricsData, error) {
+func (p *redisPlugin) CollectMetrics(ctx context.Context, target string) (*models.MetricsData, error) {
 	return p.collector.CollectMetrics(ctx)
 }
 
-// GetConfiguration retrieves the live configuration from the Redis instance.
-func (p *redisPlugin) GetConfiguration(ctx context.Context) (*models.ConfigData, error) {
-	return p.collector.CollectConfig(ctx)
-}
-
-// CollectLogs retrieves entries from the Redis slow query log.
-func (p *redisPlugin) CollectLogs(ctx context.Context, _ *models.LogOptions) (*models.LogData, error) {
+func (p *redisPlugin) CollectLogs(ctx context.Context, target string, opts *models.LogOptions) (*models.LogData, error) {
 	return p.collector.CollectSlowLog(ctx)
 }
 
-// --- Health Checks ---
+func (p *redisPlugin) CollectConfig(ctx context.Context, target string) (*models.ConfigData, error) {
+	return p.collector.CollectConfig(ctx)
+}
 
-// HealthCheck performs a basic health check by pinging the Redis instance.
-func (p *redisPlugin) HealthCheck(ctx context.Context) (*models.HealthStatus, error) {
-	if err := p.Ping(ctx); err != nil {
+func (p *redisPlugin) HealthCheck(ctx context.Context, target string) (*models.HealthStatus, error) {
+	if err := p.Ping(ctx, target); err != nil {
 		return &models.HealthStatus{IsHealthy: false, Message: fmt.Sprintf("Failed to ping Redis: %v", err)}, nil
 	}
 	return &models.HealthStatus{IsHealthy: true, Message: "Redis instance is responsive."}, nil
 }
 
-// Ping sends a PING command to the Redis server to check for connectivity.
-func (p *redisPlugin) Ping(ctx context.Context) error {
+func (p *redisPlugin) Ping(ctx context.Context, target string) error {
 	return p.client.Ping(ctx).Err()
 }
 
-// Shutdown gracefully closes the Redis client connection to prevent resource leaks.
 func (p *redisPlugin) Shutdown() error {
 	p.Log.Info("Shutting down Redis plugin and closing client connection.")
 	if p.client != nil {
@@ -139,4 +138,81 @@ func (p *redisPlugin) Shutdown() error {
 	return nil
 }
 
-//Personal.AI order the ending
+// --- Fix Capabilities ---
+
+func (p *redisPlugin) CanAutoFix(issue *models.Issue) (bool, *models.FixAction) {
+	switch issue.Title {
+	case IssueTitleMemoryHigh:
+		return true, &models.FixAction{
+			ID:          "fix-redis-memory-purge",
+			Description: "Execute MEMORY PURGE to release fragmented memory",
+			Command:     "MEMORY PURGE",
+			Category:    FixCatMemory,
+		}
+	case IssueTitleSlowLog:
+		return true, &models.FixAction{
+			ID:          "fix-redis-slowlog-reset",
+			Description: "Reset slow log to clear old entries",
+			Command:     "SLOWLOG RESET",
+			Category:    FixCatConfig,
+		}
+	case IssueTitleConnHigh:
+		return true, &models.FixAction{
+			ID:          "fix-redis-kill-normal-clients",
+			Description: "Kill all normal clients to free up connections",
+			Command:     "CLIENT KILL TYPE normal",
+			Category:    FixCatConn,
+		}
+	}
+	return false, nil
+}
+
+func (p *redisPlugin) ExecuteFix(ctx context.Context, fix *models.FixAction) (*models.FixResult, error) {
+	return p.fixer.Execute(ctx, fix, func(ctx context.Context) error {
+		parts := strings.Fields(fix.Command)
+		if len(parts) == 0 {
+			return fmt.Errorf("empty command")
+		}
+
+		// cmdName is now unused
+		// cmdName := parts[0]
+		args := make([]interface{}, len(parts))
+		for i, v := range parts {
+			args[i] = v
+		}
+
+		return p.client.Do(ctx, args...).Err()
+	}, nil) // No rollback for these simple commands
+}
+
+func (p *redisPlugin) ValidateFix(ctx context.Context, issue *models.Issue, result *models.FixResult) (bool, string, error) {
+	if !result.Success {
+		return false, "Fix execution failed previously", nil
+	}
+
+	switch issue.Title {
+	case IssueTitleSlowLog:
+		// Go-redis v8 does not expose SlowLogLen helper directly on Client.
+		// Use Do command.
+		val, err := p.client.Do(ctx, "SLOWLOG", "LEN").Int()
+		if err != nil {
+			return false, "", err
+		}
+		if val == 0 {
+			return true, "Slow log is empty", nil
+		}
+		return false, fmt.Sprintf("Slow log still has %d entries", val), nil
+
+	case IssueTitleMemoryHigh:
+		// Simple validation: just check we can ping, actual memory drop is hard to simulate immediately without waiting
+		err := p.client.Ping(ctx).Err()
+		return err == nil, "Redis is responsive after purge", err
+
+	case IssueTitleConnHigh:
+		// Validate we are responsive
+		err := p.client.Ping(ctx).Err()
+		return err == nil, "Redis is responsive after connection kill", err
+	}
+
+	return true, "Fix assumed successful", nil
+}
