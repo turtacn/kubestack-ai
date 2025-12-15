@@ -19,6 +19,9 @@ type Config struct {
 	EnableLLM     bool
 	MaxTurns      int
 	SessionTTL    time.Duration
+	RedisAddress  string
+	RedisPassword string
+	RedisDB       int
 }
 
 // DefaultConfig returns default configuration.
@@ -75,16 +78,15 @@ func NewNLPProcessor(cfg *Config, llmClient interfaces.LLMClient) *NLPProcessor 
 
 	if cfg.EnableLLM && llmClient != nil {
 		llmRecognizer := intent.NewLLMIntentRecognizer(llmClient, ruleRecognizer)
-		// Hybrid: Rule first, fallback to LLM if needed (implemented in HybridRecognizer)
-		// Or LLM first? Usually Hybrid means Rule first for speed/cost, LLM for coverage.
-		// My HybridRecognizer impl logic: Rule -> if low conf -> LLM.
 		finalRecognizer = intent.NewHybridRecognizer(ruleRecognizer, llmRecognizer, 0.7) // 0.7 threshold
 	}
 
 	// 4. Context Manager
-	// For now, defaulting to InMemory.
-	// Future: use Redis based on config.
-	ctxManager := ncontext.NewInMemoryContextManager(cfg.MaxTurns, cfg.SessionTTL)
+	var store ncontext.SessionStore
+	if cfg.RedisAddress != "" {
+		store = ncontext.NewRedisSessionStore(cfg.RedisAddress, cfg.RedisPassword, cfg.RedisDB, "ksa:session", cfg.SessionTTL)
+	}
+	ctxManager := ncontext.NewInMemoryContextManager(cfg.MaxTurns, cfg.SessionTTL, store)
 
 	return &NLPProcessor{
 		tokenizer:        tok,
@@ -119,9 +121,11 @@ func (p *NLPProcessor) Process(ctx context.Context, req *ProcessRequest) (*Proce
 	// 4. Load Context
 	convCtx, err := p.contextManager.GetContext(ctx, req.SessionID)
 	if err != nil {
-		// Log error, proceed with new/empty context if needed?
-		// For now, error likely means storage failure, but we can continue statelessly.
-		// But GetContext returns new context on miss usually.
+		// Log error
+	}
+	// If context is new (empty), set UserID
+	if convCtx.UserID == "" {
+		convCtx.UserID = req.UserID
 	}
 
 	// 5. Intent Recognition

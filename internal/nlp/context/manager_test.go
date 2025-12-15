@@ -12,7 +12,7 @@ import (
 )
 
 func TestContextManager_MultiTurn(t *testing.T) {
-	manager := ncontext.NewInMemoryContextManager(5, 1*time.Minute)
+	manager := ncontext.NewInMemoryContextManager(5, 1*time.Minute, nil)
 	ctx := context.Background()
 	sessionID := "test-session"
 
@@ -37,7 +37,7 @@ func TestContextManager_MultiTurn(t *testing.T) {
 }
 
 func TestContextManager_EntityCarryOver(t *testing.T) {
-	manager := ncontext.NewInMemoryContextManager(10, 30*time.Minute)
+	manager := ncontext.NewInMemoryContextManager(10, 30*time.Minute, nil)
 	ctx := context.Background()
 	sessionID := "carry-over-test"
 
@@ -60,7 +60,7 @@ func TestContextManager_EntityCarryOver(t *testing.T) {
 
 func TestContextManager_SessionTimeout(t *testing.T) {
 	// Set very short TTL
-	manager := ncontext.NewInMemoryContextManager(10, 10*time.Millisecond)
+	manager := ncontext.NewInMemoryContextManager(10, 10*time.Millisecond, nil)
 	ctx := context.Background()
 	sessionID := "timeout-test"
 

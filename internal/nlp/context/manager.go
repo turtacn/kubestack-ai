@@ -82,14 +82,16 @@ type InMemoryContextManager struct {
 	mu         sync.RWMutex
 	maxTurns   int
 	sessionTTL time.Duration
+	store      SessionStore // Optional backing store
 }
 
 // NewInMemoryContextManager creates a new InMemoryContextManager.
-func NewInMemoryContextManager(maxTurns int, sessionTTL time.Duration) *InMemoryContextManager {
+func NewInMemoryContextManager(maxTurns int, sessionTTL time.Duration, store SessionStore) *InMemoryContextManager {
 	return &InMemoryContextManager{
 		contexts:   make(map[string]*ConversationContext),
 		maxTurns:   maxTurns,
 		sessionTTL: sessionTTL,
+		store:      store,
 	}
 }
 
@@ -101,24 +103,56 @@ func (m *InMemoryContextManager) GetContext(ctx context.Context, sessionID strin
 	if ok {
 		// Check expiry
 		if time.Since(convCtx.UpdatedAt) > m.sessionTTL {
-			return m.newContext(sessionID), nil
+			m.ClearContext(ctx, sessionID) // Remove from memory
+			// Try load from store if available?
+			// If store exists, maybe it has fresh data?
+		} else {
+			return convCtx, nil
 		}
-		return convCtx, nil
 	}
+
+	// Try loading from persistent store
+	if m.store != nil {
+		session, err := m.store.Load(ctx, sessionID)
+		if err == nil && session != nil && session.Context != nil {
+			// Restore context
+			m.mu.Lock()
+			m.contexts[sessionID] = session.Context
+			m.mu.Unlock()
+			return session.Context, nil
+		}
+	}
+
 	return m.newContext(sessionID), nil
 }
 
 func (m *InMemoryContextManager) SaveContext(ctx context.Context, sessionID string, convCtx *ConversationContext) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.contexts[sessionID] = convCtx
+	m.mu.Unlock()
+
+	// Persist asynchronously or synchronously? Sync for safety.
+	if m.store != nil {
+		session := &Session{
+			ID:        sessionID,
+			UserID:    convCtx.UserID,
+			Context:   convCtx,
+			CreatedAt: convCtx.CreatedAt,
+			UpdatedAt: convCtx.UpdatedAt,
+		}
+		return m.store.Save(ctx, session)
+	}
 	return nil
 }
 
 func (m *InMemoryContextManager) ClearContext(ctx context.Context, sessionID string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.contexts, sessionID)
+	m.mu.Unlock()
+
+	if m.store != nil {
+		return m.store.Delete(ctx, sessionID)
+	}
 	return nil
 }
 
