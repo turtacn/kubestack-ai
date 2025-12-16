@@ -50,9 +50,9 @@ mkdir -p chroma-data
 docker run -d --rm --name chromadb -p 8000:8000 -v "$(pwd)/chroma-data":/chroma -e IS_PERSISTENT=TRUE -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma
 ```
 
-## Running the Server (Web Console)
+## Running the Server (Web Console & Alerts)
 
-KubeStack-AI includes a web console for real-time diagnosis streaming.
+KubeStack-AI includes a web console and an alert receiver.
 
 1.  Start the server:
     ```bash
@@ -62,11 +62,16 @@ KubeStack-AI includes a web console for real-time diagnosis streaming.
 2.  Open your browser and navigate to:
     [http://localhost:8080](http://localhost:8080)
 
-3.  Use the form to trigger a diagnosis:
+3.  **Manual Diagnosis**:
     *   **Middleware**: Select the type (e.g., Redis).
     *   **Target Host**: e.g., `localhost:6379`.
     *   **Instance Name**: e.g., `my-redis`.
     *   Click "Start Diagnosis" and watch the real-time logs.
+
+4.  **Alert Webhook Integration**:
+    *   Configure Alertmanager to send webhooks to: `http://<server-ip>:8080/api/v1/webhook/alertmanager`
+    *   Configure Grafana to send webhooks to: `http://<server-ip>:8080/api/v1/webhook/grafana`
+    *   When an alert fires, KubeStack-AI will automatically trigger a diagnosis and notify configured channels (Slack, DingTalk).
 
 ## CLI Usage
 

@@ -66,4 +66,24 @@ monitor:
   alerting:
     evaluation_interval: "1m" # Default alert evaluation interval.
 
+# Alerting & Diagnosis Integration (New in P7)
+# Note: Full rules are in configs/alert_rules.yaml
+alert_dispatcher:
+  dedup_window: 5m
+  correlation_window: 2m
+
+# Notification Channels
+# These are used by both Alerting (Phase 7) and Tasks (Phase 4)
+notification:
+  # This section provides defaults. Specific channels are configured in alert_rules.yaml or below.
+  alert_severity: "warning" # Minimum severity to notify
+  channels:
+    dingtalk:
+      enabled: false
+      webhook_url: ""
+      secret: ""
+    slack:
+      enabled: false
+      webhook_url: ""
+
 # Personal.AI order the ending

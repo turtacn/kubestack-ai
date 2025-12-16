@@ -3,336 +3,274 @@ package redis
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
-	"time"
+	"strings"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
-	"github.com/mitchellh/mapstructure"
-	"go.uber.org/zap"
 )
 
+func init() {
+	plugin.RegisterPluginFactory("Redis", func() plugin.DiagnosticPlugin {
+		return &RedisPlugin{}
+	})
+}
+
+// RedisPlugin Redis诊断插件.
 type RedisPlugin struct {
-	config *RedisConfig
-	client redis.UniversalClient
-	logger *zap.Logger
+	client *redis.Client
 }
 
-type RedisConfig struct {
-	Address  string
-	Password string
-	DB       int
-	PoolSize int
-	Timeout  time.Duration
+func (p *RedisPlugin) Name() string {
+	return "redis"
 }
 
-// 实现Plugin接口
-func (p *RedisPlugin) Name() string { return "redis" }
-func (p *RedisPlugin) Version() string { return "1.0.0" }
-func (p *RedisPlugin) Description() string {
-	return "Redis middleware diagnostic plugin"
-}
-func (p *RedisPlugin) SupportedMiddlewareVersions() []string {
-	return []string{"5.x", "6.x", "7.x"}
+func (p *RedisPlugin) Type() plugin.MiddlewareType {
+	return plugin.MiddlewareRedis
 }
 
-func (p *RedisPlugin) Initialize(config *plugin.PluginConfig) error {
-	p.logger = zap.L().With(zap.String("plugin", "redis"))
-	var redisConf RedisConfig
-	if err := mapstructure.Decode(config.Settings, &redisConf); err != nil {
-		return err
+func (p *RedisPlugin) Version() string {
+	return "1.0.0"
+}
+
+// Connect implements MiddlewarePlugin
+func (p *RedisPlugin) Connect(ctx context.Context, config *plugin.ConnectionConfig) error {
+	opts := &redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Password: config.Password,
+		DB:       0,
 	}
-
-	opts := &redis.UniversalOptions{
-		Addrs:    []string{redisConf.Address},
-		Password: redisConf.Password,
-		DB:       redisConf.DB,
-		PoolSize: redisConf.PoolSize,
+	if config.PoolSize > 0 {
+		opts.PoolSize = config.PoolSize
 	}
-
-	if redisConf.Timeout > 0 {
-		opts.DialTimeout = redisConf.Timeout
-		opts.ReadTimeout = redisConf.Timeout
-		opts.WriteTimeout = redisConf.Timeout
-	}
-
-	p.client = redis.NewUniversalClient(opts)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := p.client.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("redis connection failed: %w", err)
-	}
-	p.config = &redisConf
-	return nil
+	p.client = redis.NewClient(opts)
+	return p.client.Ping(ctx).Err()
 }
 
-func (p *RedisPlugin) Shutdown() error {
+// Disconnect implements MiddlewarePlugin
+func (p *RedisPlugin) Disconnect(ctx context.Context) error {
 	if p.client != nil {
 		return p.client.Close()
 	}
 	return nil
 }
 
-func (p *RedisPlugin) Collector() plugin.DataCollector {
-	return &RedisDataCollector{plugin: p}
+// Ping implements MiddlewarePlugin
+func (p *RedisPlugin) Ping(ctx context.Context) error {
+	if p.client == nil {
+		return fmt.Errorf("not connected")
+	}
+	return p.client.Ping(ctx).Err()
 }
 
-func (p *RedisPlugin) Parser() plugin.MetricParser {
-	return &RedisMetricParser{plugin: p}
+// IsConnected implements MiddlewarePlugin
+func (p *RedisPlugin) IsConnected() bool {
+	return p.client != nil
 }
 
-func (p *RedisPlugin) HealthChecker() plugin.HealthChecker {
-	return &RedisHealthChecker{plugin: p}
+// CollectMetrics implements MiddlewarePlugin
+func (p *RedisPlugin) CollectMetrics(ctx context.Context) (*plugin.MetricsSnapshot, error) {
+	// Not implemented for this patch
+	return nil, nil
 }
 
-// RedisDataCollector 实现
-type RedisDataCollector struct {
-	plugin *RedisPlugin
+// CollectSpecificMetric implements MiddlewarePlugin
+func (p *RedisPlugin) CollectSpecificMetric(ctx context.Context, metricName string) (interface{}, error) {
+	return nil, nil
 }
 
-func (c *RedisDataCollector) Collect(ctx context.Context, target *plugin.Target) (*plugin.CollectedData, error) {
-	// If target is provided and different from internal config, we might need to create a new client.
-	// For now, we assume the plugin is initialized for a specific target, or we reuse the client.
-	// The prompt implies we use p.client.
+// Execute implements MiddlewarePlugin
+func (p *RedisPlugin) Execute(ctx context.Context, cmd *plugin.Command) (*plugin.CommandResult, error) {
+	return nil, nil
+}
 
-	infoStr, err := c.plugin.client.Info(ctx).Result()
+// SupportedCommands implements MiddlewarePlugin
+func (p *RedisPlugin) SupportedCommands() []plugin.CommandSpec {
+	return nil
+}
+
+// GetDiagnosticData implements MiddlewarePlugin
+func (p *RedisPlugin) GetDiagnosticData(ctx context.Context) (*plugin.DiagnosticData, error) {
+	return nil, nil
+}
+
+// GetBuiltinRules implements MiddlewarePlugin
+func (p *RedisPlugin) GetBuiltinRules() []plugin.DiagnosisRule {
+	return nil
+}
+
+
+// Legacy Interface Methods (DiagnosticPlugin)
+func (p *RedisPlugin) Init(config map[string]interface{}) error {
+	return nil
+}
+
+func (p *RedisPlugin) SupportedTypes() []string {
+	return []string{"redis"}
+}
+
+func (p *RedisPlugin) Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
+	if req.Instance == "" {
+		return nil, fmt.Errorf("redis diagnosis requires an instance endpoint in the request")
+	}
+
+	addr := req.Instance
+	var password string
+
+	// Create a temporary client if not connected or address differs
+	client := p.client
+	if client == nil || client.Options().Addr != addr {
+		client = redis.NewClient(&redis.Options{
+			Addr:     addr,
+			Password: password,
+			DB:       0,
+		})
+		defer client.Close()
+	}
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis at '%s': %w", addr, err)
+	}
+
+	result := &models.DiagnosisResult{
+		Issues:  []*models.Issue{},
+		Metrics: make(map[string]interface{}),
+	}
+
+	// Step 1: 检查内存使用
+	memoryIssue, metrics := p.checkMemory(ctx, client)
+	if memoryIssue != nil {
+		result.Issues = append(result.Issues, memoryIssue)
+	}
+	for k, v := range metrics {
+		result.Metrics[k] = v
+	}
+
+	// Step 2: 检查连接数
+	connectionIssue := p.checkConnections(ctx, client)
+	if connectionIssue != nil {
+		result.Issues = append(result.Issues, connectionIssue)
+	}
+
+	// Step 3: 检查慢查询
+	slowQueryIssue := p.checkSlowLog(ctx, client)
+	if slowQueryIssue != nil {
+		result.Issues = append(result.Issues, slowQueryIssue)
+	}
+
+	// Step 4: 生成建议
+	result.Issues = p.attachRecommendations(result.Issues)
+
+	return result, nil
+}
+
+func (p *RedisPlugin) checkMemory(ctx context.Context, client *redis.Client) (*models.Issue, map[string]interface{}) {
+	metrics := make(map[string]interface{})
+	info, err := client.Info(ctx, "memory").Result()
 	if err != nil {
-		return nil, err
+		return nil, metrics
 	}
 
-	// Try to get slowlogs, ignore error as it might be disabled
-	slowlogs, _ := c.plugin.client.Do(ctx, "SLOWLOG", "GET", 100).Result()
+	usedMemory := parseMemoryInfo(info, "used_memory")
+	maxMemory := parseMemoryInfo(info, "maxmemory")
+	usedMemoryMB := usedMemory / 1024 / 1024
 
-	// Try to get config, ignore error as it might be restricted
-	configs, _ := c.plugin.client.Do(ctx, "CONFIG", "GET", "*").Result()
+	metrics["used_memory"] = usedMemory
+	metrics["maxmemory"] = maxMemory
+	metrics["used_memory_mb"] = usedMemoryMB
 
-	data := &plugin.CollectedData{
-		PluginName: "redis",
-		Target:     target,
-		Timestamp:  time.Now(),
-		RawData: map[string]interface{}{
-			"info":    infoStr,
-			"slowlog": slowlogs,
-			"config":  configs,
-		},
-	}
-	return data, nil
-}
-
-func (c *RedisDataCollector) SupportedDataSources() []plugin.DataSourceType {
-	return []plugin.DataSourceType{plugin.DataSourceCommand, plugin.DataSourceLog}
-}
-
-// RedisMetricParser 实现
-type RedisMetricParser struct {
-	plugin *RedisPlugin
-}
-
-func (p *RedisMetricParser) Parse(ctx context.Context, data *plugin.CollectedData) (*plugin.ParsedMetrics, error) {
-	infoStr, ok := data.RawData["info"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid info data")
-	}
-
-	metrics := make(map[string]*plugin.MetricValue)
-
-	// 示例：提取used_memory
-	if matches := regexp.MustCompile(`used_memory:(\d+)`).FindStringSubmatch(infoStr); len(matches) > 1 {
-		usedMem, _ := strconv.ParseInt(matches[1], 10, 64)
-		metrics["memory_used_bytes"] = &plugin.MetricValue{
-			Name:  "memory_used_bytes",
-			Value: usedMem,
-			Unit:  "bytes",
+	var issue *models.Issue
+	if maxMemory > 0 && float64(usedMemory)/float64(maxMemory) > 0.9 {
+		issue = &models.Issue{
+			Title:       "Redis内存使用率过高",
+			Severity:    enum.SeverityHigh,
+			Description: fmt.Sprintf("当前内存使用: %dMB, 最大内存: %dMB", usedMemoryMB, maxMemory/1024/1024),
+			Source:      "RedisPlugin",
 		}
 	}
-
-	// 解析更多指标
-	if matches := regexp.MustCompile(`connected_clients:(\d+)`).FindStringSubmatch(infoStr); len(matches) > 1 {
-		val, _ := strconv.ParseInt(matches[1], 10, 64)
-		metrics["connected_clients"] = &plugin.MetricValue{
-			Name:  "connected_clients",
-			Value: val,
-			Unit:  "count",
-		}
-	}
-
-	// keyspace_hits
-	var hits, misses int64
-	if matches := regexp.MustCompile(`keyspace_hits:(\d+)`).FindStringSubmatch(infoStr); len(matches) > 1 {
-		hits, _ = strconv.ParseInt(matches[1], 10, 64)
-		metrics["keyspace_hits"] = &plugin.MetricValue{
-			Name:  "keyspace_hits",
-			Value: hits,
-			Unit:  "count",
-		}
-	}
-
-	if matches := regexp.MustCompile(`keyspace_misses:(\d+)`).FindStringSubmatch(infoStr); len(matches) > 1 {
-		misses, _ = strconv.ParseInt(matches[1], 10, 64)
-		metrics["keyspace_misses"] = &plugin.MetricValue{
-			Name:  "keyspace_misses",
-			Value: misses,
-			Unit:  "count",
-		}
-	}
-
-	if hits+misses > 0 {
-		hitRate := float64(hits) / float64(hits+misses)
-		metrics["hit_rate"] = &plugin.MetricValue{Name: "hit_rate", Value: hitRate, Unit: "ratio"}
-	}
-
-	return &plugin.ParsedMetrics{
-		PluginName: "redis",
-		Timestamp:  time.Now(),
-		Metrics:    metrics,
-	}, nil
+	return issue, metrics
 }
 
-func (p *RedisMetricParser) AvailableMetrics() []plugin.MetricDefinition {
-	return []plugin.MetricDefinition{
-		{Name: "memory_used_bytes", Unit: "bytes", Description: "Used memory"},
-		{Name: "connected_clients", Unit: "count", Description: "Number of connected clients"},
-		{Name: "hit_rate", Unit: "ratio", Description: "Keyspace hit rate"},
-	}
-}
-
-// RedisHealthChecker 实现
-type RedisHealthChecker struct {
-	plugin *RedisPlugin
-}
-
-func (c *RedisHealthChecker) Check(ctx context.Context, target *plugin.Target) (*plugin.HealthStatus, error) {
-	// 1. PING检查
-	pingResult := &plugin.HealthCheckResult{Name: "ping"}
-	if err := c.plugin.client.Ping(ctx).Err(); err != nil {
-		pingResult.Status = plugin.UnhealthyLevel
-		pingResult.Message = "PING failed: " + err.Error()
-	} else {
-		pingResult.Status = plugin.HealthyLevel
-	}
-
-	// 2. 主从延迟检查（若配置了主从）
-	replResult := c.checkReplication(ctx)
-
-	// 3. 内存使用率检查
-	memResult := c.checkMemory(ctx)
-
-	items := []*plugin.HealthCheckResult{pingResult, replResult, memResult}
-	overall := c.calculateOverallHealth(items)
-
-	return &plugin.HealthStatus{
-		PluginName: "redis",
-		Overall:    overall,
-		Items:      items,
-		Timestamp:  time.Now(),
-	}, nil
-}
-
-func (c *RedisHealthChecker) checkReplication(ctx context.Context) *plugin.HealthCheckResult {
-	info, err := c.plugin.client.Info(ctx, "replication").Result()
+func (p *RedisPlugin) checkConnections(ctx context.Context, client *redis.Client) *models.Issue {
+	info, err := client.Info(ctx, "clients").Result()
 	if err != nil {
-		return &plugin.HealthCheckResult{
-			Name:    "replication",
-			Status:  plugin.UnhealthyLevel,
-			Message: "Failed to get replication info: " + err.Error(),
+		return nil
+	}
+	connectedClients := parseClientsInfo(info, "connected_clients")
+
+	if connectedClients > 10000 {
+		return &models.Issue{
+			Title:       "Redis连接数过多",
+			Severity:    enum.SeverityMedium,
+			Description: fmt.Sprintf("当前连接数: %d", connectedClients),
+			Source:      "RedisPlugin",
 		}
 	}
-
-	result := &plugin.HealthCheckResult{Name: "replication", Status: plugin.HealthyLevel}
-
-	role := ""
-	if matches := regexp.MustCompile(`role:(\w+)`).FindStringSubmatch(info); len(matches) > 1 {
-		role = matches[1]
-	}
-
-	if role == "slave" {
-		linkStatus := ""
-		if matches := regexp.MustCompile(`master_link_status:(\w+)`).FindStringSubmatch(info); len(matches) > 1 {
-			linkStatus = matches[1]
-		}
-
-		if linkStatus != "up" {
-			result.Status = plugin.UnhealthyLevel
-			result.Message = fmt.Sprintf("Master link status is %s", linkStatus)
-			return result
-		}
-
-		lastIO := -1
-		if matches := regexp.MustCompile(`master_last_io_seconds_ago:(\d+)`).FindStringSubmatch(info); len(matches) > 1 {
-			lastIO, _ = strconv.Atoi(matches[1])
-		}
-
-		if lastIO > 10 {
-			result.Status = plugin.DegradedLevel
-			result.Message = fmt.Sprintf("High replication lag: %d seconds", lastIO)
-		}
-	}
-
-	return result
+	return nil
 }
 
-func (c *RedisHealthChecker) checkMemory(ctx context.Context) *plugin.HealthCheckResult {
-	info, err := c.plugin.client.Info(ctx, "memory").Result()
+func (p *RedisPlugin) checkSlowLog(ctx context.Context, client *redis.Client) *models.Issue {
+	slowLogs, err := client.SlowLogGet(ctx, 10).Result()
 	if err != nil {
-		return &plugin.HealthCheckResult{Name: "memory", Status: plugin.UnhealthyLevel, Message: err.Error()}
+		return nil
 	}
 
-	var used, max int64
-	if matches := regexp.MustCompile(`used_memory:(\d+)`).FindStringSubmatch(info); len(matches) > 1 {
-		used, _ = strconv.ParseInt(matches[1], 10, 64)
-	}
-	if matches := regexp.MustCompile(`maxmemory:(\d+)`).FindStringSubmatch(info); len(matches) > 1 {
-		max, _ = strconv.ParseInt(matches[1], 10, 64)
-	}
-
-	if max > 0 {
-		usage := float64(used) / float64(max)
-		if usage > 0.95 {
-			return &plugin.HealthCheckResult{Name: "memory", Status: plugin.UnhealthyLevel, Message: fmt.Sprintf("Memory usage critical: %.2f%%", usage*100)}
-		} else if usage > 0.90 {
-			return &plugin.HealthCheckResult{Name: "memory", Status: plugin.DegradedLevel, Message: fmt.Sprintf("Memory usage high: %.2f%%", usage*100)}
+	if len(slowLogs) > 0 {
+		return &models.Issue{
+			Title:       "Redis存在慢查询",
+			Severity:    enum.SeverityMedium,
+			Description: fmt.Sprintf("最近10条慢查询中有 %d 条", len(slowLogs)),
+			Source:      "RedisPlugin",
 		}
 	}
-
-	return &plugin.HealthCheckResult{Name: "memory", Status: plugin.HealthyLevel}
+	return nil
 }
 
-func (c *RedisHealthChecker) calculateOverallHealth(items []*plugin.HealthCheckResult) plugin.HealthLevel {
-	overall := plugin.HealthyLevel
-	for _, item := range items {
-		if item.Status > overall {
-			overall = item.Status
+func (p *RedisPlugin) attachRecommendations(issues []*models.Issue) []*models.Issue {
+	for _, issue := range issues {
+		var recs []*models.Recommendation
+		if strings.Contains(issue.Title, "内存") {
+			recs = append(recs, &models.Recommendation{
+				Description: "设置maxmemory-policy为allkeys-lru",
+				Fix: models.FixAction{
+					Description: "设置maxmemory-policy为allkeys-lru",
+					Category:    "Configuration",
+				},
+			})
+		}
+		if strings.Contains(issue.Title, "连接数") {
+			recs = append(recs, &models.Recommendation{
+				Description: "检查客户端连接泄漏，优化连接池配置",
+				Fix: models.FixAction{
+					Description: "检查客户端连接泄漏，优化连接池配置",
+					Category:    "Application",
+				},
+			})
+		}
+		issue.Recommendations = recs
+	}
+	return issues
+}
+
+func (p *RedisPlugin) Shutdown() error {
+	return p.Disconnect(context.Background())
+}
+
+// Helpers
+func parseMemoryInfo(info string, key string) int64 {
+	lines := strings.Split(info, "\r\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, key+":") {
+			valStr := strings.TrimPrefix(line, key+":")
+			val, _ := strconv.ParseInt(valStr, 10, 64)
+			return val
 		}
 	}
-	return overall
+	return 0
 }
 
-func (c *RedisHealthChecker) CheckItems() []plugin.HealthCheckItem {
-	return []plugin.HealthCheckItem{
-		{Name: "ping", Description: "Redis responsiveness"},
-		{Name: "replication", Description: "Master-slave sync status"},
-		{Name: "memory", Description: "Memory usage"},
-	}
-}
-
-func init() {
-	// Register the plugin factory
-	plugin.RegisterPlugin(&RedisPluginFactory{})
-}
-
-type RedisPluginFactory struct{}
-
-func (f *RedisPluginFactory) Create() plugin.Plugin {
-	return &RedisPlugin{}
-}
-
-func (f *RedisPluginFactory) Metadata() *plugin.PluginMetadata {
-	return &plugin.PluginMetadata{
-		Name:       "redis",
-		Version:    "1.0.0",
-		APIVersion: "v1",
-		Description: "Redis plugin",
-	}
+func parseClientsInfo(info string, key string) int64 {
+	return parseMemoryInfo(info, key)
 }

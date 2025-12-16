@@ -43,6 +43,27 @@ type Config struct {
 	Crawler             CrawlerConfig      `mapstructure:"crawler"`
 	Cron                CronConfig         `mapstructure:"cron"`
 	NLP                 NLPConfig          `mapstructure:"nlp"`
+
+	// Phase 7
+	AlertDispatcher     AlertDispatcherConfig `mapstructure:"alert_dispatcher"`
+	AlertRules          AlertRulesConfig      `mapstructure:"alert_rules"`
+}
+
+type AlertDispatcherConfig struct {
+	DedupWindow       time.Duration `mapstructure:"dedup_window"`
+	CorrelationWindow time.Duration `mapstructure:"correlation_window"`
+}
+
+type AlertRulesConfig struct {
+	AlertRules []AlertRule `mapstructure:"alert_rules"`
+}
+
+type AlertRule struct {
+	Name           string   `mapstructure:"name"`
+	Middleware     string   `mapstructure:"middleware"`
+	DiagnosisScope []string `mapstructure:"diagnosis_scope"`
+	AutoFix        bool     `mapstructure:"auto_fix"`
+	FixStrategy    string   `mapstructure:"fix_strategy"`
 }
 
 type NLPConfig struct {
@@ -304,11 +325,21 @@ type RedisConfig struct {
 }
 
 type NotificationConfig struct {
-	Webhook       WebhookConfig `mapstructure:"webhook"`
-	Email         EmailConfig   `mapstructure:"email"`
-	Slack         SlackConfig   `mapstructure:"slack"`
-	AlertSeverity string        `mapstructure:"alert_severity"`
-	DashboardURL  string        `mapstructure:"dashboard_url"`
+	Webhook       WebhookConfig    `mapstructure:"webhook"`
+	Email         EmailConfig      `mapstructure:"email"`
+	Slack         SlackConfig      `mapstructure:"slack"`
+	AlertSeverity string           `mapstructure:"alert_severity"`
+	DashboardURL  string           `mapstructure:"dashboard_url"`
+	Channels      []ChannelConfig  `mapstructure:"channels"` // Phase 7
+}
+
+type ChannelConfig struct {
+	Type           string   `mapstructure:"type"`
+	Enabled        bool     `mapstructure:"enabled"`
+	WebhookURL     string   `mapstructure:"webhook_url"`
+	Secret         string   `mapstructure:"secret"`
+	Channel        string   `mapstructure:"channel"`
+	SeverityFilter []string `mapstructure:"severity_filter"`
 }
 
 type WebhookConfig struct {
@@ -461,7 +492,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	viper.AddConfigPath("configs")
 	viper.SetConfigName("alert_rules")
 	if err := viper.MergeInConfig(); err == nil {
-		if err := viper.Unmarshal(&cfg.Notification); err != nil {
+		// Merge into root config, will map to AlertRules and Notification
+		if err := viper.Unmarshal(&cfg); err != nil {
 			// Ignore
 		}
 	}

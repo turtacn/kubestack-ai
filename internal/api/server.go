@@ -11,8 +11,11 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/api/handlers"
 	"github.com/kubestack-ai/kubestack-ai/internal/api/middleware"
 	"github.com/kubestack-ai/kubestack-ai/internal/api/websocket"
+	pkg_alert "github.com/kubestack-ai/kubestack-ai/internal/alert"
+	"github.com/kubestack-ai/kubestack-ai/internal/alert/notifier"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/config"
 	"github.com/kubestack-ai/kubestack-ai/internal/common/logger"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/diagnosis"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/knowledge"
 	"github.com/kubestack-ai/kubestack-ai/internal/monitor/alert"
@@ -50,6 +53,9 @@ type Server struct {
 	alertStore         storage.AlertStore
 	silenceStore       storage.SilenceStore
 	timeseriesStore    storage.TimeseriesStore
+
+	// Alert Integration (P7)
+	alertManager *pkg_alert.Manager
 }
 
 // NewServer creates a new API server.
@@ -174,9 +180,50 @@ func NewServer(cfg *config.Config, diagnosisEngine interfaces.DiagnosisManager, 
 	}
 	// -----------------------------
 
+	// --- Alert Integration (P7) ---
+	// Initialize Alert Manager
+	var am *pkg_alert.Manager
+	if dm, ok := diagnosisEngine.(*diagnosis.Manager); ok {
+		// Create notifiers
+		var notifiers []notifier.Notifier
+		for _, ch := range cfg.Notification.Channels {
+			if !ch.Enabled {
+				continue
+			}
+			if ch.Type == "dingtalk" {
+				notifiers = append(notifiers, notifier.NewDingTalkNotifier(ch.WebhookURL, ch.Secret))
+			} else if ch.Type == "slack" {
+				// Assumes channel name is mapped to webhook_url in logic or handled inside
+				// We need to check SlackConfig or ChannelConfig.
+				// For P7-T7, we implemented SlackNotifier which takes webhook, channel, username.
+				// ChannelConfig struct has channel.
+				notifiers = append(notifiers, notifier.NewSlackNotifier(ch.WebhookURL, ch.Channel, "KSA-Bot"))
+			}
+		}
+
+		// Also check existing configs for Notification
+		if cfg.Notification.Slack.Enabled && cfg.Notification.Slack.WebhookURL != "" {
+			notifiers = append(notifiers, notifier.NewSlackNotifier(cfg.Notification.Slack.WebhookURL, "", "KSA-Bot"))
+		}
+
+		amConfig := &pkg_alert.ManagerConfig{
+			Dispatcher: &pkg_alert.DispatcherConfig{
+				DedupWindow:       cfg.AlertDispatcher.DedupWindow,
+				CorrelationWindow: cfg.AlertDispatcher.CorrelationWindow,
+			},
+			Feedback: &pkg_alert.FeedbackConfig{
+				EnabledChannels: []string{}, // All in notifiers are enabled
+			},
+			Notifiers: notifiers,
+		}
+		am = pkg_alert.NewManager(dm, amConfig)
+	}
+	// -----------------------------
+
 	s := &Server{
 		router:             gin.Default(),
 		config:             cfg,
+		alertManager:       am,
 		diagnosisEngine:    diagnosisEngine,
 		pluginManager:      pluginManager,
 		authService:        authService,
@@ -273,6 +320,13 @@ func (s *Server) setupRoutes() {
 		alerts := v1.Group("/alerts")
 		alerts.GET("/history", s.rbacMiddleware.CheckPermission("monitor:read"), s.monitorHandler.GetAlertHistory)
 		alerts.POST("/silence", s.rbacMiddleware.CheckPermission("monitor:write"), s.monitorHandler.CreateSilence)
+	}
+
+	// Webhooks (P7)
+	if s.alertManager != nil {
+		webhooks := v1.Group("/webhook")
+		webhooks.POST("/alertmanager", gin.WrapF(s.alertManager.WebhookHandler.HandleAlertmanagerWebhook))
+		webhooks.POST("/grafana", gin.WrapF(s.alertManager.WebhookHandler.HandleGrafanaWebhook))
 	}
 }
 
