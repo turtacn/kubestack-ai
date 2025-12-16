@@ -33,7 +33,19 @@ type DiagnosticPlugin interface {
 	Shutdown() error
 }
 
-// MiddlewarePlugin defines the interface for all middleware plugins (Legacy/Full)
+// MiddlewarePlugin defines the interface for all middleware plugins (Legacy/Full).
+//
+// DESIGN NOTE: This interface represents the operation-oriented plugin interface
+// that is currently implemented by existing plugins. The design-aligned contract
+// interface is defined in internal/core/contracts.MiddlewarePlugin, which provides
+// a diagnosis-focused API surface.
+//
+// The adapter layer in internal/core/contracts/adapter bridges between this interface
+// and the contracts interface, allowing existing plugins to work with the new contract
+// without requiring changes to plugin implementations.
+//
+// For new plugin development, consider implementing the contracts.MiddlewarePlugin interface
+// directly, or implement this interface and use the adapter for compatibility.
 type MiddlewarePlugin interface {
 	// === Basic Information ===
 

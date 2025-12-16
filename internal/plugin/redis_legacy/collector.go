@@ -1,3 +1,6 @@
+//go:build redis_legacy
+// +build redis_legacy
+
 package redis
 
 import (
@@ -91,7 +94,8 @@ func (c *MetricsCollector) CollectSpecific(ctx context.Context, metricName strin
 // parseInfo parses INFO output
 func (c *MetricsCollector) parseInfo(info string) map[string]string {
 	result := make(map[string]string)
-	lines := strings.Split(info, "\n")
+	lines := strings.Split(info, "
+")
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)

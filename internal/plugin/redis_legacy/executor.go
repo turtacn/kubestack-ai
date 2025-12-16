@@ -1,3 +1,6 @@
+//go:build redis_legacy
+// +build redis_legacy
+
 package redis
 
 import (

@@ -1,4 +1,12 @@
+//go:build redis_legacy
+// +build redis_legacy
+
 package redis
+
+// DEPRECATED: This Redis plugin implementation has been moved to redis_legacy.
+// The canonical Redis plugin is located at plugins/redis/ and uses go-redis v8.
+// This implementation uses go-redis v9 and is kept for reference only.
+// It is not imported by the main application and should not be used for new development.
 
 import (
 	"context"
@@ -8,7 +16,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/plugin"
 )
 
-// RedisPlugin implementation
+// RedisPlugin implementation (DEPRECATED - use plugins/redis instead)
 type RedisPlugin struct {
 	client    *redis.Client
 	config    *plugin.ConnectionConfig

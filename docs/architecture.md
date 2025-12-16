@@ -197,6 +197,60 @@ type MiddlewarePlugin interface {
 }
 ```
 
+#### 实现现状与契约适配层（Implementation Status & Contract Adapter Layer）
+
+**设计与实现对齐策略**
+
+在实际实现过程中，系统存在两套插件接口：
+1. **设计契约接口** (`internal/core/contracts/middleware_plugin.go`) - 上述面向诊断的设计接口
+2. **实现接口** (`internal/plugin/interface.go`) - 现有的面向操作的实现接口
+
+现有插件实现采用的是操作型接口，包含以下方法：
+- `Connect/Disconnect/Ping/IsConnected` - 连接管理
+- `Execute/SupportedCommands` - 命令执行
+- `CollectMetrics/CollectSpecificMetric` - 指标收集
+- `GetDiagnosticData/GetBuiltinRules` - 诊断支持
+
+**适配层设计**
+
+为了在不破坏现有插件实现的前提下完成设计对齐，系统引入了适配器层 (`internal/core/contracts/adapter`)：
+
+```go
+// PluginAdapter 将现有的操作型插件适配为设计契约接口
+type PluginAdapter struct {
+    underlying plugin.MiddlewarePlugin
+}
+
+// 适配器负责以下映射：
+// - Diagnose() → Connect() + GetDiagnosticData() + GetBuiltinRules()
+// - CollectMetrics() → CollectMetrics()
+// - CollectLogs() → GetDiagnosticData().SlowLogs
+// - GetConfiguration() → GetDiagnosticData().Config
+// - HealthCheck() → Ping()
+// - ExecuteFix() → Execute(Command)
+```
+
+**实现边界与设计决策**
+
+| 层次 | 职责 | 位置 | 说明 |
+|------|------|------|------|
+| **契约层** | 定义设计对齐的标准接口 | `internal/core/contracts/` | 面向诊断的API，供编排层使用 |
+| **适配层** | 桥接契约与实现 | `internal/core/contracts/adapter/` | 无侵入式适配现有插件 |
+| **实现层** | 现有插件实现 | `internal/plugin/`, `plugins/` | 操作型接口，维持现有代码稳定 |
+
+**依赖收敛策略**
+
+在Phase 01中，系统完成了Redis插件的依赖收敛：
+- **规范实现**：`plugins/redis/` (使用 `github.com/go-redis/redis/v8`)
+- **遗留实现**：`internal/plugin/redis_legacy/` (使用 `github.com/redis/go-redis/v9`，通过build tag排除)
+- **决策依据**：主应用引用的是`plugins/redis`，因此将其作为规范实现
+
+这种设计确保了：
+- ✅ 现有插件代码无需修改即可工作
+- ✅ 新的诊断流程使用统一的契约接口
+- ✅ 为后续的AI+RAG增强提供了稳定的集成点
+- ✅ 消除了依赖冲突和构建不确定性
+
 ### 知识库与RAG系统详细设计
 
 #### 知识库架构设计
