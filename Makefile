@@ -26,8 +26,13 @@ run:
 
 # Run all unit tests with race detection and code coverage.
 test:
-	@echo "INFO: Running tests..."
+	@echo "INFO: Running unit tests..."
 	@go test -v -race -cover ./...
+
+# Run E2E tests
+e2e-test:
+	@echo "INFO: Running E2E tests..."
+	@go test -v -race -cover ./test/e2e/scenarios/...
 
 # Run the linter to check for code style and quality issues.
 # Assumes golangci-lint is installed: https://golangci-lint.run/usage/install/

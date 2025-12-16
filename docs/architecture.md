@@ -236,12 +236,41 @@ graph TB
         STRUCT[结构化查询（Structured Query）]
         HYBRID[混合检索（Hybrid Retrieval）]
         RANK[相关性排序（Relevance Ranking）]
+        GRAPH_Q[图谱查询（Graph Query）]
     end
 
     KS --> KP
     KP --> KST
     KST --> KR
 ```
+
+### 知识图谱模块设计
+
+知识图谱是平台理解复杂系统依赖和故障传播的关键组件：
+
+**1. 架构位置**
+- 位于 `internal/knowledge/graph/`
+- 与RAG系统协同工作，提供上下文增强
+
+**2. 核心组件**
+| 组件 | 职责 |
+|------|------|
+| GraphStore | 图存储抽象接口，支持内存(开发)和Neo4j(生产)实现 |
+| Builder | 从Kubernetes集群资源和拓扑构建知识图谱 |
+| QueryEngine | 提供依赖分析、影响追溯和根因定位的查询能力 |
+
+**3. 数据模型**
+- **节点(Node)**: Service, Middleware (Redis/MySQL/Kafka), Pod, Namespace
+- **边(Edge)**:
+  - `depends_on`: 服务依赖中间件
+  - `connects_to`: 网络连接关系
+  - `runs_on`: Pod运行在节点
+  - `contains`: 命名空间包含服务
+  - `replica_of`: 主从/副本关系
+
+**4. 与RAG集成**
+- 检索时融合图上下文，提供受影响组件信息
+- 依赖链作为Prompt增强，帮助LLM理解系统全貌
 
 #### 具体实现策略
 

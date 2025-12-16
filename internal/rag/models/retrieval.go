@@ -7,6 +7,7 @@ type RetrievalResult struct {
 	Source     string                 `json:"source"`
 	Metadata   map[string]interface{} `json:"metadata"`
 	ChunkIndex int                    `json:"chunk_index"`
+	GraphCtx   string                 `json:"graph_ctx,omitempty"` // Context from Knowledge Graph
 }
 
 type Document struct {

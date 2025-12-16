@@ -56,6 +56,7 @@ func TestRAGEngine_MultiStageRetrieval_E2E(t *testing.T) {
 	msRetriever := retriever.NewMultiStageRetriever(
 		mockVec,
 		nil, // no keyword store
+		nil, // no graph query engine
 		[]retriever.Reranker{reranker},
 		fusion,
 		nil, // default config

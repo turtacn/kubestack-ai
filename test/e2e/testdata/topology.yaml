@@ -1,0 +1,19 @@
+nodes:
+  - id: "service:default/order-service"
+    type: service
+    name: order-service
+    namespace: default
+
+  - id: "middleware:default/redis-cache"
+    type: middleware
+    name: redis-cache
+    namespace: default
+    properties:
+      middleware_type: redis
+      version: "7.0"
+
+edges:
+  - id: "e1"
+    from_id: "service:default/order-service"
+    to_id: "middleware:default/redis-cache"
+    type: depends_on

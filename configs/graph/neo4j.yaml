@@ -1,0 +1,8 @@
+# Neo4j connection configuration
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "password"
+  database: "neo4j"
+  pool_size: 50
+  timeout: 10s

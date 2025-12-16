@@ -229,6 +229,7 @@ $ ksa diagnose clickhouse --cluster analytics
 * [**Plugin Development Guide**](docs/plugin_development.md) - Build your own middleware plugins
 * [**Supported Middlewares**](docs/supported_middlewares.md) - List of supported middlewares and their capabilities
 * [**Configuration Reference**](docs/configuration.md) - Complete config options. See `configs/knowledge/knowledge.yaml` for RAG pipeline configuration.
+* [**E2E Testing Guide**](docs/round4/phase8/e2e-testing-guide.md) - How to run and write E2E tests
 * [**Troubleshooting Guide**](docs/troubleshooting.md) - Common issues and solutions
 * [**API Reference**](docs/api.md) - REST API and SDK documentation
 
@@ -271,6 +272,7 @@ git clone https://github.com/turtacn/kubestack-ai.git
 cd kubestack-ai
 make dev-setup
 make test
+make e2e-test
 make build
 ```
 

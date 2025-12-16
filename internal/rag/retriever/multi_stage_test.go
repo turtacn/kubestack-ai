@@ -54,7 +54,7 @@ func TestMultiStageRetriever_Retrieve(t *testing.T) {
 		EnableKeyword: true,
 	}
 
-	mr := NewMultiStageRetriever(mockVec, mockKw, []Reranker{reranker}, fusion, config)
+	mr := NewMultiStageRetriever(mockVec, mockKw, nil, []Reranker{reranker}, fusion, config)
 
 	results, err := mr.Retrieve(ctx, query)
 	assert.NoError(t, err)
