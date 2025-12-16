@@ -767,17 +767,90 @@ stateDiagram-v2
   - 多分析器协同测试
 - **测试状态:** 全部通过 ✅
 
+#### 已实现组件 (Implemented Components) - Phase 03
+
+**6. AI 分析器骨架 (AI Analyzer Skeleton)** ✅
+
+- **文件位置:** `internal/core/analysis/ai_analyzer.go`
+- **功能:** AI/LLM 分析的完整契约层与测试基础设施
+- **核心组件:**
+  - `AIAnalyzer`: 实现 Analyzer 接口的 AI 分析器
+  - `LLMClient`: LLM 客户端接口抽象（`internal/core/llm/client.go`）
+  - `MockLLMClient`: 可重复测试的 Mock 实现
+  - Prompt 模板（`internal/core/analysis/prompt_templates.go`）
+  - JSON Schema（`internal/core/analysis/schema.go`）
+- **设计特性:**
+  - 结构先于能力：定义稳定的 AI 交互契约
+  - Mock-first：无需真实 LLM 即可测试完整流程
+  - Jules-friendly：单文件/单函数实现范围
+  - 可替换性：支持 Mock → Rule → LLM → RAG 平滑演进
+- **当前状态:** 完整实现，使用 MockLLMClient
+- **下一步:** 接入真实 LLM（OpenAI/Gemini）
+
+**7. LLM 客户端契约层 (LLM Client Contract Layer)** ✅
+
+- **文件位置:** `internal/core/llm/`
+- **功能:** 统一 LLM 交互接口
+- **实现:**
+  - `client.go`: 接口定义（re-export 现有 `internal/llm/interfaces.LLMClient`）
+  - `mock_client.go`: Mock 实现，用于测试
+- **特性:**
+  - 请求/响应捕获（用于测试验证）
+  - 调用计数跟踪
+  - 错误模拟能力
+- **当前状态:** Mock 实现完成 ✅
+
+**8. AI 输入/输出 Schema (AI I/O Schema)** ✅
+
+- **文件位置:** `internal/core/analysis/schema.go`
+- **功能:** 定义 AI 分析的数据契约
+- **核心结构:**
+  - `AIInput`: LLM 输入结构（PluginData + Context）
+  - `AIOutput`: LLM 输出结构（Summary + Issues）
+  - `AIIssue`: AI 识别的问题结构
+  - 转换工具：`AIIssue` ↔ `models.Issue`
+- **设计原则:**
+  - JSON-first：所有字段 JSON 可序列化
+  - 显式 Schema：预防 LLM 输出不稳定
+  - 类型安全：使用 enum.SeverityLevel 而非字符串
+- **当前状态:** 完整定义 ✅
+
+**9. Prompt 模板系统 (Prompt Template System)** ✅
+
+- **文件位置:** `internal/core/analysis/prompt_templates.go`
+- **功能:** 稳定、可版本化的 Prompt 定义
+- **模板类型:**
+  - System Prompt：定义 AI 角色和输出约束（JSON-only）
+  - User Prompt：注入诊断数据和上下文
+- **特性:**
+  - 嵌入式 Schema 示例
+  - 中间件类型自适应
+  - 上下文注入（namespace, instance, middleware）
+- **当前状态:** 基础模板完成 ✅
+
+**10. 测试基础设施 (Test Infrastructure)** ✅
+
+- **单元测试:** `internal/core/analysis/ai_analyzer_test.go`
+  - 9 个测试用例，覆盖核心场景
+  - Mock LLM 响应验证
+  - JSON 解析与清理测试
+  - Severity 映射测试
+- **集成测试:** `test/integration/ai_analyzer_integration_test.go`
+  - 完整诊断流程测试（含 AI 分析器）
+  - 多分析器协同测试（Rule + AI）
+  - 报告结构验证
+- **测试状态:** 全部通过 ✅
+
 #### 占位/待实现组件 (Placeholder / To-Be-Implemented)
 
-**1. AI 增强分析器 (AI-Enhanced Analyzer)** 🔄
+**1. 真实 LLM 客户端 (Real LLM Client)** 📋
 
-- **文件位置:** `internal/core/diagnosis/ai_analyzer.go` (占位)
 - **目标功能:**
-  - LLM 驱动的智能诊断
-  - 上下文感知推理
-  - 自然语言解释
-- **计划阶段:** Phase 03
-- **当前状态:** 占位实现，未接入真实 LLM
+  - OpenAI/Gemini API 集成
+  - 重试与错误处理
+  - Token 管理
+- **计划阶段:** Phase 04
+- **当前状态:** Mock 占位
 
 **2. RAG 知识库分析器 (RAG-Based Analyzer)** 📋
 
