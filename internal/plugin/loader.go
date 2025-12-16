@@ -119,10 +119,18 @@ func (l *Loader) LoadAll() error {
 			// ...
 		}
 
-		// Connect
-		if err := plugin.Connect(nil, connConfig); err != nil { // Context?
-			log.Printf("连接插件 %s 失败: %v", pluginConfig.Name, err)
-			continue
+		// Connect/Init
+		if mp, ok := plugin.(MiddlewarePlugin); ok {
+			if err := mp.Connect(nil, connConfig); err != nil {
+				log.Printf("连接插件 %s 失败: %v", pluginConfig.Name, err)
+				continue
+			}
+		} else {
+			// Call Init for DiagnosticPlugin
+			if err := plugin.Init(pluginConfig.Config); err != nil {
+				log.Printf("初始化插件 %s 失败: %v", pluginConfig.Name, err)
+				continue
+			}
 		}
 
 		// Register
@@ -162,7 +170,7 @@ func getInt(m map[string]interface{}, k string) int {
 	return 0
 }
 
-func (l *Loader) instantiatePlugin(config PluginConfigEntry) (MiddlewarePlugin, error) {
+func (l *Loader) instantiatePlugin(config PluginConfigEntry) (DiagnosticPlugin, error) {
 	factory, ok := pluginFactories[config.Name]
 	if ok {
 		return factory(), nil
@@ -170,7 +178,7 @@ func (l *Loader) instantiatePlugin(config PluginConfigEntry) (MiddlewarePlugin, 
 	return nil, fmt.Errorf("unknown plugin: %s", config.Name)
 }
 
-type PluginConstructor func() MiddlewarePlugin
+type PluginConstructor func() DiagnosticPlugin
 
 var pluginFactories = make(map[string]PluginConstructor)
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"time"
+
+	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
 )
 
 // MiddlewareType defines the type of middleware
@@ -18,7 +20,20 @@ const (
 	MiddlewareMongoDB       MiddlewareType = "mongodb"
 )
 
-// MiddlewarePlugin defines the interface for all middleware plugins
+// Plugin is an alias for DiagnosticPlugin
+type Plugin = DiagnosticPlugin
+
+// DiagnosticPlugin defines the interface implemented by plugins like ElasticsearchPlugin
+type DiagnosticPlugin interface {
+	Name() string
+	SupportedTypes() []string
+	Version() string
+	Init(config map[string]interface{}) error
+	Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)
+	Shutdown() error
+}
+
+// MiddlewarePlugin defines the interface for all middleware plugins (Legacy/Full)
 type MiddlewarePlugin interface {
 	// === Basic Information ===
 
@@ -214,3 +229,9 @@ const (
 	SeverityError    Severity = 3
 	SeverityCritical Severity = 4
 )
+
+// Target struct for legacy compatibility if needed
+type Target struct {
+	Type    string
+	Address string
+}

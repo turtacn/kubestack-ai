@@ -103,62 +103,57 @@ type LegacyPluginAdapter struct {
 
 func (a *LegacyPluginAdapter) Name() string { return a.p.Name() }
 func (a *LegacyPluginAdapter) Version() string { return a.p.Version() }
-func (a *LegacyPluginAdapter) Description() string { return a.p.Description() }
-func (a *LegacyPluginAdapter) SupportedVersions() []string { return a.p.SupportedMiddlewareVersions() }
+func (a *LegacyPluginAdapter) Description() string { return "" }
+func (a *LegacyPluginAdapter) SupportedVersions() []string { return []string{} }
 func (a *LegacyPluginAdapter) SupportedTypes() []enum.MiddlewareType {
-	// Map string name to enum if possible, or return empty
-	// Legacy plugins usually handle one type.
-	// We can try to parse a.Name()
-	t, _ := enum.ParseMiddlewareType(a.Name())
+	// Map string name to enum if possible
+	t, _ := enum.ParseMiddlewareType(a.p.Name())
+	if t == -1 {
+		// Try from SupportedTypes string array if available
+		for _, st := range a.p.SupportedTypes() {
+			if t, err := enum.ParseMiddlewareType(st); err == nil {
+				return []enum.MiddlewareType{t}
+			}
+		}
+		return nil
+	}
 	return []enum.MiddlewareType{t}
 }
 
 func (a *LegacyPluginAdapter) Init(config *config.PluginConfig) error {
-	// Legacy init used string path, assume new config has path
-	// Or we might need to map config.
-	return a.p.Initialize(nil) // Legacy init might expect *config.Config or path
+	// Map config.PluginConfig to map[string]interface{}
+	// This is a rough mapping.
+	m := make(map[string]interface{})
+	if config != nil {
+		m["directory"] = config.Directory
+	}
+	return a.p.Init(m)
 }
 
 func (a *LegacyPluginAdapter) Shutdown() error {
 	return a.p.Shutdown()
 }
 
-// Diagnose must match the new interface signature:
-// Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error)
+// Diagnose forwards to the plugin's Diagnose method
 func (a *LegacyPluginAdapter) Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
-	// Not implemented in legacy
-	return nil, nil
+	return a.p.Diagnose(ctx, req)
 }
 
 func (a *LegacyPluginAdapter) CollectMetrics(ctx context.Context, target string) (*models.MetricsData, error) {
-	t := &intplugin.Target{
-		Type:    a.Name(),
-		Address: target,
-	}
-
-	data, err := a.p.Collector().Collect(ctx, t)
-	if err != nil {
-		return nil, fmt.Errorf("legacy collector failed: %w", err)
-	}
-
-	metrics, err := a.p.Parser().Parse(ctx, data)
-	if err != nil {
-		return nil, fmt.Errorf("legacy parser failed: %w", err)
-	}
-
-	out := &models.MetricsData{
-		Data: make(map[string]interface{}),
-	}
-
-	if metrics != nil && metrics.Metrics != nil {
-		for k, v := range metrics.Metrics {
-			if v != nil {
-				out.Data[k] = v.Value
-			}
+	// If the plugin supports MiddlewarePlugin interface, use it
+	if mp, ok := a.p.(intplugin.MiddlewarePlugin); ok {
+		snap, err := mp.CollectMetrics(ctx)
+		if err != nil {
+			return nil, err
 		}
+		out := &models.MetricsData{Data: make(map[string]interface{})}
+		for k, v := range snap.Metrics {
+			out.Data[k] = v.Value
+		}
+		return out, nil
 	}
-
-	return out, nil
+	// Fallback for DiagnosticPlugin (Small) which doesn't support metrics collection directly
+	return &models.MetricsData{Data: make(map[string]interface{})}, nil
 }
 
 func (a *LegacyPluginAdapter) CollectLogs(ctx context.Context, target string, opts *models.LogOptions) (*models.LogData, error) {
