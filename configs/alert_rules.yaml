@@ -1,0 +1,67 @@
+alert_rules:
+  # Redis Alert Rules
+  - name: "RedisMemoryHigh"
+    middleware: redis
+    diagnosis_scope:
+      - memory
+      - keyspace
+      - eviction
+    auto_fix: true
+    fix_strategy: "memory_purge"
+
+  - name: "RedisConnectionHigh"
+    middleware: redis
+    diagnosis_scope:
+      - connection
+      - client
+    auto_fix: true
+    fix_strategy: "kill_idle_connections"
+
+  # MySQL Alert Rules
+  - name: "MySQLConnectionExhaustion"
+    middleware: mysql
+    diagnosis_scope:
+      - connection
+      - processlist
+    auto_fix: true
+    fix_strategy: "kill_sleep_connections"
+
+  - name: "MySQLSlowQueryHigh"
+    middleware: mysql
+    diagnosis_scope:
+      - slow_query
+      - lock
+    auto_fix: false
+
+  # Kafka Alert Rules
+  - name: "KafkaConsumerLag"
+    middleware: kafka
+    diagnosis_scope:
+      - consumer
+      - partition
+    auto_fix: false
+
+notification:
+  channels:
+    - type: dingtalk
+      enabled: true
+      webhook_url: "${DINGTALK_WEBHOOK_URL}"
+      secret: "${DINGTALK_SECRET}"
+      severity_filter: ["critical", "warning"]
+
+    - type: slack
+      enabled: false
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      severity_filter: ["critical"]
+
+    - type: webhook
+      enabled: true
+      url: "${CUSTOM_WEBHOOK_URL}"
+      severity_filter: ["critical", "warning", "info"]
+
+dispatcher:
+  dedup_window: 5m
+  correlation_window: 2m
+  max_concurrent_diagnoses: 10
+  priority_queue_size: 100

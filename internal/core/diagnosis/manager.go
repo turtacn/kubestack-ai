@@ -23,6 +23,16 @@ type Manager struct {
 	logger        logger.Logger
 }
 
+// DiagnoseFromAlert triggers a diagnosis based on an alert.
+// It maps the alert to a diagnosis request and executes it.
+// Note: This method does not yet use specific alert context to limit the scope of diagnosis,
+// but runs a full diagnosis on the target instance. Scope limiting can be added later.
+func (m *Manager) DiagnoseFromAlert(ctx context.Context, req *models.DiagnosisRequest, progress chan<- interfaces.DiagnosisProgress) (*models.DiagnosisResult, error) {
+	// For now, this is a wrapper around RunDiagnosis.
+	// In the future, we can use alert info in `req` (if we add it) to filter collectors/analyzers.
+	return m.RunDiagnosis(ctx, req, progress)
+}
+
 // NewManager creates a new diagnosis manager instance.
 func NewManager(pm interfaces.PluginManager, analyzers []interfaces.DiagnosisAnalyzer, em interfaces.ExecutionManager, reportDir string, kb *knowledge.KnowledgeBase) *Manager {
 	return &Manager{
