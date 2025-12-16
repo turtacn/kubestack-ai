@@ -690,6 +690,180 @@ stateDiagram-v2
    * 性能瓶颈定位
    * 依赖关系分析
 
+## 诊断管道实现说明 (Diagnosis Pipeline Implementation Notes)
+
+### 实现状态 (Implementation Status)
+
+本节描述诊断主链路的当前实现状态，标注已实现与占位组件。
+
+#### 已实现组件 (Implemented Components) - Phase 02
+
+**1. Analyzer 接口抽象 (Analyzer Interface Abstraction)** ✅
+
+- **文件位置:** `internal/core/analysis/analyzer.go`
+- **功能:** 定义统一的分析器接口，实现分析层与数据收集层的解耦
+- **接口定义:**
+  ```go
+  type Analyzer interface {
+      Name() string
+      Analyze(ctx context.Context, data *models.CollectedData) (*AnalysisResult, error)
+  }
+  ```
+- **设计优势:**
+  - 支持多种分析实现（规则、AI、RAG）并存
+  - 易于测试和模拟
+  - 可独立演进各分析策略
+
+**2. 诊断编排器 (Diagnosis Orchestrator)** ✅
+
+- **文件位置:** `internal/core/diagnosis/orchestrator.go`
+- **功能:** 协调完整的诊断管道，明确三阶段流程
+- **流程阶段:**
+  1. **上下文收集 (Context Collection):** 从插件收集指标、日志、配置
+  2. **数据分析 (Data Analysis):** 通过分析器处理收集的数据
+  3. **报告生成 (Report Generation):** 构建结构化诊断报告
+- **特性:**
+  - 实时进度报告（通过 channel）
+  - 优雅的错误处理（收集错误终止，分析器错误继续）
+  - 支持多分析器并行/串行执行
+
+**3. 统一诊断报告结构 (Unified Diagnosis Report)** ✅
+
+- **文件位置:** `internal/core/report/diagnosis_report.go`
+- **功能:** 为 CLI、API、Web 提供统一的结构化输出
+- **核心结构:**
+  - `DiagnosisReport`: 顶层报告（ID、时间戳、目标、状态、问题列表）
+  - `ReportIssue`: 问题详情（来源、严重性、描述、证据、建议）
+  - `Suggestion`: 可执行建议（优先级、修复提示）
+  - `FixHint`: 自动修复指导（命令、参数、风险级别）
+- **特性:**
+  - JSON 序列化支持
+  - 自动状态计算（基于问题严重性）
+  - 与遗留模型的转换工具
+
+**4. 规则分析器 v1 (Rule-Based Analyzer v1)** ✅
+
+- **文件位置:** `internal/core/diagnosis/rule_analyzer.go`
+- **功能:** 基于阈值的基础规则检查
+- **当前规则:**
+  - CPU 使用率 > 80% → 高严重性
+  - 内存使用率 > 85% → 高严重性
+  - 错误日志 > 10 条 → 中等严重性
+- **演进路径:**
+  - v1: 阈值规则（当前）
+  - v2: 高级模式匹配与关联
+  - v3: 基于ML的阈值自适应
+  - v4: 知识库集成
+
+**5. 测试覆盖 (Test Coverage)** ✅
+
+- **单元测试:** `internal/core/diagnosis/orchestrator_test.go`
+  - 调用顺序验证
+  - 错误传播测试
+  - 报告生成验证
+- **集成测试:** `test/integration/diagnosis_orchestrator_flow_test.go`
+  - 端到端诊断流程
+  - JSON 序列化测试
+  - 多分析器协同测试
+- **测试状态:** 全部通过 ✅
+
+#### 占位/待实现组件 (Placeholder / To-Be-Implemented)
+
+**1. AI 增强分析器 (AI-Enhanced Analyzer)** 🔄
+
+- **文件位置:** `internal/core/diagnosis/ai_analyzer.go` (占位)
+- **目标功能:**
+  - LLM 驱动的智能诊断
+  - 上下文感知推理
+  - 自然语言解释
+- **计划阶段:** Phase 03
+- **当前状态:** 占位实现，未接入真实 LLM
+
+**2. RAG 知识库分析器 (RAG-Based Analyzer)** 📋
+
+- **目标功能:**
+  - 历史案例检索
+  - 知识库增强分析
+  - 根因推理
+- **计划阶段:** Phase 04
+- **当前状态:** 设计中
+
+**3. 自动修复执行 (AutoFix Execution)** 📋
+
+- **目标功能:**
+  - 修复建议到执行的管道
+  - 风险评估
+  - 回滚能力
+- **计划阶段:** Phase 05
+- **当前状态:** 设计中
+
+### 架构原则 (Architecture Principles)
+
+1. **关注点分离:** 收集、分析、报告各司其职
+2. **接口优先:** 通过接口而非具体实现编程
+3. **可演进性:** 支持并行演进多种分析策略
+4. **向后兼容:** 保留遗留接口，平滑迁移
+
+### 数据流图 (Data Flow)
+
+```
+DiagnosisRequest
+    ↓
+[Orchestrator]
+    ↓
+Stage 1: Collection
+    Plugin Manager → CollectedData (Metrics + Logs + Config)
+    ↓
+Stage 2: Analysis
+    Analyzer 1 → AnalysisResult 1
+    Analyzer 2 → AnalysisResult 2
+    ...
+    Analyzer N → AnalysisResult N
+    ↓
+Stage 3: Report Generation
+    Aggregate Results → DiagnosisReport
+    ↓
+[Output]
+    ├─ CLI: Formatted Text
+    ├─ API: JSON Response
+    └─ Web: Structured UI
+```
+
+### 扩展指南 (Extension Guide)
+
+**添加新分析器 (Adding New Analyzer):**
+
+1. 实现 `analysis.Analyzer` 接口
+2. 在 `Analyze()` 方法中实现分析逻辑
+3. 返回 `AnalysisResult` 包含发现的问题
+4. 注册到编排器的分析器列表
+5. 无需修改编排器或报告代码
+
+**示例代码:**
+```go
+type CustomAnalyzer struct {
+    // 自定义字段
+}
+
+func (a *CustomAnalyzer) Name() string {
+    return "CustomAnalyzer"
+}
+
+func (a *CustomAnalyzer) Analyze(ctx context.Context, data *models.CollectedData) (*analysis.AnalysisResult, error) {
+    result := analysis.NewAnalysisResult(a.Name())
+    // 实现自定义分析逻辑
+    return result, nil
+}
+```
+
+### 实现参考 (Implementation References)
+
+- **Phase 02 实现总结:** `docs/round5/phase02/implementation-summary.md`
+- **Analyzer 接口:** `internal/core/analysis/analyzer.go`
+- **Orchestrator 实现:** `internal/core/diagnosis/orchestrator.go`
+- **Report 结构:** `internal/core/report/diagnosis_report.go`
+- **测试用例:** `internal/core/diagnosis/orchestrator_test.go`
+
 ## 参考资料
 
 \[1] k8sgpt-ai项目 - [https://github.com/k8sgpt-ai/k8sgpt](https://github.com/k8sgpt-ai/k8sgpt)
