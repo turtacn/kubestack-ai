@@ -1,0 +1,11 @@
+diagnosis:
+  rule_paths:
+    - "./data/diagnosis"
+  enable_builtin_rules: true
+  report:
+    default_format: markdown
+  health_score:
+    critical_weight: 30
+    error_weight: 20
+    warning_weight: 10
+    info_weight: 2

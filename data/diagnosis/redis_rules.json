@@ -1,0 +1,17 @@
+{
+  "name": "Redis Rules",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "redis-memory-high",
+      "name": "Memory Usage High",
+      "severity": "warning",
+      "condition": {
+        "expression": "metrics.used_memory_rss / metrics.maxmemory > 0.8"
+      },
+      "message": "Redis memory usage reached {{.usage}}%",
+      "suggestion": "Check for big keys",
+      "enabled": true
+    }
+  ]
+}

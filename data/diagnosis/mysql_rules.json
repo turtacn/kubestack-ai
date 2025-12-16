@@ -1,0 +1,17 @@
+{
+  "name": "MySQL Rules",
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "mysql-connections-high",
+      "name": "Connection Usage High",
+      "severity": "warning",
+      "condition": {
+        "expression": "metrics.Threads_connected / config.max_connections > 0.8"
+      },
+      "message": "Connection usage > 80%",
+      "suggestion": "Check connection pool",
+      "enabled": true
+    }
+  ]
+}

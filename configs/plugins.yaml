@@ -1,0 +1,18 @@
+plugins:
+  auto_discovery: true
+  plugin_paths:
+    - "./plugins"
+  defaults:
+    timeout: 10s
+    pool_size: 10
+  middlewares:
+    redis:
+      enabled: true
+      default_port: 6379
+      metrics_collect_interval: 15s
+    mysql:
+      enabled: true
+      default_port: 3306
+    kafka:
+      enabled: true
+      default_port: 9092
