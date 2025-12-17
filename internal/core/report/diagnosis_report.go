@@ -26,6 +26,9 @@ import (
 // DiagnosisReport is the unified, structured output for all diagnosis operations.
 // It provides a stable contract for CLI, API, and Web consumers.
 type DiagnosisReport struct {
+	// Version indicates the report schema version
+	Version string `json:"version" yaml:"version"`
+
 	// ID uniquely identifies this diagnosis session
 	ID string `json:"id" yaml:"id"`
 
@@ -141,6 +144,7 @@ type FixHint struct {
 // NewDiagnosisReport creates a new report with default values
 func NewDiagnosisReport(id string, target DiagnosisTarget) *DiagnosisReport {
 	return &DiagnosisReport{
+		Version:   ReportVersion,
 		ID:        id,
 		Timestamp: time.Now(),
 		Target:    target,
@@ -244,4 +248,21 @@ func FromModelsIssues(issues []*models.Issue) []ReportIssue {
 		reportIssues = append(reportIssues, FromModelsIssue(issue))
 	}
 	return reportIssues
+}
+
+// FromDiagnosisResult converts a models.DiagnosisResult to a DiagnosisReport
+func FromDiagnosisResult(result *models.DiagnosisResult, req *models.DiagnosisRequest) *DiagnosisReport {
+	target := DiagnosisTarget{
+		Middleware: req.TargetMiddleware,
+		Instance:   req.Instance,
+		Namespace:  req.Namespace,
+	}
+
+	report := NewDiagnosisReport(result.ID, target)
+	report.Timestamp = result.Timestamp
+	report.Status = result.Status
+	report.Summary = result.Summary
+	report.AddIssues(FromModelsIssues(result.Issues))
+
+	return report
 }

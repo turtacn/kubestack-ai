@@ -24,6 +24,7 @@ import (
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/interfaces"
 	"github.com/kubestack-ai/kubestack-ai/internal/core/models"
+	"github.com/kubestack-ai/kubestack-ai/internal/core/report"
 )
 
 type diagnoseOptions struct {
@@ -82,59 +83,80 @@ func runDiagnose(opts *diagnoseOptions) error {
 		TargetMiddleware: mwType,
 		Instance:         opts.instance,
 		Namespace:        opts.namespace,
-		// Metadata can be extended
 	}
 
 	// Handle async
 	if opts.async {
-		// P2: Integrate with task queue
 		fmt.Printf("Async diagnosis for %s submitted. Task ID: %s\n", opts.instance, "task-123")
 		return nil
 	}
 
 	// Sync execution
-	fmt.Printf("Starting diagnosis for %s (%s)...\n", opts.instance, opts.target)
+	outputFormat := viper.GetString("output.format")
+	if outputFormat != "json" {
+		fmt.Printf("Starting diagnosis for %s (%s)...\n", opts.instance, opts.target)
+	}
 
 	progressChan := make(chan interfaces.DiagnosisProgress)
 
-	// Start a goroutine to print progress
-	go func() {
-		for p := range progressChan {
-			fmt.Printf("[%s] %s: %s\n", p.Step, p.Status, p.Message)
-		}
-	}()
+	// Start a goroutine to print progress (only for non-JSON output)
+	if outputFormat != "json" {
+		go func() {
+			for p := range progressChan {
+				fmt.Printf("[%s] %s: %s\n", p.Step, p.Status, p.Message)
+			}
+		}()
+	} else {
+		// Consume progress silently for JSON output
+		go func() {
+			for range progressChan {
+			}
+		}()
+	}
 
 	// Use the global diagManager (initialized in root.go)
-
 	result, err := diagManager.RunDiagnosis(ctx, req, progressChan)
 	if err != nil {
 		return fmt.Errorf("diagnosis failed: %w", err)
 	}
 
+	// Convert result to standardized report
+	diagReport := report.FromDiagnosisResult(result, req)
+
 	// Output result
-	format := viper.GetString("output.format")
-	if format == "json" {
-		report, _ := diagManager.GenerateReport(result)
-		fmt.Println(report)
+	if outputFormat == "json" {
+		jsonOutput, err := diagReport.ToJSON()
+		if err != nil {
+			return fmt.Errorf("failed to generate JSON report: %w", err)
+		}
+		fmt.Println(jsonOutput)
 	} else {
-		printTextReport(result)
+		printTextReport(diagReport)
 	}
 
 	return nil
 }
 
-func printTextReport(result *models.DiagnosisResult) {
+func printTextReport(diagReport *report.DiagnosisReport) {
 	fmt.Printf("\nDiagnosis Complete!\n")
-	fmt.Printf("ID: %s\n", result.ID)
-	fmt.Printf("Status: %s\n", result.Status)
-	fmt.Printf("Summary: %s\n", result.Summary)
+	fmt.Printf("Report Version: %s\n", diagReport.Version)
+	fmt.Printf("ID: %s\n", diagReport.ID)
+	fmt.Printf("Status: %s\n", diagReport.Status)
+	fmt.Printf("Target: %s/%s (Namespace: %s)\n", diagReport.Target.Middleware, diagReport.Target.Instance, diagReport.Target.Namespace)
+	fmt.Printf("Summary: %s\n", diagReport.Summary)
 
-	if len(result.Issues) > 0 {
+	if len(diagReport.Issues) > 0 {
 		fmt.Println("\nIdentified Issues:")
-		for i, issue := range result.Issues {
+		for i, issue := range diagReport.Issues {
 			fmt.Printf("%d. [%s] %s\n", i+1, issue.Severity, issue.Title)
 			fmt.Printf("   Description: %s\n", issue.Description)
-			// Removed Recommendation print if not present in Issue model
+			fmt.Printf("   Source: %s\n", issue.Source)
+			if len(issue.Suggestions) > 0 {
+				fmt.Printf("   Suggestions:\n")
+				for j, sug := range issue.Suggestions {
+					fmt.Printf("     %d. %s (Priority: %s)\n", j+1, sug.Description, sug.Priority)
+				}
+			}
 		}
 	} else {
 		fmt.Println("\nNo issues found.")

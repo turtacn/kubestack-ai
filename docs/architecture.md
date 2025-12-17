@@ -977,3 +977,115 @@ func (a *CustomAnalyzer) Analyze(ctx context.Context, data *models.CollectedData
 
 \[8] 云原生安全最佳实践 - [https://kubernetes.io/docs/concepts/security/](https://kubernetes.io/docs/concepts/security/)
 
+---
+
+## Round 5 Implementation Status
+
+### Phase 05: External Interface Consolidation & Release Readiness ✅
+
+**Status:** Implemented in Round 5
+
+**Branch:** `feat/round5-phase05-cli-api-docs-stability`
+
+#### Key Achievements
+
+**1. Unified Report Schema (v1)** ✅
+
+- **Location:** `internal/core/report/`
+- **Version:** v1 (frozen for external contracts)
+- **Files:**
+  - `diagnosis_report.go`: Core DiagnosisReport structure
+  - `version.go`: Version constant definition
+- **Features:**
+  - Stable, versioned schema for all external consumers
+  - Consistent JSON serialization
+  - Backward compatibility guarantees
+  - Conversion utilities from internal models
+
+**2. CLI Convergence to Orchestrator** ✅
+
+- **Location:** `internal/cli/commands/diagnose.go`
+- **Changes:**
+  - All CLI commands route through DiagnosisManager
+  - Standardized output formats (text/JSON)
+  - Consistent report structure
+- **Output Formats:**
+  - `--output text`: Human-readable format
+  - `--output json`: Structured JSON (DiagnosisReport v1)
+
+**3. API Standardization** ✅
+
+- **Location:** `internal/api/handlers/diagnosis_handler.go`
+- **Endpoints:**
+  - `POST /diagnosis/run`: Synchronous diagnosis with immediate response
+  - `POST /diagnosis/trigger`: Asynchronous diagnosis with task tracking
+  - `GET /diagnosis/result/:id`: Retrieve completed diagnosis
+- **Response:** All endpoints return standardized DiagnosisReport (v1)
+- **Documentation:** `docs/round5/phase05/api-diagnosis-v1.md`
+
+**4. Documentation Updates** ✅
+
+- **Updated Files:**
+  - `QUICKSTART.md`: Enhanced with JSON output examples
+  - `docs/round5/phase05/api-diagnosis-v1.md`: Complete API specification
+  - `docs/architecture.md`: Round 5 implementation status
+- **Coverage:**
+  - CLI usage examples
+  - API integration examples (cURL, Python, Go)
+  - Report schema specification
+  - Version evolution guidelines
+
+**5. Deliverable State** ✅
+
+- ✅ All external interfaces converged to standardized report
+- ✅ Schema version frozen as v1
+- ✅ Documentation aligned with implementation
+- ✅ CLI and API produce consistent output
+- ✅ Code compiles and runs without issues
+- ✅ Mock environment operational
+
+#### API v1 Schema Overview
+
+```go
+type DiagnosisReport struct {
+    Version   string              `json:"version"`    // "v1"
+    ID        string              `json:"id"`
+    Timestamp time.Time           `json:"timestamp"`
+    Target    DiagnosisTarget     `json:"target"`
+    Status    enum.DiagnosisStatus `json:"status"`
+    Summary   string              `json:"summary"`
+    Issues    []ReportIssue       `json:"issues"`
+    Metrics   map[string]interface{} `json:"metrics,omitempty"`
+    Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+```
+
+#### Integration Points
+
+**CLI → DiagnosisManager → DiagnosisReport**
+```
+User Command → CLI Parser → DiagnosisManager.RunDiagnosis() → 
+DiagnosisResult → report.FromDiagnosisResult() → DiagnosisReport → 
+JSON/Text Output
+```
+
+**API → DiagnosisManager → DiagnosisReport**
+```
+HTTP Request → API Handler → DiagnosisManager.RunDiagnosis() → 
+DiagnosisResult → report.FromDiagnosisResult() → DiagnosisReport → 
+JSON Response
+```
+
+#### Version Management
+
+- **Current Version:** v1
+- **Stability Guarantee:** No breaking changes to v1 schema
+- **Future Evolution:** v2 will coexist during transition
+- **Backward Compatibility:** All v1 clients supported indefinitely
+
+#### References
+
+- API Specification: `docs/round5/phase05/api-diagnosis-v1.md`
+- Quickstart Guide: `QUICKSTART.md`
+- Phase 05 Planning: Task requirements defined in phase brief
+

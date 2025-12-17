@@ -80,12 +80,41 @@ KubeStack-AI includes a web console and an alert receiver.
 To diagnose a specific middleware instance via CLI:
 
 ```bash
-# Redis
+# Redis - Text output (default)
 ./ksa diagnose redis --namespace default --instance my-redis
+
+# Redis - JSON output (structured, version v1)
+./ksa diagnose redis --namespace default --instance my-redis --output json
 
 # PostgreSQL
 export KSA_POSTGRES_DSN="postgres://user:password@localhost:5432/dbname?sslmode=disable"
-./ksa diagnose postgresql
+./ksa diagnose postgresql --instance my-postgres
+
+# MySQL with JSON output
+./ksa diagnose mysql --instance mysql-primary --output json
+```
+
+**Output Formats:**
+- `--output text` (default): Human-readable text format
+- `--output json`: Structured JSON format (DiagnosisReport v1 schema)
+
+**JSON Output Example:**
+```json
+{
+  "version": "v1",
+  "id": "redis-my-redis-1702823456",
+  "timestamp": "2024-12-17T10:30:56Z",
+  "target": {
+    "middleware": "redis",
+    "instance": "my-redis",
+    "namespace": "default"
+  },
+  "status": "healthy",
+  "summary": "Diagnosis completed for redis. Found 0 issues.",
+  "issues": [],
+  "metrics": {},
+  "metadata": {}
+}
 ```
 
 ### 2. Search Knowledge Base
