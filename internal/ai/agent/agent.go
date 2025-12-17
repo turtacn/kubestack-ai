@@ -9,6 +9,7 @@ import (
 	ncontext "github.com/kubestack-ai/kubestack-ai/internal/nlp/context"
 	"github.com/kubestack-ai/kubestack-ai/internal/nlp/entity"
 	"github.com/kubestack-ai/kubestack-ai/internal/nlp/intent"
+	"github.com/kubestack-ai/kubestack-ai/internal/planning"
 )
 
 // UserInput represents a user's input.
@@ -28,6 +29,8 @@ type AgentResponse struct {
 type Agent struct {
 	nlpProcessor  *nlp.NLPProcessor
 	memoryManager *memory.MemoryManager
+	planEngine    *planning.PlanEngine
+	llmClient     planning.LLMClient
 }
 
 // NewAgent creates a new Agent.
@@ -35,6 +38,16 @@ func NewAgent(nlpProcessor *nlp.NLPProcessor, memoryManager *memory.MemoryManage
 	return &Agent{
 		nlpProcessor:  nlpProcessor,
 		memoryManager: memoryManager,
+	}
+}
+
+// NewAgentWithPlanning creates a new Agent with planning capabilities.
+func NewAgentWithPlanning(nlpProcessor *nlp.NLPProcessor, memoryManager *memory.MemoryManager, planEngine *planning.PlanEngine, llmClient planning.LLMClient) *Agent {
+	return &Agent{
+		nlpProcessor:  nlpProcessor,
+		memoryManager: memoryManager,
+		planEngine:    planEngine,
+		llmClient:     llmClient,
 	}
 }
 
@@ -214,4 +227,85 @@ type ExplainHandler struct{}
 
 func (h *ExplainHandler) Handle(ctx context.Context, req *TaskRequest) (*TaskResult, error) {
 	return &TaskResult{Message: "Explaining... (Mock)"}, nil
+}
+
+// ExecutePlan executes a plan and records it in memory
+func (a *Agent) ExecutePlan(ctx context.Context, plan *planning.Plan) (*planning.ExecutionState, error) {
+	if a.planEngine == nil {
+		return nil, fmt.Errorf("plan engine not initialized")
+	}
+
+	// Execute the plan
+	state, err := a.planEngine.ExecutePlan(ctx, plan)
+
+	// Record execution in memory if available
+	if a.memoryManager != nil {
+		entry := memory.MemoryEntry{
+			Role:    "system",
+			Content: fmt.Sprintf("Executed plan: %s (Status: %s)", plan.Name, state.Status),
+		}
+		a.memoryManager.RecordMessage("system", entry)
+	}
+
+	return state, err
+}
+
+// CreatePlanFromGoal converts a natural language goal into a structured plan
+func (a *Agent) CreatePlanFromGoal(ctx context.Context, goal string) (*planning.Plan, error) {
+	if a.llmClient == nil {
+		return nil, fmt.Errorf("LLM client not initialized")
+	}
+
+	prompt := fmt.Sprintf(`Convert the following goal into a structured execution plan.
+Goal: %s
+
+Create a plan with specific steps. Each step should have:
+- A unique ID
+- A descriptive name
+- A type (ToolCall, LLMQuery, Condition)
+- Any dependencies on other steps
+- The action to perform
+
+Respond with a simple list of steps that can be executed in order.`, goal)
+
+	response, err := a.llmClient.Complete(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate plan: %w", err)
+	}
+
+	// For now, create a simple mock plan
+	// In a real implementation, this would parse the LLM response
+	plan := planning.NewPlan(
+		fmt.Sprintf("plan-%d", len(response)),
+		"Generated Plan",
+		[]planning.Step{
+			{
+				ID:   "step1",
+				Name: "Initial Step",
+				Type: planning.StepTypeLLMQuery,
+				Action: planning.ActionSpec{
+					Prompt: goal,
+				},
+			},
+		},
+	)
+	plan.Description = goal
+
+	return plan, nil
+}
+
+// GetPlanState retrieves the execution state of a plan
+func (a *Agent) GetPlanState(planID string) (*planning.ExecutionState, error) {
+	if a.planEngine == nil {
+		return nil, fmt.Errorf("plan engine not initialized")
+	}
+	return a.planEngine.GetState(planID)
+}
+
+// CancelPlan cancels an executing plan
+func (a *Agent) CancelPlan(planID string) error {
+	if a.planEngine == nil {
+		return fmt.Errorf("plan engine not initialized")
+	}
+	return a.planEngine.CancelPlan(planID)
 }

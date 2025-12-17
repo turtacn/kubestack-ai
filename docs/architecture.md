@@ -1236,3 +1236,154 @@ JSON Response
 - Quickstart Guide: `QUICKSTART.md`
 - Phase 05 Planning: Task requirements defined in phase brief
 
+---
+
+## Round 6: Agent Enhancement
+
+### Phase 2: Planning Engine (✅ Completed)
+
+#### Overview
+
+The Planning Engine is a core component that enables KubeStack AI agents to decompose complex tasks into structured, executable plans with DAG-based dependency management, parallel execution, and automatic rollback capabilities.
+
+#### Key Components
+
+1. **DAG (Directed Acyclic Graph) Manager**
+   - Topological sorting using Kahn's algorithm
+   - Cycle detection
+   - Parallel execution group identification
+   - Location: `internal/planning/dag.go`
+
+2. **Step Executor**
+   - Support for multiple step types: ToolCall, LLMQuery, Condition, SubPlan
+   - Retry logic with exponential backoff
+   - Timeout handling
+   - Parallel execution using goroutines and errgroup
+   - Location: `internal/planning/executor.go`
+
+3. **Plan Engine**
+   - Orchestrates plan execution
+   - State management and persistence
+   - Pause/resume/cancel capabilities
+   - Location: `internal/planning/engine.go`
+
+4. **Rollback Manager**
+   - Automatic rollback on failure
+   - Best-effort rollback (continues on error)
+   - Reverse-order execution (LIFO)
+   - Location: `internal/planning/rollback.go`
+
+5. **Reflection Loop**
+   - LLM-based post-execution evaluation
+   - Success/failure assessment
+   - Improvement suggestions
+   - Location: `internal/planning/reflection.go`
+
+6. **State Manager**
+   - In-memory and persistent state storage
+   - Integration with Memory system (Phase 1)
+   - Step-level state tracking
+   - Location: `internal/planning/state.go`
+
+#### Data Structures
+
+**Step Types:**
+- `ToolCall`: Execute a tool with specified arguments
+- `LLMQuery`: Query LLM with a prompt
+- `Condition`: Evaluate a boolean condition
+- `SubPlan`: Execute a nested plan (placeholder)
+
+**Step Status:**
+- `Pending`: Not yet started
+- `Running`: Currently executing
+- `Completed`: Successfully finished
+- `Failed`: Execution failed
+- `Skipped`: Skipped due to dependencies
+- `RolledBack`: Rolled back after failure
+
+**Plan Status:**
+- `Pending`: Plan not yet started
+- `Running`: Plan is executing
+- `Completed`: All steps completed successfully
+- `Failed`: One or more steps failed
+- `RolledBack`: Plan was rolled back
+- `Paused`: Plan execution paused
+- `Cancelled`: Plan execution cancelled
+
+#### Agent Integration
+
+The Agent has been extended with planning capabilities:
+
+```go
+// Create a plan from natural language
+plan, err := agent.CreatePlanFromGoal(ctx, "Deploy application with zero downtime")
+
+// Execute the plan
+state, err := agent.ExecutePlan(ctx, plan)
+
+// Monitor execution
+state, err := agent.GetPlanState(planID)
+
+// Cancel if needed
+err := agent.CancelPlan(planID)
+```
+
+#### Features
+
+- ✅ DAG-based task dependency resolution
+- ✅ Automatic parallel execution of independent steps
+- ✅ Configurable retry policies with backoff
+- ✅ Timeout handling per step
+- ✅ Automatic rollback on failure
+- ✅ State persistence and recovery
+- ✅ Plan cancellation support
+- ✅ LLM-based reflection and evaluation
+
+#### Testing
+
+- **Test Coverage**: 61 test cases, all passing
+- **Test Files**:
+  - `internal/planning/plan_test.go`: Plan validation and management
+  - `internal/planning/dag_test.go`: DAG algorithms
+  - `internal/planning/executor_test.go`: Step execution
+  - `internal/planning/engine_test.go`: Full plan execution
+  - `internal/planning/rollback_test.go`: Rollback mechanism
+
+#### Configuration
+
+```go
+type PlanEngineConfig struct {
+    MaxParallel       int  // Max parallel steps (default: 5)
+    EnableReflection  bool // Enable post-execution reflection (default: false)
+    EnableRollback    bool // Enable auto-rollback (default: true)
+}
+```
+
+#### Performance
+
+- **Time Complexity**: O(V + E) for DAG operations (V = steps, E = dependencies)
+- **Space Complexity**: O(V) for state storage
+- **Scalability**: Tested with plans up to 20 steps
+- **Parallel Execution**: Limited by MaxParallel config
+
+#### Integration Points
+
+1. **Memory System** (Phase 1): State persistence
+2. **Agent Core**: Plan creation and execution
+3. **Tool Registry**: Tool execution within steps
+4. **LLM Client**: Reflection and plan generation
+
+#### Documentation
+
+- Design Document: `docs/round6/phase2/design-planning-engine.md`
+- Code Location: `internal/planning/`
+- Branch: `feat/round6-phase2-planning-engine`
+
+#### Status
+
+**Implementation Status**: ✅ Complete (2025-12-17)
+- All core components implemented
+- Comprehensive unit tests passing
+- Agent integration complete
+- Documentation finalized
+
