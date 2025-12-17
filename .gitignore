@@ -44,3 +44,6 @@ Thumbs.db
 # Test report directories
 reports/
 reports_test/
+
+# Runtime data directories
+/data/memory/

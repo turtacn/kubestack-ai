@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubestack-ai/kubestack-ai/internal/memory"
 	"github.com/kubestack-ai/kubestack-ai/internal/nlp"
 	ncontext "github.com/kubestack-ai/kubestack-ai/internal/nlp/context"
 	"github.com/kubestack-ai/kubestack-ai/internal/nlp/entity"
@@ -25,18 +26,35 @@ type AgentResponse struct {
 
 // Agent is the AI agent that processes user input.
 type Agent struct {
-	nlpProcessor *nlp.NLPProcessor
+	nlpProcessor  *nlp.NLPProcessor
+	memoryManager *memory.MemoryManager
 }
 
 // NewAgent creates a new Agent.
-func NewAgent(nlpProcessor *nlp.NLPProcessor) *Agent {
+func NewAgent(nlpProcessor *nlp.NLPProcessor, memoryManager *memory.MemoryManager) *Agent {
 	return &Agent{
-		nlpProcessor: nlpProcessor,
+		nlpProcessor:  nlpProcessor,
+		memoryManager: memoryManager,
 	}
 }
 
 // ProcessUserInput processes the user's input and returns a response.
 func (a *Agent) ProcessUserInput(ctx context.Context, input *UserInput) (*AgentResponse, error) {
+	// === 0. Memory Management ===
+	if a.memoryManager != nil {
+		if err := a.memoryManager.LoadSession(input.SessionID); err != nil {
+			// If session doesn't exist yet, that's OK
+		}
+
+		userEntry := memory.MemoryEntry{
+			Role:    "user",
+			Content: input.Text,
+		}
+		if err := a.memoryManager.RecordMessage(input.SessionID, userEntry); err != nil {
+			return nil, fmt.Errorf("failed to record user message: %w", err)
+		}
+	}
+
 	// === 1. NLP Processing ===
 	nlpResult, err := a.nlpProcessor.Process(ctx, &nlp.ProcessRequest{
 		Text:      input.Text,
@@ -66,7 +84,18 @@ func (a *Agent) ProcessUserInput(ctx context.Context, input *UserInput) (*AgentR
 		return nil, err
 	}
 
-	// === 4. Response Generation ===
+	// === 4. Record Assistant Response ===
+	if a.memoryManager != nil {
+		assistantEntry := memory.MemoryEntry{
+			Role:    "assistant",
+			Content: taskResult.Message,
+		}
+		if err := a.memoryManager.RecordMessage(input.SessionID, assistantEntry); err != nil {
+			return nil, fmt.Errorf("failed to record assistant message: %w", err)
+		}
+	}
+
+	// === 5. Response Generation ===
 	return &AgentResponse{
 		Text:   taskResult.Message,
 		Result: taskResult.Data,
@@ -99,6 +128,29 @@ func (a *Agent) handleUnknownIntent(ctx context.Context, res *nlp.ProcessResult)
 	return &AgentResponse{
 		Text: "Sorry, I didn't understand that. You can ask me to diagnose issues, check metrics, or help with configuration.",
 	}, nil
+}
+
+// GetConversationHistory retrieves conversation history for a session
+func (a *Agent) GetConversationHistory(sessionID string, maxTokens int) ([]memory.MemoryEntry, error) {
+	if a.memoryManager == nil {
+		return []memory.MemoryEntry{}, nil
+	}
+	return a.memoryManager.GetContext(sessionID, maxTokens)
+}
+
+// ClearSession clears the working memory for a session
+func (a *Agent) ClearSession() {
+	if a.memoryManager != nil {
+		a.memoryManager.ClearWorking()
+	}
+}
+
+// Close closes the agent and its resources
+func (a *Agent) Close() error {
+	if a.memoryManager != nil {
+		return a.memoryManager.Close()
+	}
+	return nil
 }
 
 // TaskRequest represents a request to execute a task.
