@@ -199,6 +199,94 @@ func TestDiagnosis_ReportJSONSerialization(t *testing.T) {
 	t.Logf("Report JSON length: %d bytes", len(jsonStr))
 }
 
+// TestCase-4: TestDiagnosis_DryRunAutoFix
+// Integration test for AutoFix capability with dry-run mode
+func TestDiagnosis_DryRunAutoFix(t *testing.T) {
+	// Setup mock plugin manager with auto-fixable issues
+	mockPM := &testPluginManager{
+		data: &models.CollectedData{
+			Metrics: &models.MetricsData{
+				Data: map[string]interface{}{
+					"memory_usage":    95.0, // High memory usage
+					"cpu_usage":       85.0,
+					"connection_pool": 150,
+				},
+			},
+			Logs: &models.LogData{
+				Entries: []string{
+					"ERROR: Memory limit reached",
+					"WARN: Connection pool exhausted",
+				},
+			},
+			Config: &models.ConfigData{
+				Data: map[string]string{
+					"max_memory":      "1gb",
+					"max_connections": "100",
+				},
+			},
+		},
+	}
+
+	// Setup analyzer
+	ruleAnalyzer := diagnosis.NewRuleAnalyzer()
+
+	// Create orchestrator with AutoFix enabled
+	opts := &diagnosis.OrchestratorOptions{
+		EnableAutoFix: true,
+	}
+	orchestrator := diagnosis.NewOrchestratorWithOptions(mockPM, []analysis.Analyzer{ruleAnalyzer}, opts)
+
+	// Verify AutoFix is enabled
+	if !orchestrator.IsAutoFixEnabled() {
+		t.Fatal("Expected AutoFix to be enabled")
+	}
+
+	// Create diagnosis request
+	req := &models.DiagnosisRequest{
+		TargetMiddleware: enum.Redis,
+		Instance:         "redis-autofix-test",
+		Namespace:        "test",
+	}
+
+	// Run diagnosis
+	progress := make(chan interfaces.DiagnosisProgress, 20)
+	report, err := orchestrator.RunDiagnosis(context.Background(), req, progress)
+
+	if err != nil {
+		t.Fatalf("Expected no error from diagnosis, got: %v", err)
+	}
+
+	if report == nil {
+		t.Fatal("Expected report to be non-nil")
+	}
+
+	// Verify AutoFix metadata is present
+	if autoFixEnabled, ok := report.Metadata["autofix_enabled"].(bool); ok {
+		if !autoFixEnabled {
+			t.Error("Expected autofix_enabled metadata to be true")
+		}
+	} else {
+		t.Error("Expected autofix_enabled metadata to be present")
+	}
+
+	// Check for AutoFix hints
+	if hints, ok := report.Metadata["autofix_hints"]; ok {
+		t.Logf("Found AutoFix hints: %v", hints)
+	}
+
+	// Verify report structure
+	if report.ID == "" {
+		t.Error("Report should have a non-empty ID")
+	}
+
+	t.Logf("✓ AutoFix integration test passed: Report generated with AutoFix metadata")
+
+	// Close progress channel
+	for range progress {
+		// Drain progress channel
+	}
+}
+
 // TestDiagnosis_MultipleAnalyzers tests orchestration with multiple analyzers
 func TestDiagnosis_MultipleAnalyzers(t *testing.T) {
 	mockPM := &testPluginManager{

@@ -119,6 +119,7 @@ func (m *manager) GeneratePlan(ctx context.Context, issues []models.Issue) (*mod
 }
 
 // ExecutePlan carries out the steps defined in an execution plan.
+// This is the legacy interface maintained for backward compatibility.
 func (m *manager) ExecutePlan(ctx context.Context, plan *models.ExecutionPlan) (*models.ExecutionResult, error) {
 	m.log.Infof("Starting execution of plan ID: %s with strategy: %s", plan.ID, plan.Strategy)
 	result := &models.ExecutionResult{

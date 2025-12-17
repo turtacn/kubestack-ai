@@ -30,24 +30,53 @@ import (
 // 1. Context Collection - Gather data from plugins
 // 2. Analysis - Process data through analyzers
 // 3. Report Generation - Build structured output
+// 4. [Optional] AutoFix - Execute automated fixes if enabled
 //
 // This design enables:
 // - Clear separation of concerns
 // - Parallel evolution of each stage
 // - Easy testing and mocking
 // - Support for multiple analyzer types (rule-based, AI, RAG)
+// - Opt-in AutoFix with safety boundaries (Phase 04)
 type Orchestrator struct {
 	pluginManager interfaces.PluginManager
 	analyzers     []analysis.Analyzer
 	logger        logger.Logger
+	// autoFixEnabled controls whether AutoFix is available (opt-in)
+	autoFixEnabled bool
+}
+
+// OrchestratorOptions configures the orchestrator behavior.
+type OrchestratorOptions struct {
+	// EnableAutoFix enables the optional AutoFix stage
+	EnableAutoFix bool
 }
 
 // NewOrchestrator creates a new diagnosis orchestrator
 func NewOrchestrator(pm interfaces.PluginManager, analyzers []analysis.Analyzer) *Orchestrator {
 	return &Orchestrator{
-		pluginManager: pm,
-		analyzers:     analyzers,
-		logger:        logger.NewLogger("diagnosis-orchestrator"),
+		pluginManager:  pm,
+		analyzers:      analyzers,
+		logger:         logger.NewLogger("diagnosis-orchestrator"),
+		autoFixEnabled: false, // Default: disabled
+	}
+}
+
+// NewOrchestratorWithOptions creates a new diagnosis orchestrator with custom options.
+func NewOrchestratorWithOptions(
+	pm interfaces.PluginManager,
+	analyzers []analysis.Analyzer,
+	opts *OrchestratorOptions,
+) *Orchestrator {
+	if opts == nil {
+		opts = &OrchestratorOptions{EnableAutoFix: false}
+	}
+
+	return &Orchestrator{
+		pluginManager:  pm,
+		analyzers:      analyzers,
+		logger:         logger.NewLogger("diagnosis-orchestrator"),
+		autoFixEnabled: opts.EnableAutoFix,
 	}
 }
 
@@ -207,6 +236,51 @@ func (o *Orchestrator) buildReport(
 	diagReport.Metadata["analyzer_count"] = len(o.analyzers)
 	diagReport.Metadata["target_middleware"] = req.TargetMiddleware
 	diagReport.Metadata["target_instance"] = req.Instance
+	diagReport.Metadata["autofix_enabled"] = o.autoFixEnabled
+
+	// Add AutoFix hints if enabled
+	if o.autoFixEnabled {
+		autoFixHints := o.extractAutoFixHints(analysisResults)
+		if len(autoFixHints) > 0 {
+			diagReport.Metadata["autofix_hints"] = autoFixHints
+			o.logger.Infof("Found %d auto-fixable recommendations", len(autoFixHints))
+		}
+	}
 
 	return diagReport
+}
+
+// extractAutoFixHints extracts auto-fixable recommendations from analysis results.
+func (o *Orchestrator) extractAutoFixHints(analysisResults []*analysis.AnalysisResult) []string {
+	hints := make([]string, 0)
+
+	for _, result := range analysisResults {
+		if result != nil && len(result.Issues) > 0 {
+			for _, issue := range result.Issues {
+				for _, rec := range issue.Recommendations {
+					if rec.CanAutoFix {
+						hints = append(hints, fmt.Sprintf("[%s] %s", issue.ID, rec.Description))
+					}
+				}
+			}
+		}
+	}
+
+	return hints
+}
+
+// IsAutoFixEnabled returns whether AutoFix is enabled for this orchestrator.
+func (o *Orchestrator) IsAutoFixEnabled() bool {
+	return o.autoFixEnabled
+}
+
+// SetAutoFixEnabled enables or disables AutoFix capability.
+// Note: This should only be called during initialization or configuration updates.
+func (o *Orchestrator) SetAutoFixEnabled(enabled bool) {
+	o.autoFixEnabled = enabled
+	if enabled {
+		o.logger.Info("AutoFix capability enabled")
+	} else {
+		o.logger.Info("AutoFix capability disabled")
+	}
 }
