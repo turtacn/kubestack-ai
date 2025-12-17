@@ -67,16 +67,24 @@ KubeStack-AI provides a **unified, AI-driven interface** that:
 - **Monitoring**: Prometheus, Grafana
 - **Service Discovery**: etcd, Consul
 
-### 🧩 **Plugin Architecture**
-- **Extensible Design**: Add support for any middleware through plugins
-- **Core Plugins**: Native support for Redis, Kafka, MySQL, PostgreSQL, and Elasticsearch
-- **Community Driven**: Open plugin ecosystem
-- **Hot-swappable**: Install, update, and remove plugins without downtime
-- **Middleware Support**:
-  - **Redis**: 5.x, 6.x, 7.x (Cluster/Sentinel/Standalone)
-  - **Kafka**: 2.x, 3.x (Lag monitoring, JMX)
-  - **MySQL**: 5.7, 8.x (Replication, Slow Queries)
-  - **Elasticsearch**: 7.x, 8.x (Cluster Health, Node Stats)
+### 🧩 **Plugin Architecture** (✨ Phase 2.5 - Enhanced)
+- **Extensible Design**: Add support for any middleware through plugins with standardized interfaces
+- **Hot-Loading**: Dynamic plugin loading/unloading without service restart
+- **Lifecycle Management**: Complete Init → Start → Stop → Reload lifecycle with health checks
+- **Sandbox Isolation**: Timeout control, panic recovery, and resource limits per plugin
+- **Core Plugins** (Production-Ready):
+  - **Redis Plugin**: Comprehensive diagnostics (memory, connections, replication, persistence, performance)
+    - Modes: Standalone, Sentinel, Cluster
+    - Versions: 5.x, 6.x, 7.x
+    - Diagnostics: Memory usage, fragmentation, eviction, client analysis, replication lag, slow logs, hit rate
+  - **Kafka Plugin**: Broker health, consumer lag tracking, topic analysis
+    - Versions: 2.x, 3.x
+    - Features: Consumer group monitoring, partition analysis, SASL/TLS authentication
+  - **MySQL Plugin**: Replication monitoring, slow query analysis, connection pool diagnostics
+    - Versions: 5.7, 8.x
+    - Features: Replication status, performance_schema integration, InnoDB metrics
+- **Community Driven**: Open plugin SDK with comprehensive documentation
+- **Multi-Format Output**: JSON, YAML, and formatted table output for all plugins
 
 ### 🤖 **AI-Enhanced Operations**
 - **Smart Recommendations**: Context-aware optimization suggestions  
@@ -116,6 +124,17 @@ Visit our [releases page](https://github.com/turtacn/kubestack-ai/releases) to d
 # Initialize KubeStack-AI
 ksa init
 
+# Diagnose middleware instances (Phase 2.5 Enhanced)
+ksa diagnose redis localhost:6379                    # Redis diagnostics
+ksa diagnose kafka broker1:9092,broker2:9092        # Kafka cluster
+ksa diagnose mysql "user:pass@tcp(host:3306)/db"   # MySQL instance
+
+# With specific categories
+ksa diagnose redis localhost:6379 --categories memory,replication
+
+# JSON output for automation
+ksa diagnose redis localhost:6379 -o json | jq .
+
 # Diagnose all middleware in current namespace
 ksa diagnose --all
 
@@ -125,14 +144,11 @@ ksa ask "Why is my Redis cluster slow?"
 # Get specific middleware status
 ksa status redis --namespace production
 
-# Run diagnosis on a specific middleware
-ksa diagnose redis my-redis-instance -n default
-
 # List available plugins
 ksa plugin list
 
-# Install a new plugin
-ksa plugin install mongodb
+# Get plugin information
+ksa plugin info redis-diagnostics
 ```
 
 ### Web Interface
