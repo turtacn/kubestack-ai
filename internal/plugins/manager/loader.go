@@ -101,42 +101,53 @@ type LegacyPluginAdapter struct {
 	p intplugin.Plugin
 }
 
-func (a *LegacyPluginAdapter) Name() string { return a.p.Name() }
-func (a *LegacyPluginAdapter) Version() string { return a.p.Version() }
-func (a *LegacyPluginAdapter) Description() string { return "" }
-func (a *LegacyPluginAdapter) SupportedVersions() []string { return []string{} }
+func (a *LegacyPluginAdapter) Name() string { 
+	info := a.p.Info()
+	return info.Name 
+}
+func (a *LegacyPluginAdapter) Version() string { 
+	info := a.p.Info()
+	return info.Version 
+}
+func (a *LegacyPluginAdapter) Description() string { 
+	info := a.p.Info()
+	return info.Description 
+}
+func (a *LegacyPluginAdapter) SupportedVersions() []string { 
+	return []string{} // TODO: get from Info if available
+}
 func (a *LegacyPluginAdapter) SupportedTypes() []enum.MiddlewareType {
 	// Map string name to enum if possible
-	t, _ := enum.ParseMiddlewareType(a.p.Name())
+	info := a.p.Info()
+	t, _ := enum.ParseMiddlewareType(info.Name)
 	if t == -1 {
-		// Try from SupportedTypes string array if available
-		for _, st := range a.p.SupportedTypes() {
-			if t, err := enum.ParseMiddlewareType(st); err == nil {
-				return []enum.MiddlewareType{t}
-			}
-		}
 		return nil
 	}
 	return []enum.MiddlewareType{t}
 }
 
 func (a *LegacyPluginAdapter) Init(config *config.PluginConfig) error {
-	// Map config.PluginConfig to map[string]interface{}
-	// This is a rough mapping.
-	m := make(map[string]interface{})
-	if config != nil {
-		m["directory"] = config.Directory
+	// Convert to new PluginConfig format
+	ctx := context.Background()
+	options := make(map[string]interface{})
+	if config != nil && config.Directory != "" {
+		options["directory"] = config.Directory
 	}
-	return a.p.Init(m)
+	pluginCfg := intplugin.PluginConfig{
+		Options: options,
+	}
+	return a.p.Init(ctx, pluginCfg)
 }
 
 func (a *LegacyPluginAdapter) Shutdown() error {
-	return a.p.Shutdown()
+	ctx := context.Background()
+	return a.p.Stop(ctx)
 }
 
 // Diagnose forwards to the plugin's Diagnose method
 func (a *LegacyPluginAdapter) Diagnose(ctx context.Context, req *models.DiagnosisRequest) (*models.DiagnosisResult, error) {
-	return a.p.Diagnose(ctx, req)
+	// TODO: Convert to new Diagnose interface if needed
+	return nil, fmt.Errorf("Diagnose not yet implemented in adapter")
 }
 
 func (a *LegacyPluginAdapter) CollectMetrics(ctx context.Context, target string) (*models.MetricsData, error) {

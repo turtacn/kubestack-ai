@@ -30,7 +30,7 @@ var (
 	targetMiddleware string
 	namespace        string
 	instance         string
-	outputJSON       bool
+	outputJSONFlag       bool
 )
 
 // NewDiagnoseCommand creates the `diagnose` command.
@@ -47,7 +47,7 @@ func NewDiagnoseCommand(manager interfaces.DiagnosisManager) *cobra.Command {
 	cmd.Flags().StringVarP(&targetMiddleware, "target", "t", "", "Target middleware type (e.g., redis, mysql)")
 	cmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "Kubernetes namespace")
 	cmd.Flags().StringVarP(&instance, "instance", "i", "", "Instance name")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output result in JSON format")
+	cmd.Flags().BoolVar(&outputJSONFlag, "json", false, "Output result in JSON format")
 
 	cmd.MarkFlagRequired("target")
 	cmd.MarkFlagRequired("instance")
@@ -69,7 +69,7 @@ func runDiagnose(manager interfaces.DiagnosisManager) {
 		OutputFormat:     "text",
 	}
 
-	if outputJSON {
+	if outputJSONFlag {
 		req.OutputFormat = "json"
 	}
 
@@ -79,7 +79,7 @@ func runDiagnose(manager interfaces.DiagnosisManager) {
 	// Handle progress
 	go func() {
 		for p := range progressChan {
-			if !outputJSON {
+			if !outputJSONFlag {
 				fmt.Printf("[%s] %s: %s\n", p.Step, p.Status, p.Message)
 			}
 		}
@@ -92,7 +92,7 @@ func runDiagnose(manager interfaces.DiagnosisManager) {
 		os.Exit(1)
 	}
 
-	if outputJSON {
+	if outputJSONFlag {
 		data, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(data))
 	} else {

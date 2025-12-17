@@ -154,7 +154,7 @@ func printTextReport(diagReport *report.DiagnosisReport) {
 			if len(issue.Suggestions) > 0 {
 				fmt.Printf("   Suggestions:\n")
 				for j, sug := range issue.Suggestions {
-					fmt.Printf("     %d. %s (Priority: %s)\n", j+1, sug.Description, sug.Priority)
+					fmt.Printf("     %d. %s (Priority: %v)\n", j+1, sug.Description, sug.Priority)
 				}
 			}
 		}

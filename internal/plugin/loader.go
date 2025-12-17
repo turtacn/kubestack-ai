@@ -1,25 +1,46 @@
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Loader 插件加载器
+// Loader manages plugin loading and lifecycle
 type Loader struct {
-	configPath string
-	registry   *PluginRegistry
-	validator  *Validator
+	configPath    string
+	pluginDir     string
+	registry      *PluginRegistry
+	validator     *Validator
+	builtins      map[string]PluginFactory
+	loaded        map[string]Plugin
+	mu            sync.RWMutex
 }
 
 func NewLoader(configPath string) *Loader {
 	return &Loader{
 		configPath: configPath,
+		pluginDir:  "/etc/ksa/plugins",
 		registry:   NewPluginRegistry(),
 		validator:  NewValidator(),
+		builtins:   make(map[string]PluginFactory),
+		loaded:     make(map[string]Plugin),
+	}
+}
+
+// NewLoaderWithDir creates a loader with a specific plugin directory
+func NewLoaderWithDir(configPath, pluginDir string) *Loader {
+	return &Loader{
+		configPath: configPath,
+		pluginDir:  pluginDir,
+		registry:   NewPluginRegistry(),
+		validator:  NewValidator(),
+		builtins:   make(map[string]PluginFactory),
+		loaded:     make(map[string]Plugin),
 	}
 }
 
@@ -199,4 +220,107 @@ func GetRegisteredPlugins() []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// RegisterBuiltin registers a builtin plugin factory
+func (l *Loader) RegisterBuiltin(id string, factory PluginFactory) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.builtins[id] = factory
+}
+
+// LoadBuiltin loads a builtin plugin by ID
+func (l *Loader) LoadBuiltin(ctx context.Context, id string, config PluginConfig) (Plugin, error) {
+	l.mu.RLock()
+	factory, ok := l.builtins[id]
+	l.mu.RUnlock()
+	
+	if !ok {
+		return nil, fmt.Errorf("builtin plugin not found: %s", id)
+	}
+	
+	mwPlugin, err := factory(&config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plugin: %w", err)
+	}
+	
+	// Convert MiddlewarePlugin to Plugin (assumes MiddlewarePlugin wraps an EnhancedMiddlewarePlugin)
+	// For now, just cast - TODO: implement proper conversion
+	plugin, ok := interface{}(mwPlugin).(Plugin)
+	if !ok {
+		return nil, fmt.Errorf("plugin does not implement Plugin interface")
+	}
+	
+	l.mu.Lock()
+	l.loaded[id] = plugin
+	l.mu.Unlock()
+	
+	return plugin, nil
+}
+
+// Get retrieves a loaded plugin by ID
+func (l *Loader) Get(id string) (Plugin, bool) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	plugin, ok := l.loaded[id]
+	return plugin, ok
+}
+
+// List returns information about all loaded plugins
+func (l *Loader) List() []EnhancedPluginInfo {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	
+	infos := make([]EnhancedPluginInfo, 0, len(l.loaded))
+	for _, plugin := range l.loaded {
+		infos = append(infos, plugin.Info())
+	}
+	return infos
+}
+
+// Unload unloads a plugin by ID
+func (l *Loader) Unload(ctx context.Context, id string) error {
+	l.mu.Lock()
+	plugin, ok := l.loaded[id]
+	if !ok {
+		l.mu.Unlock()
+		return fmt.Errorf("plugin not loaded: %s", id)
+	}
+	delete(l.loaded, id)
+	l.mu.Unlock()
+	
+	return plugin.Stop(ctx)
+}
+
+// LoadFromConfig loads plugins from configuration
+func (l *Loader) LoadFromConfig(ctx context.Context, configs []PluginConfig) error {
+	// TODO: Implement this properly with enhanced config
+	// Sort by priority (higher priority first)
+	// For now, just load in order
+	for _, config := range configs {
+		// Temporarily skip enabled check
+		_ = config
+		continue
+		/*
+		if !config.Enabled {
+			continue
+		}*/
+		
+		// Try to load from builtins first
+		// We need the plugin ID from somewhere - assume it's in settings
+		if pluginID, ok := config.Options["id"].(string); ok {
+			if _, err := l.LoadBuiltin(ctx, pluginID, config); err != nil {
+				log.Printf("Failed to load plugin %s: %v", pluginID, err)
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+// DiscoverPlugins scans the plugin directory for available plugins
+func (l *Loader) DiscoverPlugins(dir string) ([]string, error) {
+	// This is a placeholder - in a full implementation,
+	// we would scan for .so files or manifest.yaml files
+	return []string{}, nil
 }

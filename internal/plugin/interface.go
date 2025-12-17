@@ -20,8 +20,38 @@ const (
 	MiddlewareMongoDB       MiddlewareType = "mongodb"
 )
 
-// Plugin is an alias for DiagnosticPlugin
-type Plugin = DiagnosticPlugin
+// Plugin defines the core interface that all plugins must implement
+type Plugin interface {
+	// Info returns plugin metadata
+	Info() EnhancedPluginInfo
+	
+	// Init initializes the plugin with configuration
+	Init(ctx context.Context, config PluginConfig) error
+	
+	// Start starts the plugin
+	Start(ctx context.Context) error
+	
+	// Stop stops the plugin gracefully
+	Stop(ctx context.Context) error
+	
+	// HealthCheck performs a health check on the plugin
+	HealthCheck(ctx context.Context) error
+}
+
+// EnhancedPluginInfo contains metadata about a plugin
+type EnhancedPluginInfo struct {
+	ID           string            `json:"id" yaml:"id"`
+	Name         string            `json:"name" yaml:"name"`
+	Version      string            `json:"version" yaml:"version"`
+	Type         PluginType        `json:"type" yaml:"type"`
+	Description  string            `json:"description" yaml:"description"`
+	Author       string            `json:"author" yaml:"author"`
+	Homepage     string            `json:"homepage" yaml:"homepage"`
+	License      string            `json:"license" yaml:"license"`
+	Requires     []string          `json:"requires" yaml:"requires"`
+	Capabilities []string          `json:"capabilities" yaml:"capabilities"`
+	ConfigSchema *JSONSchema       `json:"config_schema,omitempty" yaml:"config_schema,omitempty"`
+}
 
 // DiagnosticPlugin defines the interface implemented by plugins like ElasticsearchPlugin
 type DiagnosticPlugin interface {
@@ -95,6 +125,32 @@ type MiddlewarePlugin interface {
 
 	// GetBuiltinRules returns built-in diagnosis rules
 	GetBuiltinRules() []DiagnosisRule
+}
+
+// EnhancedMiddlewarePlugin extends the Plugin interface for middleware diagnostics
+type EnhancedMiddlewarePlugin interface {
+	Plugin
+	
+	// MiddlewareType returns the type of middleware
+	MiddlewareType() string
+	
+	// SupportedVersions returns the list of supported middleware versions
+	SupportedVersions() []string
+	
+	// Connect establishes a connection to the middleware
+	Connect(ctx context.Context, target MiddlewareTarget) error
+	
+	// Disconnect closes the connection
+	Disconnect(ctx context.Context) error
+	
+	// Diagnose performs diagnostic checks
+	Diagnose(ctx context.Context, opts DiagnoseOptions) (*DiagnosticResult, error)
+	
+	// GetMetrics retrieves current metrics
+	GetMetrics(ctx context.Context) (map[string]interface{}, error)
+	
+	// Execute performs an action on the middleware
+	Execute(ctx context.Context, action string, params map[string]interface{}) (interface{}, error)
 }
 
 // TLSConfig defines TLS configuration
@@ -241,6 +297,91 @@ const (
 	SeverityError    Severity = 3
 	SeverityCritical Severity = 4
 )
+
+// PluginType defines the type of plugin
+type PluginType string
+
+const (
+	PluginTypeMiddleware  PluginType = "middleware"
+	PluginTypeDiagnostic  PluginType = "diagnostic"
+	PluginTypeAction      PluginType = "action"
+	PluginTypeIntegration PluginType = "integration"
+)
+
+// JSONSchema represents a simplified JSON schema for config validation
+type JSONSchema struct {
+	Type       string                 `json:"type" yaml:"type"`
+	Properties map[string]JSONSchema  `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Required   []string               `json:"required,omitempty" yaml:"required,omitempty"`
+	Default    interface{}            `json:"default,omitempty" yaml:"default,omitempty"`
+}
+
+// MiddlewareTarget defines a target middleware instance to diagnose
+type MiddlewareTarget struct {
+	Type      string            `json:"type" yaml:"type"`
+	Name      string            `json:"name" yaml:"name"`
+	Endpoints []string          `json:"endpoints" yaml:"endpoints"`
+	Auth      *AuthConfig       `json:"auth,omitempty" yaml:"auth,omitempty"`
+	TLS       *TLSConfig        `json:"tls,omitempty" yaml:"tls,omitempty"`
+	Options   map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
+}
+
+// AuthConfig contains authentication credentials
+type AuthConfig struct {
+	Username  string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password  string `json:"password,omitempty" yaml:"password,omitempty"`
+	Token     string `json:"token,omitempty" yaml:"token,omitempty"`
+	SecretRef string `json:"secret_ref,omitempty" yaml:"secret_ref,omitempty"`
+}
+
+// DiagnosticResult contains the result of a diagnostic operation
+type DiagnosticResult struct {
+	PluginID    string              `json:"plugin_id" yaml:"plugin_id"`
+	TargetName  string              `json:"target_name" yaml:"target_name"`
+	Status      DiagnosticStatus    `json:"status" yaml:"status"`
+	Findings    []Finding           `json:"findings" yaml:"findings"`
+	Metrics     map[string]interface{} `json:"metrics" yaml:"metrics"`
+	Suggestions []string            `json:"suggestions" yaml:"suggestions"`
+	Timestamp   time.Time           `json:"timestamp" yaml:"timestamp"`
+	Duration    time.Duration       `json:"duration" yaml:"duration"`
+}
+
+// DiagnosticStatus represents the overall health status
+type DiagnosticStatus string
+
+const (
+	DiagnosticStatusHealthy  DiagnosticStatus = "healthy"
+	DiagnosticStatusWarning  DiagnosticStatus = "warning"
+	DiagnosticStatusCritical DiagnosticStatus = "critical"
+	DiagnosticStatusUnknown  DiagnosticStatus = "unknown"
+)
+
+// Finding represents a single diagnostic finding
+type Finding struct {
+	Severity    Severity               `json:"severity" yaml:"severity"`
+	Category    string                 `json:"category" yaml:"category"`
+	Title       string                 `json:"title" yaml:"title"`
+	Description string                 `json:"description" yaml:"description"`
+	Evidence    map[string]interface{} `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	Remediation string                 `json:"remediation,omitempty" yaml:"remediation,omitempty"`
+}
+
+// DiagnoseOptions contains options for diagnostic operations
+type DiagnoseOptions struct {
+	Categories []string      `json:"categories,omitempty" yaml:"categories,omitempty"`
+	Depth      string        `json:"depth" yaml:"depth"`
+	Timeout    time.Duration `json:"timeout" yaml:"timeout"`
+}
+
+// PluginFactory is a function that creates a new plugin instance (Enhanced version)
+type PluginFactoryFunc func() Plugin
+
+// PluginHooks defines callbacks for plugin lifecycle events
+type PluginHooks interface {
+	OnLoad(plugin Plugin) error
+	OnUnload(plugin Plugin) error
+	OnError(plugin Plugin, err error)
+}
 
 // Target struct for legacy compatibility if needed
 type Target struct {
