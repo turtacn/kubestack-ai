@@ -1,0 +1,101 @@
+# PostgreSQL Middleware Connection Configuration Template
+
+postgresql:
+  instances:
+    production:
+      type: postgresql
+      endpoints:
+        - "postgres-primary.postgres.svc.cluster.local:5432"
+      database: "postgres"
+      auth:
+        secret_ref: "postgres-credentials"
+        username_key: "username"
+        password_key: "password"
+      tls:
+        enabled: true
+        ca_cert_ref: "postgres-ca-cert"
+        # SSL mode: disable, require, verify-ca, verify-full
+        ssl_mode: "verify-full"
+      options:
+        connect_timeout: "10"
+        statement_timeout: "30000"
+        application_name: "ksa-diagnostics"
+      
+      # Diagnostic options
+      diagnostic_options:
+        categories:
+          - connection
+          - replication
+          - vacuum
+          - locks
+          - performance
+        depth: standard
+        timeout: "60s"
+
+    development:
+      type: postgresql
+      endpoints:
+        - "localhost:5432"
+      database: "postgres"
+      auth:
+        username: "postgres"
+        password: "postgres"
+      tls:
+        enabled: false
+      diagnostic_options:
+        categories:
+          - connection
+          - performance
+        depth: quick
+        timeout: "30s"
+
+    staging:
+      type: postgresql
+      endpoints:
+        - "postgres-staging.example.com:5432"
+      database: "myapp"
+      auth:
+        secret_ref: "postgres-staging-creds"
+        username_key: "username"
+        password_key: "password"
+      tls:
+        enabled: true
+        ssl_mode: "require"
+      options:
+        connect_timeout: "15"
+        pool_max_conns: "20"
+
+# Default thresholds
+defaults:
+  timeout: "60s"
+  
+  # Connection thresholds
+  connection_warning_percent: 70
+  connection_critical_percent: 90
+  max_idle_seconds: 300
+  
+  # Replication thresholds
+  replication_lag_warning_bytes: 10485760  # 10MB
+  replication_lag_critical_bytes: 104857600  # 100MB
+  
+  # Vacuum thresholds
+  dead_tuples_warning: 10000
+  dead_tuples_critical: 100000
+  
+  # Performance thresholds
+  slow_query_threshold_ms: 1000
+  cache_hit_ratio_warning: 90.0
+
+# Usage examples:
+#
+# Using ksa CLI with preset:
+#   ksa diagnose postgresql production
+#
+# Override with CLI flags:
+#   ksa diagnose postgresql production --categories connection,replication --depth deep
+#
+# Direct endpoint (no preset):
+#   ksa diagnose postgresql "postgres://user:pass@localhost:5432/mydb"
+#
+# With JSON output:
+#   ksa diagnose postgresql production -o json | jq .

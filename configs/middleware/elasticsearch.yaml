@@ -1,0 +1,115 @@
+# Elasticsearch Middleware Connection Configuration Template
+
+elasticsearch:
+  instances:
+    production:
+      type: elasticsearch
+      endpoints:
+        - "https://es-node-0.elasticsearch.svc.cluster.local:9200"
+        - "https://es-node-1.elasticsearch.svc.cluster.local:9200"
+        - "https://es-node-2.elasticsearch.svc.cluster.local:9200"
+      auth:
+        username: "elastic"
+        secret_ref: "elasticsearch-credentials"
+        password_key: "password"
+        # Or use API key
+        # api_key_ref: "elasticsearch-api-key"
+        # api_key_field: "key"
+      tls:
+        enabled: true
+        ca_cert_ref: "elasticsearch-ca-cert"
+        insecure_skip_verify: false
+      options:
+        # Connection options
+        max_retries: "3"
+        enable_retry_on_timeout: "true"
+        discovery_interval: "5m"
+        
+        # Timeouts
+        response_header_timeout: "30s"
+        dial_timeout: "10s"
+      
+      # Diagnostic options
+      diagnostic_options:
+        categories:
+          - cluster
+          - nodes
+          - indices
+          - shards
+        depth: standard
+        timeout: "90s"
+
+    development:
+      type: elasticsearch
+      endpoints:
+        - "http://localhost:9200"
+      auth:
+        username: "elastic"
+        password: "changeme"
+      tls:
+        enabled: false
+      diagnostic_options:
+        categories:
+          - cluster
+          - indices
+        depth: quick
+        timeout: "30s"
+
+    staging:
+      type: elasticsearch
+      endpoints:
+        - "https://es-staging.example.com:9200"
+      auth:
+        api_key: "${ELASTICSEARCH_API_KEY}"
+      tls:
+        enabled: true
+        insecure_skip_verify: false
+      options:
+        max_retries: "5"
+
+# Default thresholds
+defaults:
+  timeout: "90s"
+  
+  # Cluster health thresholds
+  # Status: green (all good), yellow (replicas missing), red (primary shards missing)
+  yellow_is_warning: true
+  red_is_critical: true
+  
+  # Node thresholds
+  heap_usage_warning_percent: 85
+  heap_usage_critical_percent: 95
+  disk_usage_warning_percent: 85
+  disk_usage_critical_percent: 95
+  cpu_usage_warning_percent: 80
+  
+  # Shard thresholds
+  unassigned_shards_warning: 1
+  relocating_shards_warning: 10
+  initializing_shards_warning: 5
+  
+  # Index thresholds
+  red_indices_critical: 1
+  yellow_indices_warning: 5
+  
+  # Performance thresholds
+  search_latency_warning_ms: 1000
+  indexing_latency_warning_ms: 500
+  jvm_gc_time_warning_ms: 1000
+
+# Usage examples:
+#
+# Using ksa CLI with preset:
+#   ksa diagnose elasticsearch production
+#
+# Override with CLI flags:
+#   ksa diagnose elasticsearch production --categories cluster,nodes --depth deep
+#
+# Direct endpoint (no preset):
+#   ksa diagnose elasticsearch https://elastic:password@localhost:9200
+#
+# With JSON output:
+#   ksa diagnose elasticsearch production -o json | jq .
+#
+# Check specific indices:
+#   ksa diagnose elasticsearch production --indices "logs-*,metrics-*"
