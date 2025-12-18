@@ -23,6 +23,7 @@ import (
 
 	"github.com/kubestack-ai/kubestack-ai/internal/common/types/enum"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // ValidateCommand validates that a cobra command has all required fields populated
@@ -45,7 +46,7 @@ func ValidateCommandTree(cmd *cobra.Command) []error {
 	}
 	
 	// Validate flags
-	cmd.Flags().VisitAll(func(flag *cobra.Flag) {
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 		if flag.Usage == "" {
 			errors = append(errors, fmt.Errorf("flag '%s' in command '%s' must have usage text", flag.Name, cmd.Use))
 		}

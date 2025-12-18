@@ -16,6 +16,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // KBEntry represents a knowledge base entry
@@ -91,11 +93,13 @@ Results can be filtered by severity, middleware type, and limited in number.`,
   ksa kb search "performance" -o json`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := cmd.Context().Value("config").(*GlobalConfig)
 			keyword := strings.Join(args, " ")
+			
+			// Get output format from flag
+			outputFormat, _ := cmd.Flags().GetString("output")
 
 			// Get knowledge base client
-			kb := getKnowledgeBase(cfg)
+			kb := getKnowledgeBase()
 
 			// Search with filters
 			results, err := kb.Search(context.Background(), keyword, severity, middleware, limit, full)
@@ -104,11 +108,11 @@ Results can be filtered by severity, middleware type, and limited in number.`,
 			}
 
 			// Output results
-			if cfg.OutputFormat == "json" {
-				return outputJSON(results)
-			} else if cfg.OutputFormat == "yaml" {
-				return outputYAML(results)
-			} else if cfg.OutputFormat == "table" {
+			if outputFormat == "json" {
+				return kbOutputJSON(results)
+			} else if outputFormat == "yaml" {
+				return kbOutputYAML(results)
+			} else if outputFormat == "table" {
 				return outputKBSearchTable(results, full)
 			}
 
@@ -142,11 +146,13 @@ The entry ID can be obtained from search results.`,
   ksa kb get kb-redis-001 -o yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := cmd.Context().Value("config").(*GlobalConfig)
 			entryID := args[0]
+			
+			// Get output format from flag
+			outputFormat, _ := cmd.Flags().GetString("output")
 
 			// Get knowledge base client
-			kb := getKnowledgeBase(cfg)
+			kb := getKnowledgeBase()
 
 			// Get entry
 			entry, err := kb.Get(context.Background(), entryID)
@@ -155,10 +161,10 @@ The entry ID can be obtained from search results.`,
 			}
 
 			// Output result
-			if cfg.OutputFormat == "json" {
-				return outputJSON(entry)
-			} else if cfg.OutputFormat == "yaml" {
-				return outputYAML(entry)
+			if outputFormat == "json" {
+				return kbOutputJSON(entry)
+			} else if outputFormat == "yaml" {
+				return kbOutputYAML(entry)
 			}
 
 			// Default text output
@@ -184,10 +190,8 @@ This will download the latest entries and update existing ones.`,
   # Force update (overwrite local changes)
   ksa kb update --force`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := cmd.Context().Value("config").(*GlobalConfig)
-
 			// Get knowledge base client
-			kb := getKnowledgeBase(cfg)
+			kb := getKnowledgeBase()
 
 			fmt.Println("Updating knowledge base...")
 
@@ -354,10 +358,32 @@ func (m *mockKBClient) Update(ctx context.Context, force bool) (map[string]int, 
 }
 
 // getKnowledgeBase returns a knowledge base client
-func getKnowledgeBase(cfg *GlobalConfig) KnowledgeBaseClient {
+func getKnowledgeBase() KnowledgeBaseClient {
 	// TODO: In production, return real KB client based on config
 	// For now, return mock client for demonstration
 	return &mockKBClient{}
+}
+
+// kbOutputJSON outputs data in JSON format
+func kbOutputJSON(data interface{}) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(data)
+}
+
+// kbOutputYAML outputs data in YAML format
+func kbOutputYAML(data interface{}) error {
+	enc := yaml.NewEncoder(os.Stdout)
+	defer enc.Close()
+	return enc.Encode(data)
+}
+
+// truncateString truncates a string to the specified length
+func truncateKBString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 // outputKBSearchTable outputs search results in table format
@@ -376,14 +402,14 @@ func outputKBSearchTable(entries []*KBEntry, full bool) error {
 		if full {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 				entry.ID,
-				truncateString(entry.Title, 40),
+				truncateKBString(entry.Title, 40),
 				entry.Severity,
 				entry.Middleware,
 				entry.Updated.Format("2006-01-02"))
 		} else {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 				entry.ID,
-				truncateString(entry.Title, 40),
+				truncateKBString(entry.Title, 40),
 				entry.Severity,
 				entry.Middleware)
 		}
