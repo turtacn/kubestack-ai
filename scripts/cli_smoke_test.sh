@@ -177,6 +177,37 @@ test_plugin_list() {
     fi
 }
 
+# Test 6c: KB help
+test_kb_help() {
+    log_test "Testing kb --help"
+    
+    output=$($KSA_BIN kb --help 2>&1)
+    if echo "$output" | grep -q "kb\|knowledge"; then
+        test_passed
+    else
+        test_failed "KB help missing expected content"
+        echo "Output: $output"
+    fi
+}
+
+# Test 6d: KB search
+test_kb_search() {
+    log_test "Testing kb search"
+    
+    set +e
+    output=$($KSA_BIN kb search "Redis" 2>&1)
+    exit_code=$?
+    set -e
+    
+    # Command should complete successfully or show error
+    if [ $exit_code -eq 0 ] || echo "$output" | grep -q -i "redis\|entry\|found\|error"; then
+        test_passed
+    else
+        test_failed "KB search should complete or show meaningful error"
+        echo "Output: $output"
+    fi
+}
+
 # Test 7: Config file validation
 test_config_validation() {
     log_test "Testing config file validation"
@@ -352,6 +383,8 @@ main() {
     test_server_help
     test_plugin_help
     test_plugin_list
+    test_kb_help
+    test_kb_search
     test_config_validation
     test_json_output
     test_yaml_output

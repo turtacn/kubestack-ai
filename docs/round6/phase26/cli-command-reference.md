@@ -15,6 +15,7 @@
    - [ksa fix](#ksa-fix)
    - [ksa server](#ksa-server)
    - [ksa plugin](#ksa-plugin)
+   - [ksa kb](#ksa-kb)
    - [ksa monitor](#ksa-monitor)
    - [ksa alert](#ksa-alert)
    - [ksa version](#ksa-version)
@@ -646,9 +647,188 @@ ksa plugin disable redis-diagnostics
 **Output**:
 ```
 Plugin 'redis-diagnostics' disabled successfully
-
-Press Ctrl+C to stop
 ```
+
+---
+
+## ksa kb
+
+Search and manage the KubeStack-AI knowledge base.
+
+**Synopsis**:
+```bash
+ksa kb [command] [flags]
+```
+
+**Available Commands**:
+- `search` - Search the knowledge base for entries
+- `get` - Get detailed information about an entry
+- `update` - Update the knowledge base from remote sources
+
+**Description**:
+The knowledge base contains diagnostic procedures, best practices, troubleshooting guides, and solutions for various middleware issues. Use these commands to search for relevant documentation, retrieve detailed guides, and keep your local knowledge base up to date.
+
+### Subcommands
+
+#### ksa kb search
+
+Search the knowledge base for entries matching a keyword.
+
+**Usage**:
+```bash
+ksa kb search <keyword> [flags]
+```
+
+**Arguments**:
+- `<keyword>` - Search keyword or phrase (required)
+
+**Flags**:
+- `--severity string` - Filter by severity level (critical, warning, info)
+- `--middleware string` - Filter by middleware type (redis, mysql, kafka, elasticsearch, postgresql)
+- `--limit int` - Maximum number of results to return (default: 10)
+- `--full` - Return full entry content instead of summary only
+- `-o, --output string` - Output format (text, json, yaml, table)
+
+**Examples**:
+```bash
+# Basic search
+ksa kb search "OOM"
+
+# Search with filters
+ksa kb search "memory" --middleware redis --severity critical
+
+# Get full content
+ksa kb search "Redis" --full --limit 5
+
+# Table output
+ksa kb search "performance" -o table
+
+# JSON output
+ksa kb search "optimization" -o json
+```
+
+**Output (text format)**:
+```
+Found 2 entries:
+
+[1] Redis OOM 紧急处理方案
+    ID: kb-redis-001
+    Severity: critical | Middleware: redis | Updated: 2025-10-15
+    Summary: Redis 内存溢出（OOM）的紧急处理步骤和根因分析方法
+
+[2] Redis 内存优化最佳实践
+    ID: kb-redis-002
+    Severity: info | Middleware: redis | Updated: 2025-10-10
+    Summary: Redis 内存使用优化的最佳实践和配置建议
+```
+
+**Output (table format)**:
+```
+ENTRY ID      TITLE                          SEVERITY  MIDDLEWARE
+--------      -----                          --------  ----------
+kb-redis-001  Redis OOM 紧急处理方案         critical  redis
+kb-redis-002  Redis 内存优化最佳实践         info      redis
+```
+
+#### ksa kb get
+
+Get detailed information about a specific knowledge base entry.
+
+**Usage**:
+```bash
+ksa kb get <entry-id> [flags]
+```
+
+**Arguments**:
+- `<entry-id>` - Knowledge base entry ID (required)
+
+**Flags**:
+- `-o, --output string` - Output format (text, json, yaml)
+
+**Examples**:
+```bash
+# Get entry details
+ksa kb get kb-redis-001
+
+# Get in JSON format
+ksa kb get kb-redis-001 -o json
+
+# Get in YAML format
+ksa kb get kb-redis-001 -o yaml
+```
+
+**Output**:
+```
+ID: kb-redis-001
+Title: Redis OOM 紧急处理方案
+Severity: critical
+Middleware: redis
+Created: 2025-09-01
+Updated: 2025-10-15
+Tags: redis, oom, memory, emergency
+
+Content:
+1. 临时缓解措施：
+   a. 登录 Redis 执行 CONFIG GET maxmemory 确认内存上限；
+   b. 执行 CONFIG SET maxmemory-policy allkeys-lru 开启键淘汰；
+   c. 使用 redis-cli --bigkeys 定位大键，分批删除；
+   
+2. 根因排查：
+   a. 检查是否有内存泄漏（对比 used_memory 趋势）；
+   b. 确认过期键是否未及时清理（查看 expired_keys 指标）；
+   c. 分析慢查询日志，识别异常命令；
+   
+3. 长期优化：
+   a. 配置合理的 maxmemory 和淘汰策略；
+   b. 启用 RDB/AOF 持久化策略；
+   c. 实施键命名规范和过期时间管理；
+   d. 考虑 Redis Cluster 或分片方案。
+
+Related Documents:
+  - kb-redis-002
+  - kb-redis-005
+```
+
+#### ksa kb update
+
+Update the local knowledge base by synchronizing with remote sources.
+
+**Usage**:
+```bash
+ksa kb update [flags]
+```
+
+**Flags**:
+- `--force` - Force update, overwriting any local changes
+
+**Examples**:
+```bash
+# Update knowledge base
+ksa kb update
+
+# Force update (overwrite local changes)
+ksa kb update --force
+```
+
+**Output**:
+```
+Updating knowledge base...
+Knowledge base updated successfully
+  New entries: 5
+  Updated entries: 12
+  Deleted entries: 2
+  Total entries: 145
+```
+
+---
+
+## ksa monitor
+
+Monitor middleware instances in real-time (TODO: Not yet implemented).
+
+**Synopsis**:
+```bash
+ksa monitor [middleware-type] [flags]
 
 ---
 
