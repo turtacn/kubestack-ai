@@ -46,16 +46,12 @@ type Config struct {
 
 	// Phase 7
 	AlertDispatcher     AlertDispatcherConfig `mapstructure:"alert_dispatcher"`
-	AlertRules          AlertRulesConfig      `mapstructure:"alert_rules"`
+	AlertRules          []AlertRule           `mapstructure:"alert_rules"`
 }
 
 type AlertDispatcherConfig struct {
 	DedupWindow       time.Duration `mapstructure:"dedup_window"`
 	CorrelationWindow time.Duration `mapstructure:"correlation_window"`
-}
-
-type AlertRulesConfig struct {
-	AlertRules []AlertRule `mapstructure:"alert_rules"`
 }
 
 type AlertRule struct {
