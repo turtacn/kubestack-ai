@@ -9,6 +9,13 @@ internal/knowledge/search/jieba_tokenizer.go:33:18: undefined: gojieba.NewJieba
 
 This error occurs because `gojieba` requires CGO (C bindings) and C++ dependencies to compile.
 
+### Additional Error Fixed
+```
+internal/knowledge/search/jieba_tokenizer_stub.go:38:2: declared and not used: result
+```
+
+This was caused by an unused variable in the stub implementation. Fixed by simplifying the return statement.
+
 ## Solution
 Added build tags to make gojieba optional:
 
@@ -80,7 +87,7 @@ If Chinese text search is critical, use CGO-enabled builds.
 ## Files Modified
 
 1. `internal/knowledge/search/jieba_tokenizer.go` - Added `//go:build cgo` tag
-2. `internal/knowledge/search/jieba_tokenizer_stub.go` - Created stub implementation
+2. `internal/knowledge/search/jieba_tokenizer_stub.go` - Created stub implementation (fixed unused variable error)
 
 ## Testing
 
