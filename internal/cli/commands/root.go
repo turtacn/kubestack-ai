@@ -164,6 +164,7 @@ func init() {
 	rootCmd.AddCommand(newAskCmd())
 	rootCmd.AddCommand(newFixCmd())
 	rootCmd.AddCommand(newServerCmd())
+	rootCmd.AddCommand(newPluginCmd())
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

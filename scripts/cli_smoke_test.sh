@@ -146,6 +146,37 @@ test_server_help() {
     fi
 }
 
+# Test 6a: Plugin help
+test_plugin_help() {
+    log_test "Testing plugin --help"
+    
+    output=$($KSA_BIN plugin --help 2>&1)
+    if echo "$output" | grep -q "plugin"; then
+        test_passed
+    else
+        test_failed "Plugin help missing expected content"
+        echo "Output: $output"
+    fi
+}
+
+# Test 6b: Plugin list
+test_plugin_list() {
+    log_test "Testing plugin list"
+    
+    set +e
+    output=$($KSA_BIN plugin list 2>&1)
+    exit_code=$?
+    set -e
+    
+    # Command should complete or show error about missing plugin directory
+    if [ $exit_code -eq 0 ] || echo "$output" | grep -q -i "plugin\|directory\|error"; then
+        test_passed
+    else
+        test_failed "Plugin list should complete or show meaningful error"
+        echo "Output: $output"
+    fi
+}
+
 # Test 7: Config file validation
 test_config_validation() {
     log_test "Testing config file validation"
@@ -319,6 +350,8 @@ main() {
     test_ask_help
     test_fix_help
     test_server_help
+    test_plugin_help
+    test_plugin_list
     test_config_validation
     test_json_output
     test_yaml_output

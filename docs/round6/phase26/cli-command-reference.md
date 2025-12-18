@@ -14,6 +14,7 @@
    - [ksa ask](#ksa-ask)
    - [ksa fix](#ksa-fix)
    - [ksa server](#ksa-server)
+   - [ksa plugin](#ksa-plugin)
    - [ksa monitor](#ksa-monitor)
    - [ksa alert](#ksa-alert)
    - [ksa version](#ksa-version)
@@ -516,6 +517,135 @@ Configuration: configs/config.yaml
 Server listening on http://0.0.0.0:8080
 API documentation: http://0.0.0.0:8080/docs
 Health check: http://0.0.0.0:8080/health
+```
+
+---
+
+## ksa plugin
+
+Manage KubeStack-AI plugins for middleware diagnostics and operations.
+
+**Synopsis**:
+```bash
+ksa plugin [command] [flags]
+```
+
+**Available Commands**:
+- `list` - List all available plugins
+- `info` - Show detailed information about a plugin
+- `enable` - Enable a plugin
+- `disable` - Disable a plugin
+
+### Subcommands
+
+#### ksa plugin list
+
+List all available plugins with their status.
+
+**Usage**:
+```bash
+ksa plugin list [flags]
+```
+
+**Flags**:
+- `-o, --output string` - Output format (text, json, yaml)
+
+**Examples**:
+```bash
+# List all plugins
+ksa plugin list
+
+# List plugins in JSON format
+ksa plugin list -o json
+```
+
+**Output**:
+```
+PLUGIN                 TYPE          VERSION  DESCRIPTION
+------                 ----          -------  -----------
+redis-diagnostics      diagnostics   1.0.0    Redis diagnostics and health checks
+mysql-diagnostics      diagnostics   1.0.0    MySQL diagnostics and query analysis
+kafka-diagnostics      diagnostics   1.0.0    Kafka cluster monitoring and diagnosis
+elasticsearch-diag     diagnostics   1.0.0    Elasticsearch cluster health analysis
+postgresql-diag        diagnostics   1.0.0    PostgreSQL performance diagnostics
+```
+
+#### ksa plugin info
+
+Show detailed information about a specific plugin.
+
+**Usage**:
+```bash
+ksa plugin info <plugin-name> [flags]
+```
+
+**Arguments**:
+- `<plugin-name>` - Name of the plugin (required)
+
+**Flags**:
+- `-o, --output string` - Output format (text, json, yaml)
+
+**Examples**:
+```bash
+# Show plugin information
+ksa plugin info redis-diagnostics
+
+# Show information in JSON format
+ksa plugin info redis-diagnostics -o json
+```
+
+**Output**:
+```
+Plugin: redis-diagnostics
+Type: diagnostics
+Version: 1.0.0
+Description: Redis diagnostics plugin for health checks, performance analysis, and troubleshooting
+```
+
+#### ksa plugin enable
+
+Enable a plugin to make it available for use.
+
+**Usage**:
+```bash
+ksa plugin enable <plugin-name>
+```
+
+**Arguments**:
+- `<plugin-name>` - Name of the plugin (required)
+
+**Examples**:
+```bash
+# Enable a plugin
+ksa plugin enable redis-diagnostics
+```
+
+**Output**:
+```
+Plugin 'redis-diagnostics' enabled successfully
+```
+
+#### ksa plugin disable
+
+Disable a plugin to prevent it from being used.
+
+**Usage**:
+```bash
+ksa plugin disable <plugin-name>
+```
+
+**Arguments**:
+- `<plugin-name>` - Name of the plugin (required)
+
+**Examples**:
+```bash
+# Disable a plugin
+ksa plugin disable redis-diagnostics
+```
+
+**Output**:
+```
+Plugin 'redis-diagnostics' disabled successfully
 
 Press Ctrl+C to stop
 ```

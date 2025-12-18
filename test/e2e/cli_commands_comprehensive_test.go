@@ -37,7 +37,7 @@ func TestAllCommandsHaveHelp(t *testing.T) {
 	assert.NotEmpty(t, rootCmd.Long, "Root command should have Long description")
 	
 	// Check all subcommands
-	expectedCommands := []string{"diagnose", "ask", "fix", "server", "version"}
+	expectedCommands := []string{"diagnose", "ask", "fix", "server", "plugin", "version"}
 	commands := rootCmd.Commands()
 	
 	commandMap := make(map[string]*cobra.Command)
