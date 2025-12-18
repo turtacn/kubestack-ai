@@ -1,0 +1,42 @@
+# Redis Middleware Connection Configuration Template
+#
+# This file provides configuration templates for connecting to Redis instances
+# in various modes (Standalone, Sentinel, Cluster) for diagnostic purposes.
+
+redis:
+  # Pre-configured Redis instances
+  instances:
+    # Example: Production Redis Cluster
+    production-cache:
+      type: redis
+      mode: cluster  # standalone / sentinel / cluster
+      endpoints:
+        - "redis-cluster-0.redis.svc.cluster.local:6379"
+        - "redis-cluster-1.redis.svc.cluster.local:6379"
+        - "redis-cluster-2.redis.svc.cluster.local:6379"
+      auth:
+        # Option 1: Direct password (not recommended for production)
+        # password: "your-password-here"
+        
+        # Option 2: Reference to Kubernetes Secret (recommended)
+        secret_ref: "redis-credentials"
+        secret_key: "password"
+      tls:
+        enabled: false
+      options:
+        pool_size: "10"
+        dial_timeout: "5s"
+        read_timeout: "3s"
+
+    # Example: Development Standalone Redis
+    development:
+      type: redis
+      mode: standalone
+      endpoints:
+        - "localhost:6379"
+      auth:
+        password: "devpassword"
+      tls:
+        enabled: false
+
+# Usage: ksa diagnose redis production-cache

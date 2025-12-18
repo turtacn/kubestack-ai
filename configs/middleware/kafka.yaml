@@ -1,0 +1,31 @@
+# Kafka Middleware Connection Configuration Template
+
+kafka:
+  instances:
+    production:
+      type: kafka
+      endpoints:
+        - "kafka-0.kafka.svc.cluster.local:9092"
+        - "kafka-1.kafka.svc.cluster.local:9092"
+        - "kafka-2.kafka.svc.cluster.local:9092"
+      auth:
+        mechanism: "SCRAM-SHA-512"  # PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512
+        secret_ref: "kafka-credentials"
+        username_key: "username"
+        password_key: "password"
+      tls:
+        enabled: true
+        ca_cert_ref: "kafka-ca-cert"
+      options:
+        client_id: "ksa-diagnostics"
+        version: "3.0.0"
+
+    development:
+      type: kafka
+      endpoints:
+        - "localhost:9092"
+      auth: {}
+      tls:
+        enabled: false
+
+# Usage: ksa diagnose kafka production

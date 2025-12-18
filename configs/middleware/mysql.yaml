@@ -1,0 +1,34 @@
+# MySQL Middleware Connection Configuration Template
+
+mysql:
+  instances:
+    production:
+      type: mysql
+      endpoints:
+        - "mysql-primary.mysql.svc.cluster.local:3306"
+      database: "information_schema"
+      auth:
+        secret_ref: "mysql-credentials"
+        username_key: "username"
+        password_key: "password"
+      tls:
+        enabled: true
+        ca_cert_ref: "mysql-ca-cert"
+      options:
+        charset: "utf8mb4"
+        parseTime: "true"
+        timeout: "10s"
+        readTimeout: "30s"
+
+    development:
+      type: mysql
+      endpoints:
+        - "localhost:3306"
+      database: "information_schema"
+      auth:
+        username: "root"
+        password: "password"
+      tls:
+        enabled: false
+
+# Usage: ksa diagnose mysql production
