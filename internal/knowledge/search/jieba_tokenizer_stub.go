@@ -34,11 +34,9 @@ func NewJiebaTokenizer() *JiebaTokenizer {
 }
 
 func (t *JiebaTokenizer) Tokenize(sentence []byte) analysis.TokenStream {
-	// Fallback to simple whitespace tokenization when CGO is disabled
-	result := make(analysis.TokenStream, 0)
-	// Simple split by spaces - not ideal but works without CGO
-	words := analysis.TokenStream{}
-	return words
+	// Fallback to empty tokenization when CGO is disabled
+	// Note: This is a stub implementation - full functionality requires CGO
+	return analysis.TokenStream{}
 }
 
 func (t *JiebaTokenizer) Free() {
