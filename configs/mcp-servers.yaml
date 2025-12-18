@@ -1,0 +1,131 @@
+# MCP Server Configuration Example
+# This file demonstrates how to configure MCP servers for KubeStack AI
+
+mcp:
+  # Enable auto-discovery of tools from MCP servers
+  auto_discover: true
+  
+  # Connection pool settings
+  pool:
+    # Maximum time a connection can be idle before cleanup
+    max_idle_time: 5m
+    # Interval for checking and cleaning up idle connections
+    cleanup_interval: 1m
+  
+  # List of MCP servers to connect to
+  servers:
+    # Filesystem server - provides file system operations
+    - id: filesystem
+      command: mcp-server-filesystem
+      args:
+        - --root
+        - /data
+        - --allow-write
+        - "false"
+      env:
+        - LOG_LEVEL=info
+    
+    # GitHub server - provides GitHub API operations
+    - id: github
+      command: mcp-server-github
+      args:
+        - --org
+        - my-organization
+      env:
+        - GITHUB_TOKEN=${GITHUB_TOKEN}
+        - GITHUB_API_URL=https://api.github.com
+    
+    # Slack server - provides Slack operations
+    - id: slack
+      command: mcp-server-slack
+      args: []
+      env:
+        - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+        - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+    
+    # Database server - provides database query operations
+    - id: database
+      command: mcp-server-postgres
+      args:
+        - --host
+        - localhost
+        - --port
+        - "5432"
+        - --database
+        - kubestack
+      env:
+        - PGUSER=admin
+        - PGPASSWORD=${DB_PASSWORD}
+        - PGSSLMODE=require
+    
+    # Custom Python server - example of custom MCP server
+    - id: custom-python
+      command: python
+      args:
+        - /path/to/custom_mcp_server.py
+      env:
+        - PYTHONPATH=/path/to/modules
+        - API_KEY=${CUSTOM_API_KEY}
+    
+    # Weather service - example external service integration
+    - id: weather
+      command: mcp-server-weather
+      args:
+        - --api-key
+        - ${WEATHER_API_KEY}
+        - --units
+        - metric
+      env: []
+
+# Global timeout settings
+timeout:
+  # Default timeout for tool calls
+  tool_call: 30s
+  # Timeout for connection initialization
+  connect: 10s
+  # Timeout for tool discovery
+  discovery: 15s
+
+# Logging configuration for MCP operations
+logging:
+  # Log level for MCP operations (debug, info, warn, error)
+  level: info
+  # Log MCP protocol messages
+  protocol_messages: false
+  # Log tool calls and results
+  tool_calls: true
+  # Log connection lifecycle events
+  connections: true
+
+# Security settings
+security:
+  # Validate tool schemas before registration
+  validate_schemas: true
+  # Maximum message size (in bytes)
+  max_message_size: 1048576  # 1MB
+  # Allowed tool name pattern (regex)
+  allowed_tool_pattern: "^[a-zA-Z0-9_-]+$"
+  # Sandbox tool execution
+  sandbox_enabled: false
+
+# Performance tuning
+performance:
+  # Enable connection pooling
+  pooling_enabled: true
+  # Maximum concurrent tool calls per server
+  max_concurrent_calls: 10
+  # Cache tool definitions
+  cache_tool_definitions: true
+  # Cache duration
+  cache_ttl: 1h
+
+# Error handling
+error_handling:
+  # Retry failed connections
+  retry_on_failure: true
+  # Maximum retry attempts
+  max_retries: 3
+  # Retry backoff (exponential)
+  retry_backoff: 1s
+  # Continue on server connection failure
+  continue_on_error: true
