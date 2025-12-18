@@ -1,0 +1,45 @@
+# Copyright © 2024 KubeStack-AI Authors
+# RabbitMQ middleware configuration template
+# Status: TODO - Implementation pending
+
+# TODO: Implement RabbitMQ plugin support
+# This configuration template is a placeholder for future RabbitMQ integration
+
+rabbitmq:
+  connection:
+    # RabbitMQ connection settings
+    host: "localhost"
+    port: 5672
+    # Management API
+    management_port: 15672
+    # Authentication
+    username: "guest"
+    password: "${RABBITMQ_PASSWORD}"
+    vhost: "/"
+    # Connection timeout
+    timeout: 10s
+  
+  monitoring:
+    # Metrics collection
+    collect_queue_stats: true
+    collect_exchange_stats: true
+    collect_connection_stats: true
+    collect_node_stats: true
+    # Collection interval
+    interval: 60s
+  
+  diagnosis:
+    # Health check configuration
+    health_check:
+      enabled: true
+      interval: 30s
+    # Performance thresholds
+    thresholds:
+      queue_depth_warning: 1000
+      queue_depth_critical: 5000
+      message_rate_warning: 1000
+      consumer_utilization_warning: 0.8
+      memory_usage_percent: 80
+
+# Note: This is a template and requires RabbitMQ plugin implementation
+# Tracked in future development phases

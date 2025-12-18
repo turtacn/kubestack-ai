@@ -1,0 +1,39 @@
+# Copyright © 2024 KubeStack-AI Authors
+# MongoDB middleware configuration template
+# Status: TODO - Implementation pending
+
+# TODO: Implement MongoDB plugin support
+# This configuration template is a placeholder for future MongoDB integration
+
+mongodb:
+  connection:
+    # MongoDB connection string
+    uri: "mongodb://localhost:27017"
+    # Connection pool settings
+    max_pool_size: 100
+    min_pool_size: 10
+    # Timeouts
+    connect_timeout: 10s
+    socket_timeout: 30s
+  
+  monitoring:
+    # Metrics collection
+    collect_server_status: true
+    collect_db_stats: true
+    collect_collection_stats: true
+    # Collection interval
+    interval: 60s
+  
+  diagnosis:
+    # Health check configuration
+    health_check:
+      enabled: true
+      interval: 30s
+    # Performance thresholds
+    thresholds:
+      slow_query_ms: 100
+      connection_pool_usage_percent: 80
+      replication_lag_seconds: 10
+
+# Note: This is a template and requires MongoDB plugin implementation
+# Tracked in future development phases

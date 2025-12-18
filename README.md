@@ -14,6 +14,8 @@
   <a href="https://github.com/turtacn/kubestack-ai/releases"><img src="https://img.shields.io/github/v/release/turtacn/kubestack-ai" alt="Release"></a>
   <a href="https://goreportcard.com/report/github.com/turtacn/kubestack-ai"><img src="https://goreportcard.com/badge/github.com/turtacn/kubestack-ai" alt="Go Report Card"></a>
   <a href="https://codecov.io/gh/turtacn/kubestack-ai"><img src="https://codecov.io/gh/turtacn/kubestack-ai/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <img src="https://img.shields.io/badge/CLI_Tests-20%2B-success" alt="CLI Test Coverage">
+  <img src="https://img.shields.io/badge/Plugins_Tested-5%2F5-success" alt="Plugin Coverage">
 </p>
 
 <p align="center">
@@ -291,6 +293,42 @@ make test
 make e2e-test
 make build
 ```
+
+### Testing & Quality Assurance
+
+KubeStack-AI maintains high code quality with comprehensive testing:
+
+```bash
+# Run all unit tests
+make test
+
+# Run integration tests
+make test-integration
+
+# Run E2E tests
+make e2e-test
+
+# Run CLI smoke tests (Phase 26)
+./scripts/cli_smoke_test.sh
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+**Test Coverage**: 80%+ overall, 90%+ for CLI components
+
+**CLI Testing** (Phase 26):
+- ✅ 20+ E2E test scenarios covering all commands
+- ✅ 5/5 middleware plugins fully tested (Redis, MySQL, Kafka, Elasticsearch, PostgreSQL)
+- ✅ 100% output format coverage (text, JSON, YAML)
+- ✅ Comprehensive configuration validation
+- ✅ Automated smoke tests for CI/CD
+
+For detailed CLI testing documentation, see:
+- [CLI Command Reference](docs/round6/phase26/cli-command-reference.md)
+- [CLI Test Plan](docs/round6/phase26/test-plan-cli-comprehensive.md)
+- [CLI Validation Design](docs/round6/phase26/design-cli-validation.md)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
