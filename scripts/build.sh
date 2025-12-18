@@ -104,7 +104,7 @@ main() {
 
     # Optional: Build the Docker image. Uncomment to enable.
     # if ! command -v docker &> /dev/null; then
-    //     echo "WARN: docker not found, skipping docker image build."
+    #     echo "WARN: docker not found, skipping docker image build."
     # else
     #     build_docker
     # fi
