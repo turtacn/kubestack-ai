@@ -151,6 +151,12 @@ ksa plugin list
 
 # Get plugin information
 ksa plugin info redis-diagnostics
+
+# Search knowledge base for solutions
+ksa kb search "Redis OOM"
+
+# Get specific KB entry
+ksa kb get kb-redis-001
 ```
 
 ### Web Interface

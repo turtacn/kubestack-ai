@@ -177,7 +177,52 @@ DIAG_ID=$(./ksa diagnose redis --instance localhost:6379 -o json | jq -r '.id')
 ./ksa fix --id $DIAG_ID --dry-run
 ```
 
-### 4. Supported Middleware
+### 4. Search Knowledge Base
+
+Search the built-in knowledge base for solutions and best practices:
+
+```bash
+# Search for Redis memory issues
+./ksa kb search "Redis OOM"
+
+# Search with severity filter
+./ksa kb search "memory" --severity critical
+
+# Search with middleware filter
+./ksa kb search "performance" --middleware redis
+
+# Get detailed entry
+./ksa kb get kb-redis-001
+
+# JSON output
+./ksa kb search "optimization" -o json
+
+# Update knowledge base
+./ksa kb update
+```
+
+### 5. Manage Plugins
+
+View and manage diagnostic plugins:
+
+```bash
+# List all plugins
+./ksa plugin list
+
+# Get plugin details
+./ksa plugin info redis-diagnostics
+
+# JSON output
+./ksa plugin list -o json
+
+# Enable a plugin
+./ksa plugin enable redis-diagnostics
+
+# Disable a plugin
+./ksa plugin disable redis-diagnostics
+```
+
+### 6. Supported Middleware
 
 Currently supported middleware types:
 - **Redis** - In-memory data store
@@ -189,7 +234,7 @@ Currently supported middleware types:
 Coming soon:
 - MongoDB, RabbitMQ, MinIO, Prometheus, ClickHouse
 
-### 5. Complete CLI Reference
+### 7. Complete CLI Reference
 
 For detailed information about all commands, flags, and options, see:
 - [CLI Command Reference](docs/round6/phase26/cli-command-reference.md)
