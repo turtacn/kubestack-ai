@@ -9,12 +9,19 @@ internal/knowledge/search/jieba_tokenizer.go:33:18: undefined: gojieba.NewJieba
 
 This error occurs because `gojieba` requires CGO (C bindings) and C++ dependencies to compile.
 
-### Additional Error Fixed
+### Additional Errors Fixed
+
+**Error #2: Unused variable in stub**
 ```
 internal/knowledge/search/jieba_tokenizer_stub.go:38:2: declared and not used: result
 ```
+Fixed by simplifying the return statement.
 
-This was caused by an unused variable in the stub implementation. Fixed by simplifying the return statement.
+**Error #3: Config unmarshal error**
+```
+'alert_rules' expected a map or struct, got "slice"
+```
+Fixed by changing `AlertRules` field type from `AlertRulesConfig` struct to `[]AlertRule` slice to match the YAML structure in `configs/alert_rules.yaml`.
 
 ## Solution
 Added build tags to make gojieba optional:
@@ -88,6 +95,8 @@ If Chinese text search is critical, use CGO-enabled builds.
 
 1. `internal/knowledge/search/jieba_tokenizer.go` - Added `//go:build cgo` tag
 2. `internal/knowledge/search/jieba_tokenizer_stub.go` - Created stub implementation (fixed unused variable error)
+3. `internal/common/config/config.go` - Fixed alert_rules config structure
+4. `scripts/build.sh` - Fixed comment syntax (line 107)
 
 ## Testing
 
