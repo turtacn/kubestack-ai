@@ -132,7 +132,9 @@ func (m *pluginManager) Shutdown() {
 func (m *pluginManager) CollectData(ctx context.Context, req *models.DiagnosisRequest) (*models.CollectedData, error) {
 	pluginName := ""
 	if req.TargetMiddleware.String() != "Unknown" {
-		pluginName = strings.ToLower(req.TargetMiddleware.String())
+		// Map middleware type to plugin name (e.g., "Redis" -> "redis-diagnostics")
+		middlewareName := strings.ToLower(req.TargetMiddleware.String())
+		pluginName = middlewareName + "-diagnostics"
 	} else {
 		// Fallback logic
 		return nil, fmt.Errorf("could not determine plugin name from request")

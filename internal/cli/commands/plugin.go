@@ -245,13 +245,13 @@ func getAvailablePlugins() []PluginInfo {
 			Description: "Kafka cluster monitoring and diagnosis",
 		},
 		{
-			Name:        "elasticsearch-diag",
+			Name:        "elasticsearch-diagnostics",
 			Type:        "diagnostics",
 			Version:     "1.0.0",
 			Description: "Elasticsearch cluster health analysis",
 		},
 		{
-			Name:        "postgresql-diag",
+			Name:        "postgresql-diagnostics",
 			Type:        "diagnostics",
 			Version:     "1.0.0",
 			Description: "PostgreSQL performance diagnostics",
