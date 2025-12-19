@@ -68,7 +68,7 @@ Specify a configuration file path.
 
 **Usage**:
 ```bash
-ksa --config /path/to/config.yaml diagnose redis --instance localhost:6379
+ksa --config /path/to/config.yaml diagnose -t redis --instance localhost:6379
 ```
 
 ### --log-level
@@ -81,7 +81,7 @@ Set the logging level.
 
 **Usage**:
 ```bash
-ksa --log-level debug diagnose redis --instance localhost:6379
+ksa --log-level debug diagnose -t redis --instance localhost:6379
 ```
 
 ### --output, -o
@@ -112,6 +112,8 @@ ksa [command]
 - `diagnose` - Diagnose middleware issues
 - `ask` - Ask questions about middleware
 - `fix` - Apply fixes for diagnosed issues
+- `kb` - Search and manage the KubeStack-AI knowledge base
+- `plugin` - Manage KubeStack-AI plugins for middleware diagnostics and operations
 - `server` - Start the API server
 - `monitor` - Monitor middleware instances
 - `alert` - Manage alert rules
